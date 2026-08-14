@@ -869,13 +869,18 @@ def alertas():
 
 
 @app.get("/cesta")
-def cesta(authorization: str | None = Header(None)):
+def cesta(authorization: str | None = Header(None), mercados: str | None = None):
     """Compara o custo TOTAL da lista (do usuário logado) em cada mercado, com cobertura e a
-    'melhor divisão' item a item. Grátis recebe só os NÚMEROS; o "onde" é trancado no servidor."""
+    'melhor divisão' item a item. Grátis recebe só os NÚMEROS; o "onde" é trancado no servidor.
+
+    `mercados` (slugs separados por vírgula) restringe TUDO a esses mercados — é o modo
+    'Meus mercados': ranking, menor preço por item, divisão e economia passam a considerar
+    só eles. Sem o parâmetro, compara todos (modo 'Todos')."""
     conn = _conn()
     try:
         uid = _uid_do_header(authorization)
         premium = _premium(conn, uid)
+        filtro_slugs = {s.strip() for s in (mercados or "").split(",") if s.strip()} or None
         itens_lista = conn.execute(
             "SELECT ean, nome, quantidade, preco_alvo, comprado FROM lista "
             "WHERE user_id = ? ORDER BY criado_em DESC", (uid,)
@@ -883,6 +888,8 @@ def cesta(authorization: str | None = Header(None)):
         mercados = conn.execute(
             "SELECT id, slug, nome, cor_badge FROM mercados WHERE ativo = 1"
         ).fetchall()
+        if filtro_slugs:   # modo "Meus mercados": só os favoritos do usuário entram
+            mercados = [m for m in mercados if m["slug"] in filtro_slugs]
         n_itens = len(itens_lista)
         n_alertas = 0
         divisao: dict[str, dict] = {}  # estratégia "dividido": slug -> {itens, subtotal}
@@ -912,6 +919,8 @@ def cesta(authorization: str | None = Header(None)):
                 nome_prod = prod["nome_canonico"] if prod else ean
                 marca_prod = prod["marca"] if prod else None
                 img_prod = prod["imagem_url"] if prod else None
+            if filtro_slugs:   # modo "Meus mercados": só os favoritos entram na comparação do item
+                ranking = [r for r in ranking if r["mercado_slug"] in filtro_slugs]
             por_mercado = {r["mercado_slug"]: r for r in ranking}
             # total por mercado
             slugs_com = set()

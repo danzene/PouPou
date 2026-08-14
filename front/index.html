@@ -545,6 +545,14 @@
   .onb-check svg{ width:12px; height:12px; }
   .onb-tile.on .onb-check{ display:flex; }
   .onb-skip{ display:block; width:100%; margin-top:8px; background:none; border:none; color:var(--mut); font-size:13px; font-weight:600; cursor:pointer; padding:6px; }
+  /* toggle "Meus mercados / Todos" na lista */
+  .lista-modo{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:2px 0 14px; }
+  .lm-seg{ display:inline-flex; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-pill); padding:3px; gap:2px; }
+  .lm-seg button{ display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 15px; border:none; background:transparent; color:var(--mut); font-weight:700; font-size:13px; border-radius:var(--r-pill); cursor:pointer; }
+  .lm-seg button svg{ width:14px; height:14px; }
+  .lm-seg button.on{ background:var(--surface); color:var(--green-dark); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .lm-hint{ font-size:12px; color:var(--mut); text-align:center; }
+  .lm-empty{ background:var(--surface-2); border:1px dashed var(--line); border-radius:var(--r-card); padding:16px; text-align:center; color:var(--mut); font-size:14px; margin-bottom:14px; }
   .fav-star{ display:inline-flex; vertical-align:-2px; } .fav-star svg{ width:14px; height:14px; color:var(--yellow); fill:var(--yellow); }
 
   /* preço ancorado + trial + segmentado + ROI */
@@ -1303,11 +1311,17 @@ function cardItemCesta(it){
     </div>
   </div>`;
 }
+/* modo da lista: "meus" (só os mercados favoritos) x "todos". Só faz sentido com favoritos. */
+const LISTA_MODO_KEY="mb_lista_modo";
+function listaModo(){ return favMercados().length?lsGet(LISTA_MODO_KEY,"meus"):"todos"; }
+function setListaModo(m){ lsSet(LISTA_MODO_KEY,m); loadCesta(); }
 async function loadCesta(){
   catAtiva=null; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","true");
   saida.innerHTML=`<p class="state">Montando sua lista…</p>`; ctx.textContent="";
   try{
-    const d=await fetchAuth(`${API}/cesta`).then(r=>r.json());
+    const favs=favMercados(), modo=listaModo();
+    const qs=(modo==="meus"&&favs.length)?`?mercados=${encodeURIComponent(favs.join(","))}`:"";
+    const d=await fetchAuth(`${API}/cesta${qs}`).then(r=>r.json());
     CESTA_EANS=new Set((d.itens||[]).map(i=>i.ean));
     if(!d.n_itens){ ctx.textContent="";
       saida.innerHTML=estaLogado()
@@ -1351,10 +1365,17 @@ async function loadCesta(){
       miolo=vs+bloqueado(otimBloco+rankingMercados(d), `Desbloqueie pra ${teaser}`,
         `Você já vê <b>quanto</b> dá pra economizar e a loja única mais barata. O PouPou+ mostra <b>em qual mercado</b> pegar cada item e <b>qual</b> sai mais barato no total.`);
     }
+    // toggle "Meus mercados / Todos" (só aparece se a pessoa tem favoritos)
+    const semMeus=(modo==="meus"&&favs.length&&!(d.mercados||[]).some(m=>m.viavel));
+    const modoToggle=favs.length?`<div class="lista-modo"><div class="lm-seg">
+        <button type="button" class="${modo==='meus'?'on':''}" onclick="setListaModo('meus')">${ic('star')} Meus mercados</button>
+        <button type="button" class="${modo==='todos'?'on':''}" onclick="setListaModo('todos')">Todos os mercados</button>
+      </div>${modo==='meus'?`<div class="lm-hint">Comparando só os ${favs.length} mercado${favs.length>1?"s":""} que você marcou como seus.</div>`:""}</div>`:"";
+    if(semMeus){ miolo=`<div class="lm-empty">Nenhum dos seus mercados cobre esta feira o suficiente pra comparar. Toque em <b>Todos os mercados</b> acima pra ver todas as lojas.</div>`; }
     const pctC=d.n_itens?Math.round((d.n_comprados||0)/d.n_itens*100):0;
     const prog=`<div class="li-progress"><span class="txt">${d.n_comprados||0} de ${d.n_itens} no carrinho</span><div class="bar"><span style="width:${pctC}%"></span></div></div>`;
     const listaTitle=`<div class="sec-title lista-hd"><span>Minha lista <span class="muted">${d.n_itens} ${d.n_itens===1?"produto":"produtos"} · marque o que já pegou</span></span><button class="li-esvaziar" type="button" onclick="esvaziarLista()">${ic("trash")} Esvaziar</button></div>`;
-    saida.innerHTML=trialBanner+banner+ecoBox+miolo+listaTitle+prog+d.itens.map(cardItemCesta).join("");
+    saida.innerHTML=trialBanner+banner+modoToggle+ecoBox+miolo+listaTitle+prog+d.itens.map(cardItemCesta).join("");
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar a lista.</p>`; }
 }
 

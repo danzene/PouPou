@@ -604,6 +604,11 @@
   :root[data-theme="dark"] .clube-chip .cp{ color:#ffe7ad; background:#3a2e0e; }
   .clube-chip .cn{ font-size:11px; font-weight:700; color:var(--mut); background:var(--surface-2); border-radius:var(--r-pill); min-width:20px; text-align:center; padding:1px 6px; }
   .clube-prog{ font-size:13px; color:var(--mut); margin:0 0 12px; }
+  .lista-hd{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .li-esvaziar{ flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--mut); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-pill); padding:5px 12px; cursor:pointer; }
+  .li-esvaziar:hover{ color:var(--red); border-color:var(--red); }
+  .li-esvaziar svg{ width:14px; height:14px; }
+  .sub.basica[aria-pressed="true"]{ background:var(--green); border-color:var(--green); color:var(--on-green); }
 </style>
 </head>
 <body>
@@ -1089,6 +1094,26 @@ function renderClube(){
     ${cur?`<div class="clube-prog">Ofertas <b>${esc(cur.programa)}</b> do <b>${esc(cur.mercado)}</b></div>`:""}
     <div class="per-list">${its.map(cardOferta).join("")}</div>`;
 }
+/* ---------- Cesta Básica: os itens do dia a dia, prontos pra montar a feira ---------- */
+let BASICA_ITENS=[];
+async function loadCestaBasica(){ catAtiva="fresco:basica"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
+  saida.innerHTML=`<p class="state">Montando a cesta básica…</p>`; ctx.textContent="";
+  try{ const d=await fetch(`${API}/cesta-basica`).then(r=>r.json());
+    BASICA_ITENS=d.itens||[];
+    ctx.textContent=`${BASICA_ITENS.length} itens essenciais`;
+    if(!BASICA_ITENS.length){ saida.innerHTML=`<p class="state"><span class="big">${ic("cart")}</span>Ainda montando a cesta básica.</p>`; return; }
+    saida.innerHTML=`<div class="sec-title">${ic("cart")} Cesta básica <span class="muted">o essencial do dia a dia, presente em quase todas as lojas</span></div>
+      <p class="per-nota">Uma feira pronta com o básico. Toque em <b>Adicionar tudo</b> pra montar sua lista num toque, ou item por item.</p>
+      <button class="btn-primary" id="btnAddBasica" style="width:auto;padding:0 20px;margin:0 0 16px" onclick="addCestaBasica(this)">${ic("plus")} Adicionar tudo à minha feira</button>
+      <div class="grid">${BASICA_ITENS.map(cardProduto).join("")}</div>`;
+  }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar a cesta básica.</p>`; } }
+async function addCestaBasica(btn){
+  if(!estaLogado()){ abrirLogin(()=>addCestaBasica(btn)); return; }
+  if(!BASICA_ITENS.length) return;
+  btn.disabled=true; btn.textContent="Adicionando…";
+  for(const p of BASICA_ITENS){ if(await listaSet(p.ean,{quantidade:1,comprado:false})) CESTA_EANS.add(p.ean); }
+  atualizarBadge(); btn.textContent="✓ Cesta básica na sua feira";
+}
 let FRESCOS_STATE={its:[],nome:"",slug:"",ord:"rel"};
 const FRESCOS_ORD=[["rel","Mais relevante"],["asc","Menor preço"],["desc","Maior preço"]];
 function ordenarFrescos(its,ord){
@@ -1143,7 +1168,23 @@ async function addCesta(ean,btn){
 }
 async function setQtd(ean,q){ q=parseInt(q,10); if(!q||q<1) q=1; if(q>999) q=999; await listaSet(ean,{quantidade:q}); loadCesta(); }
 async function setAlvo(ean,val){ const v=val===""?null:parseFloat(val); await listaSet(ean,{preco_alvo:(v==null||isNaN(v))?null:v}); loadCesta(); }
-async function removerCesta(ean){ await listaDel(ean); CESTA_EANS.delete(ean); loadCesta(); atualizarBadge(); }
+async function removerCesta(ean,el){
+  await listaDel(ean); CESTA_EANS.delete(ean); atualizarBadge();
+  // remove a linha NA HORA (sem re-renderizar tudo) -> não pula pro topo, mantém o scroll
+  const li=el?el.closest(".li"):document.querySelector(`.li[data-ean="${(window.CSS&&CSS.escape)?CSS.escape(ean):ean}"]`);
+  if(li) li.remove();
+  const restantes=document.querySelectorAll(".li").length;
+  if(!restantes){ loadCesta(); return; }   // esvaziou -> mostra o estado vazio
+  const done=document.querySelectorAll(".li.done").length;
+  const pt=document.querySelector(".li-progress .txt"); if(pt) pt.textContent=`${done} de ${restantes} no carrinho`;
+  const pb=document.querySelector(".li-progress .bar span"); if(pb) pb.style.width=(restantes?Math.round(done/restantes*100):0)+"%";
+}
+async function esvaziarLista(){
+  if(!SESSAO) return;
+  if(!confirm("Esvaziar toda a sua lista? Isso remove todos os itens.")) return;
+  try{ await sb.from("lista").delete().eq("user_id",SESSAO.user.id); }catch(e){}
+  CESTA_EANS=new Set(); atualizarBadge(); loadCesta();
+}
 async function addFrescoBtn(btn){
   if(!estaLogado()){ abrirLogin(()=>addFrescoBtn(btn)); return; }
   const chave=btn.dataset.chave, nome=btn.dataset.nome;
@@ -1218,7 +1259,7 @@ function cardItemCesta(it){
   const queda=(it.economia_dias_item>0&&it.preco_ref_dias)?`<span class="queda">↓ caiu de ${brl(it.preco_ref_dias)}</span>`:"";
   const alertaOn=it.disparado;
   const tagFresco=it.tipo==="fresco"?`<span class="li-tag">fresco · por peso</span>`:"";
-  return `<div class="li ${it.comprado?"done":""}">
+  return `<div class="li ${it.comprado?"done":""}" data-ean="${esc(it.ean)}">
     <input class="chk" type="checkbox" ${it.comprado?"checked":""} aria-label="Marcar ${esc(it.nome)} como já comprado" onchange="toggleComprado('${it.ean}',this.checked,this)">
     ${thumb(it.imagem_url,it.nome)}
     <div class="li-body">
@@ -1240,7 +1281,7 @@ function cardItemCesta(it){
           aria-label="Quantidade de ${esc(it.nome)}" onchange="setQtd('${it.ean}',this.value)" onkeydown="if(event.key==='Enter'){setQtd('${it.ean}',this.value)}">
         <button type="button" aria-label="Aumentar 1" onclick="setQtd('${it.ean}',${it.quantidade+1})">${ic("plus")}</button>
       </div>
-      <button class="li-rm" type="button" aria-label="Remover ${esc(it.nome)} da lista" onclick="removerCesta('${it.ean}')">${ic("trash")}</button>
+      <button class="li-rm" type="button" aria-label="Remover ${esc(it.nome)} da lista" onclick="removerCesta('${it.ean}',this)">${ic("trash")}</button>
     </div>
   </div>`;
 }
@@ -1294,7 +1335,7 @@ async function loadCesta(){
     }
     const pctC=d.n_itens?Math.round((d.n_comprados||0)/d.n_itens*100):0;
     const prog=`<div class="li-progress"><span class="txt">${d.n_comprados||0} de ${d.n_itens} no carrinho</span><div class="bar"><span style="width:${pctC}%"></span></div></div>`;
-    const listaTitle=`<div class="sec-title">Minha lista <span class="muted">${d.n_itens} ${d.n_itens===1?"produto":"produtos"} · marque o que já pegou</span></div>`;
+    const listaTitle=`<div class="sec-title lista-hd"><span>Minha lista <span class="muted">${d.n_itens} ${d.n_itens===1?"produto":"produtos"} · marque o que já pegou</span></span><button class="li-esvaziar" type="button" onclick="esvaziarLista()">${ic("trash")} Esvaziar</button></div>`;
     saida.innerHTML=trialBanner+banner+ecoBox+miolo+listaTitle+prog+d.itens.map(cardItemCesta).join("");
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar a lista.</p>`; }
 }
@@ -1570,9 +1611,11 @@ function renderFrescos(lista){
   subEl.hidden=false;
   const oferta=`<button class="sub oferta" data-slug="fresco:ofertas" aria-pressed="false">${ic("cat_oferta")} Ofertas</button>`;
   const clube=`<button class="sub clube" data-slug="fresco:clube" aria-pressed="false">${ic("crown")} Clube</button>`;
+  const basica=`<button class="sub basica" data-slug="fresco:basica" aria-pressed="false">${ic("cart")} Cesta básica</button>`;
   const cats=lista.map(c=>`<button class="sub" data-slug="fresco:${c.slug}" aria-pressed="false">${ic(FRESCO_ICON[c.slug]||"cat_outros")} ${esc(c.nome)}</button>`).join("");
-  subEl.innerHTML=`<span class="lbl">Frescos e ofertas</span>${oferta}${clube}${cats}`;
+  subEl.innerHTML=`<span class="lbl">Frescos e ofertas</span>${basica}${oferta}${clube}${cats}`;
   subEl.querySelectorAll(".sub").forEach(b=>{
+    if(b.dataset.slug==="fresco:basica"){ b.addEventListener("click",loadCestaBasica); return; }
     if(b.dataset.slug==="fresco:ofertas"){ b.addEventListener("click",loadOfertas); return; }
     if(b.dataset.slug==="fresco:clube"){ b.addEventListener("click",loadClube); return; }
     const c=lista.find(x=>`fresco:${x.slug}`===b.dataset.slug);

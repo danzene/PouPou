@@ -220,6 +220,50 @@ def _produto_dict(conn: sqlite3.Connection, prod: sqlite3.Row, com_sparkline: bo
     }
 
 
+# Cesta básica: staples do dia a dia. Pra cada termo, pega o produto presente no MAIOR número
+# de mercados (comparável em quase todas) e mais barato — pronto pra montar a feira num toque.
+CESTA_BASICA_TERMOS = [
+    ("Arroz", "arroz"), ("Feijão", "feijao"), ("Óleo de soja", "oleo de soja"),
+    ("Açúcar", "acucar refinado"), ("Café", "cafe"), ("Leite", "leite integral"),
+    ("Macarrão", "macarrao"), ("Farinha de trigo", "farinha de trigo"),
+    ("Sal", "sal refinado"), ("Margarina", "margarina"),
+    ("Extrato de tomate", "extrato de tomate"), ("Biscoito", "biscoito"),
+    ("Sabão em pó", "sabao em po"), ("Detergente", "detergente"),
+    ("Papel higiênico", "papel higienico"),
+]
+
+
+@app.get("/cesta-basica")
+def cesta_basica_itens():
+    """Itens de cesta básica: pra cada um, o produto presente em MAIS mercados (comparável em
+    quase todas) e mais barato. Uma feira pronta com o essencial do dia a dia."""
+    conn = _conn()
+    try:
+        itens, vistos = [], set()
+        for rotulo, termo in CESTA_BASICA_TERMOS:
+            base = database.normalizar_nome(termo)
+            padrao, inicio = f"%{base}%", f"{base}%"
+            # prioriza quem COMEÇA com o termo (Arroz... > Macarrão de Arroz), depois quem está
+            # em MAIS mercados (comparável em quase todas), depois o mais barato.
+            r = conn.execute(
+                """SELECT ean, nome_canonico, marca, categoria, unidade, qtd_embalagem,
+                          imagem_url, n_mercados
+                   FROM produtos
+                   WHERE lower(unaccent(nome_canonico)) LIKE ? AND n_mercados > 0
+                   ORDER BY (lower(unaccent(nome_canonico)) LIKE ?) DESC,
+                            n_mercados DESC, menor_preco ASC LIMIT 1""",
+                (padrao, inicio),
+            ).fetchone()
+            if r and r["ean"] not in vistos:
+                vistos.add(r["ean"])
+                d = _produto_dict(conn, r, com_sparkline=False)
+                d["rotulo_basico"] = rotulo
+                itens.append(d)
+        return {"itens": itens, "n": len(itens)}
+    finally:
+        conn.close()
+
+
 @app.get("/categorias")
 def categorias():
     conn = _conn()

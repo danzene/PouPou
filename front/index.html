@@ -1117,25 +1117,35 @@ async function loadFrescos(slug,nome){ catAtiva=`fresco:${slug}`; marcarNav(); $
     renderFrescosCards();
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar.</p>`; } }
 
-/* ---------- cesta / lista de compras ---------- */
+/* ---------- cesta / feira do usuário (persistida no Supabase, com RLS por dono) ---------- */
 let CESTA_EANS=new Set();
-async function addCesta(ean,btn){
-  try{ await fetch(`${API}/lista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ean})});
-    CESTA_EANS.add(ean); btn.textContent="✓"; btn.classList.add("in"); atualizarBadge();
-  }catch(e){ btn.textContent="!"; }
+async function tokenAtual(){ if(!sb||!SESSAO) return null; try{ const {data}=await sb.auth.getSession(); return data.session?data.session.access_token:null; }catch(e){ return null; } }
+// fetch com o token do usuário no header (o /cesta lê a feira dele + aplica a trava no servidor)
+async function fetchAuth(url,opts){ opts=opts||{}; const t=await tokenAtual(); opts.headers=Object.assign({},opts.headers||{},t?{Authorization:"Bearer "+t}:{}); return fetch(url,opts); }
+// upsert/delete de um item da feira, direto no Supabase (RLS garante que é só a do dono)
+async function listaSet(ean,campos){
+  if(!sb||!SESSAO) return false;
+  const {error}=await sb.from("lista").upsert(Object.assign({user_id:SESSAO.user.id,ean},campos),{onConflict:"user_id,ean"});
+  if(error) console.warn("lista upsert:",error.message);
+  return !error;
 }
-async function setQtd(ean,q){ q=parseInt(q,10); if(!q||q<1) q=1; if(q>999) q=999;
-  await fetch(`${API}/lista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ean,quantidade:q})});
-  loadCesta(); }
-async function setAlvo(ean,val){ const v=val===""?null:parseFloat(val);
-  await fetch(`${API}/lista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ean,preco_alvo:v})});
-  loadCesta(); }
-async function removerCesta(ean){ await fetch(`${API}/lista/${encodeURIComponent(ean)}`,{method:"DELETE"}); CESTA_EANS.delete(ean); loadCesta(); atualizarBadge(); }
+async function listaDel(ean){ if(sb&&SESSAO) await sb.from("lista").delete().eq("user_id",SESSAO.user.id).eq("ean",ean); }
+
+async function addCesta(ean,btn){
+  if(!estaLogado()){ abrirLogin(()=>addCesta(ean,btn)); return; }   // feira exige conta (força cadastro)
+  const ok=await listaSet(ean,{quantidade:1,comprado:false});
+  if(ok){ CESTA_EANS.add(ean); if(btn){ btn.textContent="✓"; btn.classList.add("in"); } atualizarBadge(); }
+  else if(btn){ btn.textContent="!"; }
+}
+async function setQtd(ean,q){ q=parseInt(q,10); if(!q||q<1) q=1; if(q>999) q=999; await listaSet(ean,{quantidade:q}); loadCesta(); }
+async function setAlvo(ean,val){ const v=val===""?null:parseFloat(val); await listaSet(ean,{preco_alvo:(v==null||isNaN(v))?null:v}); loadCesta(); }
+async function removerCesta(ean){ await listaDel(ean); CESTA_EANS.delete(ean); loadCesta(); atualizarBadge(); }
 async function addFrescoBtn(btn){
+  if(!estaLogado()){ abrirLogin(()=>addFrescoBtn(btn)); return; }
   const chave=btn.dataset.chave, nome=btn.dataset.nome;
-  try{ await fetch(`${API}/lista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fresco:chave,nome})});
-    CESTA_EANS.add("f:"+chave); btn.textContent="✓ na lista"; btn.classList.add("in"); atualizarBadge();
-  }catch(e){ btn.textContent="!"; }
+  const ok=await listaSet("f:"+chave,{nome,quantidade:1,comprado:false});
+  if(ok){ CESTA_EANS.add("f:"+chave); btn.textContent="✓ na lista"; btn.classList.add("in"); atualizarBadge(); }
+  else{ btn.textContent="!"; }
 }
 function toggleAlerta(btn){ const ed=btn.nextElementSibling, open=ed.hasAttribute("hidden");
   ed.toggleAttribute("hidden",!open); btn.setAttribute("aria-expanded",String(open));
@@ -1145,7 +1155,7 @@ async function toggleComprado(ean,val,el){
   const done=document.querySelectorAll(".li.done").length, total=document.querySelectorAll(".li").length;
   const pt=document.querySelector(".li-progress .txt"); if(pt) pt.textContent=`${done} de ${total} no carrinho`;
   const pb=document.querySelector(".li-progress .bar span"); if(pb) pb.style.width=(total?Math.round(done/total*100):0)+"%";
-  try{ await fetch(`${API}/lista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ean,comprado:val})}); }catch(e){}
+  await listaSet(ean,{comprado:!!val});
 }
 
 /* explica, item a item, de onde vem cada real economizado */
@@ -1243,15 +1253,17 @@ async function loadCesta(){
   catAtiva=null; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","true");
   saida.innerHTML=`<p class="state">Montando sua lista…</p>`; ctx.textContent="";
   try{
-    const d=await fetch(`${API}/cesta`).then(r=>r.json());
-    CESTA_EANS=new Set(d.itens.map(i=>i.ean));
+    const d=await fetchAuth(`${API}/cesta`).then(r=>r.json());
+    CESTA_EANS=new Set((d.itens||[]).map(i=>i.ean));
     if(!d.n_itens){ ctx.textContent="";
-      saida.innerHTML=`<p class="state"><span class="big">${ic("cart")}</span>Sua lista está vazia.<br>Busque produtos e toque em <b>+</b> para comparar o total em cada mercado.</p>`;
+      saida.innerHTML=estaLogado()
+        ? `<p class="state"><span class="big">${ic("cart")}</span>Sua feira está vazia.<br>Busque produtos e toque em <b>+</b> para montar sua lista.</p>`
+        : `<p class="state"><span class="big">${ic("user")}</span>Entre pra montar sua feira e ver quanto dá pra economizar.<br><button class="btn-primary" style="margin-top:14px;width:auto;padding:0 20px" onclick="abrirLogin(()=>loadCesta())">Entrar / criar conta</button></p>`;
       return; }
     ctx.textContent="";
     const banner=d.n_alertas>0?`<div class="alerta-banner">${ic("bell")} ${d.n_alertas} item(ns) no preço-alvo ou abaixo</div>`:"";
     const eMerc=d.economia_mercados||0, eDias=d.economia_dias||0, heroVal=eMerc>0?eMerc:eDias;
-    const prem=acessoPremium();
+    const prem=(d.premium!==undefined)?d.premium:acessoPremium();  // verdade do servidor
     const trialBanner=trialAtivo()?`<div class="trial-banner">${ic("crown")} Acesso completo liberado — faltam <b>${diasRestantesTrial()} dia(s)</b> do seu período grátis</div>`:"";
     const ecoBox=(eMerc>0||eDias>0)?`<div class="eco">
         <div class="eco-lbl">Você pode economizar</div>
@@ -1295,7 +1307,7 @@ async function loadCesta(){
 }
 
 async function atualizarBadge(){
-  try{ const d=await fetch(`${API}/cesta`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/cesta`).then(r=>r.json());
     $("#cestaN").textContent=d.n_itens; $("#cestaAlert").hidden=(d.n_alertas||0)===0;
     $("#cfN").textContent=d.n_itens; $("#cestaFixa").hidden=(d.n_itens||0)===0;
     CESTA_EANS=new Set((d.itens||[]).map(i=>i.ean));
@@ -1411,7 +1423,7 @@ async function authSubmit(ev){ ev.preventDefault();
     SESSAO=res.data.session;
     await carregarPerfil();
     const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
-    fecharLogin(); atualizarContaUI();
+    fecharLogin(); atualizarContaUI(); atualizarBadge();   // carrega a feira do usuário
     if(cb) cb();
   }catch(e){ err.textContent="Erro de conexão. Tente de novo."; reset(); }
   return false;
@@ -1425,7 +1437,7 @@ function traduzErroAuth(m){
   if(m.includes("rate limit")||m.includes("too many")||m.includes("seconds")) return "Muitas tentativas. Espere um minutinho.";
   return "Não deu pra entrar agora. Tente de novo.";
 }
-async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; atualizarContaUI(); loadPerfil(); }
+async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; CESTA_EANS=new Set(); atualizarContaUI(); atualizarBadge(); loadPerfil(); }
 
 function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
   t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2800); }

@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 
 from analise import normalizar
@@ -33,6 +35,77 @@ FRONT = RAIZ / "front" / "index.html"
 LOGOS_DIR = RAIZ / "front" / "logos"
 
 app = FastAPI(title="Comparador de Preços — RM Campinas", version="0.5")
+
+# ---- Auth (Supabase): valida o Bearer token e diz QUEM é o usuário + se é premium ----
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ijtnozcomqzxfaidurso.supabase.co").rstrip("/")
+SUPABASE_ANON = os.getenv(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqdG5vemNvbXF6"
+    "eGZhaWR1cnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NzY2MTAsImV4cCI6MjEwMjI1MjYxMH0."
+    "9Hl9d2fK0yiD7WAaMZZfRuqAJeJ5F8skGIpWNkpfl9o")  # chave PÚBLICA (anon)
+_tok_cache: dict = {}   # token -> (user_id, expira_em): evita bater no Supabase a cada request
+
+
+def _uid_do_header(authorization: str | None) -> str | None:
+    """Valida o token do Supabase (via /auth/v1/user) e devolve o user_id (uuid), ou None."""
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    token = parts[1]
+    ent = _tok_cache.get(token)
+    if ent and ent[1] > time.time():
+        return ent[0]
+    try:
+        r = httpx.get(f"{SUPABASE_URL}/auth/v1/user",
+                      headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON}, timeout=8)
+        uid = r.json().get("id") if r.status_code == 200 else None
+    except Exception:  # noqa: BLE001
+        uid = None
+    if uid:
+        _tok_cache[token] = (uid, time.time() + 300)  # cache 5 min
+    return uid
+
+
+def _premium(conn, uid: str | None) -> bool:
+    """True se o usuário é assinante OU está com o reverse trial de 3 dias ativo (lê profiles)."""
+    if not uid:
+        return False
+    r = conn.execute("SELECT plano, trial_ini FROM profiles WHERE id = ?", (uid,)).fetchone()
+    if not r:
+        return False
+    if r["plano"] == "assinante":
+        return True
+    if r["plano"] == "trial" and r["trial_ini"]:
+        ini = r["trial_ini"]
+        if isinstance(ini, str):
+            try:
+                ini = datetime.fromisoformat(ini)
+            except ValueError:
+                return False
+        if ini.tzinfo is None:
+            ini = ini.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - ini < timedelta(days=3)
+    return False
+
+
+def _gate_cesta(resp: dict, premium: bool) -> dict:
+    """TRAVA NO SERVIDOR: pra quem NÃO é premium, remove o "onde comprar" (rota, ranking,
+    preço por mercado e qual loja) do payload — o dado acionável nem sai do backend. Mantém
+    os NÚMEROS (economia, totais) que são a isca. Assinante/trial recebe tudo."""
+    if premium:
+        return resp
+    resp["mix"]["divisao"] = []          # tira a rota "compre X no mercado Y"
+    resp["mercados"] = []                # tira o ranking completo de lojas
+    mm = resp.get("melhor_mercado")
+    if mm:                               # mantém o TOTAL, mascara QUAL loja
+        mm["nome"] = mm["slug"] = mm["cor_badge"] = None
+    for it in resp.get("itens", []):
+        m = it.get("melhor")
+        it["melhor"] = {"preco": m.get("preco"), "rotulo": m.get("rotulo")} if m else None  # só o menor preço
+        it["precos"] = []                # tira os preços por mercado
+    return resp
 
 # Garante schema/migrações (tabelas links, lista) ao subir a API.
 _boot = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
@@ -752,14 +825,17 @@ def alertas():
 
 
 @app.get("/cesta")
-def cesta():
-    """Compara o custo TOTAL da lista em cada mercado (preço × quantidade),
-    com cobertura (quantos itens o mercado tem) e a 'melhor divisão' item a item."""
+def cesta(authorization: str | None = Header(None)):
+    """Compara o custo TOTAL da lista (do usuário logado) em cada mercado, com cobertura e a
+    'melhor divisão' item a item. Grátis recebe só os NÚMEROS; o "onde" é trancado no servidor."""
     conn = _conn()
     try:
+        uid = _uid_do_header(authorization)
+        premium = _premium(conn, uid)
         itens_lista = conn.execute(
-            "SELECT ean, nome, quantidade, preco_alvo, comprado FROM lista ORDER BY criado_em DESC"
-        ).fetchall()
+            "SELECT ean, nome, quantidade, preco_alvo, comprado FROM lista "
+            "WHERE user_id = ? ORDER BY criado_em DESC", (uid,)
+        ).fetchall() if uid else []
         mercados = conn.execute(
             "SELECT id, slug, nome, cor_badge FROM mercados WHERE ativo = 1"
         ).fetchall()
@@ -874,10 +950,11 @@ def cesta():
         if melhor_mercado and melhor_mercado["completo"]:
             economia_dividido = round(melhor_mercado["total"] - mix_total, 2)
 
-        return {
+        return _gate_cesta({
             "n_itens": n_itens,
             "n_alertas": n_alertas,
             "n_comprados": sum(1 for i in itens_out if i["comprado"]),
+            "premium": premium,                        # o front sabe se destranca (bate com o servidor)
             "mercados": mercados_out,
             "melhor_mercado": melhor_mercado,          # Opção 1: comprar tudo numa loja só
             "economia_vs_pior": economia,              # loja única mais barata vs mais cara
@@ -886,7 +963,7 @@ def cesta():
             "economia_mercados": round(economia_mercados, 2),  # vs. comprar cada item no mercado mais caro
             "economia_dias": round(economia_dias, 2),          # vs. o preço típico recente (queda nos dias)
             "itens": itens_out,
-        }
+        }, premium)
     finally:
         conn.close()
 

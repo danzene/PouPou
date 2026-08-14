@@ -1,0 +1,31 @@
+{
+  "descricao": "Categorias-semente. Cada termo de busca herda a categoria em que está. 'disponivel:0' = aparece no front como 'em breve' e NÃO é coletada.",
+  "categorias": [
+    {
+      "slug": "mercearia", "nome": "Mercearia", "disponivel": 1, "ordem": 1,
+      "termos": ["arroz","feijao","cafe","acucar","oleo de soja","macarrao","farinha de trigo",
+                 "molho de tomate","sal","biscoito","achocolatado","atum","sardinha",
+                 "milho em conserva","ervilha","azeite","vinagre","cafe soluvel","aveia","gelatina"]
+    },
+    {
+      "slug": "bebidas", "nome": "Bebidas", "disponivel": 1, "ordem": 2,
+      "termos": ["refrigerante","suco","cha","agua mineral","cerveja sem alcool","energetico"]
+    },
+    {
+      "slug": "limpeza", "nome": "Limpeza", "disponivel": 1, "ordem": 3,
+      "termos": ["sabao em po","detergente","amaciante","agua sanitaria","desinfetante","esponja"]
+    },
+    {
+      "slug": "higiene", "nome": "Higiene", "disponivel": 1, "ordem": 4,
+      "termos": ["papel higienico","shampoo","sabonete","creme dental","papel toalha","fralda","absorvente"]
+    },
+    {
+      "slug": "laticinios", "nome": "Laticínios", "disponivel": 1, "ordem": 5,
+      "termos": ["leite","leite condensado","creme de leite","margarina","manteiga","iogurte","requeijao"]
+    },
+    {
+      "slug": "hortifruti", "nome": "Hortifrúti", "disponivel": 0, "ordem": 6,
+      "termos": []
+    }
+  ]
+}

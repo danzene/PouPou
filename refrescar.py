@@ -28,7 +28,8 @@ import httpx
 from dotenv import load_dotenv
 
 from analise import normalizar
-from coletores.base import ItemColeta, MercadoIndisponivel
+from coletores.base import ItemColeta, MercadoIndisponivel, robots_permite
+from coletores.convertiez import ColetorConvertiez
 from coletores.vtex import ColetorVTEX, _headers
 from db import database
 
@@ -86,6 +87,62 @@ def refrescar_vtex(conn, cfg: dict, delay: float, contato: str) -> int:
     return n
 
 
+def refrescar_convertiez(conn, cfg: dict, delay: float, contato: str) -> int:
+    """Refresh do Convertiez (Super Pague Menos): re-busca as PÁGINAS dos produtos já
+    conhecidos (URLs na tabela `links`) e atualiza preço/desconto. É 1 requisição por
+    produto (o EAN/preço só vêm na página), mas limitado aos EANs conhecidos — mantém o
+    preço fresco entre as varreduras completas (que rotacionam o catálogo em ~1 semana e
+    deixariam promoções dias atrasadas). Preço promocional passa a refletir o site."""
+    slug, base = cfg["slug"], cfg["url_base"].rstrip("/")
+    row = conn.execute("SELECT id FROM mercados WHERE slug = ?", (slug,)).fetchone()
+    if not row:
+        return 0
+    mid = row["id"]
+    rows = conn.execute(
+        "SELECT l.ean, l.url FROM links l "
+        "WHERE l.mercado_id = ? AND l.url IS NOT NULL AND EXISTS "
+        "(SELECT 1 FROM precos_atual pa WHERE pa.ean = l.ean AND pa.mercado_id = l.mercado_id)",
+        (mid,)).fetchall()
+    if not rows:
+        log.info("[%s] sem URLs conhecidas (rode coletar.py antes).", slug)
+        return 0
+    col = ColetorConvertiez(slug=slug, nome=cfg["nome"], url_base=base, delay=delay,
+                            contato=contato, **cfg.get("params", {}))
+    headers = col._headers()
+    if not robots_permite(base, "/produto/p", headers["User-Agent"], headers):
+        log.warning("[%s] robots.txt bloqueia páginas de produto — pulando refresh.", slug)
+        return 0
+    agora = datetime.now(timezone.utc).isoformat()
+    n = 0
+    with httpx.Client(headers=headers, timeout=col.timeout, follow_redirects=True) as client:
+        for i, r in enumerate(rows):
+            url = r["url"]
+            href = url[len(base):] if url.startswith(base) else None
+            if not href:
+                continue
+            item = col._produto(client, href, None)  # re-busca a página; EAN/preço frescos
+            if not isinstance(item, ItemColeta):
+                continue  # refresh é por EAN; ignora perecível/None (página fora do ar)
+            medida = normalizar.extrair_medida(item.nome)
+            ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
+            database.inserir_preco(conn, ean=item.ean, mercado_id=mid, preco=item.preco,
+                preco_por_unidade=ppu, coletado_em=agora, so_no_site=item.so_no_site,
+                preco_de=item.preco_de, desconto_pct=item.desconto_pct, oferta_tipo=item.oferta_tipo)
+            n += 1
+            if i % 50 == 0:
+                conn.commit()
+    conn.commit()
+    log.info("[%s] OK: %d de %d preços atualizados.", slug, n, len(rows))
+    return n
+
+
+# plataforma -> função de refresh rápido (só os produtos já conhecidos)
+REFRESHERS = {
+    "vtex": refrescar_vtex,
+    "convertiez": refrescar_convertiez,
+}
+
+
 def main(argv: list[str]) -> int:
     delay = float(os.getenv("DELAY_REFRESH", "0.4"))
     contato = os.getenv("CONTATO", "contato@exemplo.com")
@@ -93,16 +150,26 @@ def main(argv: list[str]) -> int:
     mercados = json.loads((RAIZ / "config" / "mercados.json").read_text(encoding="utf-8"))["mercados"]
 
     filtro = set(argv[1:])
-    alvos = [m for m in mercados if m.get("ativo") and m.get("plataforma") == "vtex"
+    alvos = [m for m in mercados if m.get("ativo") and m.get("plataforma") in REFRESHERS
              and (not filtro or m["slug"] in filtro)]
     if not alvos:
-        log.error("Nenhum mercado VTEX ativo (filtro=%s).", filtro or "—")
+        log.error("Nenhum mercado com refresh disponível (filtro=%s). Plataformas: %s",
+                  filtro or "—", ", ".join(REFRESHERS))
         return 1
 
     conn = database.conectar(db_path)
     database.inicializar(conn)
-    log.info("Refresh rápido de %d mercado(s) VTEX: %s", len(alvos), ", ".join(m["slug"] for m in alvos))
-    total = sum(refrescar_vtex(conn, cfg, delay, contato) for cfg in alvos)
+    log.info("Refresh rápido de %d mercado(s): %s", len(alvos), ", ".join(m["slug"] for m in alvos))
+    total = 0
+    for cfg in alvos:
+        fn = REFRESHERS[cfg["plataforma"]]
+        try:
+            total += fn(conn, cfg, delay, contato)
+        except MercadoIndisponivel as exc:
+            conn.commit()
+            log.warning("[%s] abortado (rate-limit): %s", cfg["slug"], exc)
+        except Exception:  # noqa: BLE001 — um mercado não derruba os outros
+            log.exception("[%s] FALHOU no refresh — seguindo.", cfg["slug"])
     database.rebuild_resumo(conn)
     conn.commit()
     conn.close()

@@ -653,6 +653,7 @@
   <div class="login-box" id="loginBox"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 const API="";
 const $=s=>document.querySelector(s);
@@ -1308,25 +1309,46 @@ async function atualizarBadge(){
    trial -> cai pro grátis borrado. Tudo simulado no localStorage; a trava REAL (server-side) e
    o Mercado Pago entram na Fase 2. */
 let MERCADOS=[];                       // lista completa vinda de /mercados
-const PLANO_KEY="mb_plano", TRIAL_INI_KEY="mb_trial_ini", TRIAL_USADO_KEY="mb_trial_usado",
-      FAV_KEY="mb_mercados_fav", AUTH_KEY="mb_auth";
+const FAV_KEY="mb_mercados_fav";       // favoritos ainda em localStorage (sync p/ conta vem depois)
 const TRIAL_DIAS=3;
 const PRECO_MENSAL="R$ 9,90", PRECO_DE="R$ 29,90", PRECO_ANUAL="R$ 99,90";
 
+// ---- Supabase (cadastro real). URL + anon são PÚBLICOS; a service_role NUNCA vem pro front. ----
+const SUPABASE_URL="https://ijtnozcomqzxfaidurso.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqdG5vemNvbXF6eGZhaWR1cnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NzY2MTAsImV4cCI6MjEwMjI1MjYxMH0.9Hl9d2fK0yiD7WAaMZZfRuqAJeJ5F8skGIpWNkpfl9o";
+const sb=(window.supabase&&SUPABASE_URL)?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{auth:{persistSession:true,autoRefreshToken:true}}):null;
+
+// Sessão + perfil ficam em cache na memória (os renders são síncronos); hidratados no login/init.
+let SESSAO=null;
+let PERFIL={plano:"gratis", trial_ini:null, trial_usado:false, nome:null};
+
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-function usuario(){ try{ return JSON.parse(localStorage.getItem(AUTH_KEY)||"null"); }catch(e){ return null; } }
-function estaLogado(){ return !!usuario(); }
-function plano(){ return lsGet(PLANO_KEY,"gratis"); }
-function trialIni(){ const v=lsGet(TRIAL_INI_KEY,null); return v?new Date(v):null; }
+function usuario(){ return SESSAO?{email:SESSAO.user.email, nome:PERFIL.nome||(SESSAO.user.email||"").split("@")[0]}:null; }
+function estaLogado(){ return !!SESSAO; }
+function plano(){ return PERFIL.plano||"gratis"; }
+function trialIni(){ return PERFIL.trial_ini?new Date(PERFIL.trial_ini):null; }
 function diasRestantesTrial(){ const ini=trialIni(); if(!ini) return 0;
   return Math.max(0, Math.ceil((ini.getTime()+TRIAL_DIAS*864e5-Date.now())/864e5)); }
 function trialAtivo(){ return plano()==="trial" && diasRestantesTrial()>0; }
 function acessoPremium(){ return plano()==="assinante" || trialAtivo(); }
-function trialJaUsado(){ return lsGet(TRIAL_USADO_KEY,"")==="1"; }
+function trialJaUsado(){ return !!PERFIL.trial_usado; }
 function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("pro",acessoPremium()); }
-function setPlano(p){ lsSet(PLANO_KEY,p); atualizarContaUI(); }
-function iniciarTrial(){ lsSet(TRIAL_INI_KEY,new Date().toISOString()); lsSet(TRIAL_USADO_KEY,"1"); setPlano("trial"); }
+
+// Perfil (plano/trial) na conta do Supabase. O cache atualiza na hora; o banco em seguida.
+async function carregarPerfil(){
+  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; return; }
+  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome").eq("id",SESSAO.user.id).maybeSingle();
+    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome};
+  }catch(e){}
+}
+function salvarPerfil(campos){
+  Object.assign(PERFIL, campos);                        // cache reflete já (render é síncrono)
+  if(sb&&SESSAO){ sb.from("profiles").upsert({id:SESSAO.user.id, ...campos, atualizado_em:new Date().toISOString()}).then(()=>{},()=>{}); }
+  atualizarContaUI();
+}
+function setPlano(p){ salvarPerfil({plano:p}); }
+function iniciarTrial(){ salvarPerfil({plano:"trial", trial_ini:new Date().toISOString(), trial_usado:true}); }
 
 /* CLÍMAX: clique em "ver onde comprar". Sem conta -> login. Com conta e trial disponível ->
    começa o trial de 3 dias. Trial já usado/expirado -> tela de assinatura. */
@@ -1364,25 +1386,46 @@ function renderLogin(){
     <form onsubmit="return authSubmit(event)">
       ${criar?`<div class="auth-field"><label for="aNome">Nome</label><input id="aNome" type="text" autocomplete="name" placeholder="Como te chamamos"></div>`:""}
       <div class="auth-field"><label for="aEmail">E-mail</label><input id="aEmail" type="email" autocomplete="email" placeholder="voce@email.com" required></div>
-      <div class="auth-field"><label for="aSenha">Senha</label><input id="aSenha" type="password" autocomplete="${criar?"new-password":"current-password"}" placeholder="sua senha" required minlength="4"></div>
+      <div class="auth-field"><label for="aSenha">Senha</label><input id="aSenha" type="password" autocomplete="${criar?"new-password":"current-password"}" placeholder="sua senha (mín. 6 caracteres)" required minlength="6"></div>
       <p class="auth-err" id="authErr" aria-live="polite"></p>
       <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${TRIAL_DIAS} dias`:"Entrar"}</button>
     </form>
-    <p class="auth-note">Login de teste — nesta versão a conta fica só no seu aparelho; o acesso real (senha protegida no servidor) entra na próxima fase.</p>`;
+    <p class="auth-note">Sua conta é protegida pelo Supabase. Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
 }
-function authSubmit(ev){ ev.preventDefault();
+async function authSubmit(ev){ ev.preventDefault();
   const email=($("#aEmail").value||"").trim().toLowerCase(), senha=$("#aSenha").value||"";
   const nomeEl=$("#aNome"), nome=nomeEl?(nomeEl.value||"").trim():"";
-  const err=$("#authErr");
+  const err=$("#authErr"), btn=$("#loginBox .auth-btn"), criar=_authModo==="criar";
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent="Digite um e-mail válido."; return false; }
-  if(senha.length<4){ err.textContent="A senha precisa de ao menos 4 caracteres."; return false; }
-  lsSet(AUTH_KEY,JSON.stringify({email,nome:nome||email.split("@")[0]})); // NÃO guardamos a senha (só a sessão)
-  const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
-  fecharLogin(); atualizarContaUI();
-  if(cb) cb();
+  if(senha.length<6){ err.textContent="A senha precisa de ao menos 6 caracteres."; return false; }
+  if(!sb){ err.textContent="Não conectei ao servidor. Recarregue a página."; return false; }
+  err.textContent=""; if(btn){ btn.disabled=true; btn.dataset.txt=btn.textContent; btn.textContent="Aguarde…"; }
+  const reset=()=>{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.txt||"Enviar"; } };
+  try{
+    const res=criar
+      ? await sb.auth.signUp({email, password:senha, options:{data:{nome:nome||email.split("@")[0]}}})
+      : await sb.auth.signInWithPassword({email, password:senha});
+    if(res.error){ err.textContent=traduzErroAuth(res.error.message); reset(); return false; }
+    if(criar && !res.data.session){   // confirmação de e-mail ligada: cadastrou mas sem sessão
+      err.textContent="Conta criada! Confirme o link que enviamos no seu e-mail e depois entre."; reset(); return false; }
+    SESSAO=res.data.session;
+    await carregarPerfil();
+    const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
+    fecharLogin(); atualizarContaUI();
+    if(cb) cb();
+  }catch(e){ err.textContent="Erro de conexão. Tente de novo."; reset(); }
   return false;
 }
-function sair(){ try{ localStorage.removeItem(AUTH_KEY); }catch(e){} atualizarContaUI(); loadPerfil(); }
+function traduzErroAuth(m){
+  m=(m||"").toLowerCase();
+  if(m.includes("invalid login")) return "E-mail ou senha errados.";
+  if(m.includes("already registered")||m.includes("already been registered")||m.includes("user already")) return "Esse e-mail já tem conta. Toque em Entrar.";
+  if(m.includes("email not confirmed")) return "Confirme seu e-mail antes de entrar (veja sua caixa de entrada).";
+  if(m.includes("password")) return "Senha fraca — use 6+ caracteres.";
+  if(m.includes("rate limit")||m.includes("too many")||m.includes("seconds")) return "Muitas tentativas. Espere um minutinho.";
+  return "Não deu pra entrar agora. Tente de novo.";
+}
+async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; atualizarContaUI(); loadPerfil(); }
 
 function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
   t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2800); }
@@ -1531,6 +1574,11 @@ $("#btnCesta").addEventListener("click",loadCesta);
 
 (async function init(){
   setTemaBtn();
+  // restaura a sessão salva (login persiste entre visitas) e carrega o perfil/plano da conta
+  if(sb){
+    try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
+    sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); });
+  }
   atualizarContaUI();
   atualizarBadge();
   try{ const mk=await fetch(`${API}/mercados`).then(r=>r.json());

@@ -48,7 +48,7 @@ def buscar_produtos(conn: sqlite3.Connection, termo: str, limite: int = 15) -> l
     tokens = [t for t in full.split() if t]
     if not tokens:
         return []
-    cond = " AND ".join(["unaccent(pr.nome_canonico) LIKE ?"] * len(tokens))
+    cond = " AND ".join(["lower(unaccent(pr.nome_canonico)) LIKE ?"] * len(tokens))
     params = [f"%{t}%" for t in tokens]
     return conn.execute(
         f"""
@@ -59,8 +59,8 @@ def buscar_produtos(conn: sqlite3.Connection, termo: str, limite: int = 15) -> l
         WHERE {cond}
         GROUP BY pr.ean
         ORDER BY
-          (unaccent(pr.nome_canonico) LIKE ?) DESC,                     -- começa com a busca
-          (' ' || unaccent(pr.nome_canonico) || ' ' LIKE ?) DESC,       -- 1º token = palavra inteira
+          (lower(unaccent(pr.nome_canonico)) LIKE ?) DESC,                     -- começa com a busca
+          (' ' || lower(unaccent(pr.nome_canonico)) || ' ' LIKE ?) DESC,       -- 1º token = palavra inteira
           n_mercados DESC, length(pr.nome_canonico), pr.nome_canonico
         LIMIT ?
         """,

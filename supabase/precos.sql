@@ -6,6 +6,9 @@
 -- gating (o "onde comprar" só sai pra assinante/trial). Rode no SQL Editor.
 -- ============================================================================
 
+-- busca tolerante a acento (a busca de produtos usa lower(unaccent(nome)))
+create extension if not exists unaccent;
+
 create table if not exists public.mercados (
   id         bigint generated always as identity primary key,
   slug       text unique not null,

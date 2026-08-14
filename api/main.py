@@ -43,13 +43,12 @@ _ROTULO = {"kg": "R$/kg", "l": "R$/L", "un": "R$/un"}
 _SPARK_N = 12  # nº máximo de pontos na sparkline
 
 
-def _conn() -> sqlite3.Connection:
-    db = Path(os.getenv("DB_PATH", "dados/precos.db"))
-    if not db.is_absolute():
-        db = RAIZ / db
-    c = sqlite3.connect(db)
-    c.row_factory = sqlite3.Row
-    c.create_function("unaccent", 1, _unaccent, deterministic=True)
+def _conn():
+    """Conexão por request via backend dual (Postgres se DATABASE_URL; senão SQLite).
+    O `unaccent` é função custom no SQLite; no Postgres é a extensão nativa (via search_path)."""
+    c = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
+    if hasattr(c, "create_function"):   # só o sqlite3.Connection tem isso
+        c.create_function("unaccent", 1, _unaccent, deterministic=True)
     return c
 
 

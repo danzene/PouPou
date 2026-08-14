@@ -7,6 +7,7 @@ Regras de ouro:
 """
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import unicodedata
@@ -16,8 +17,64 @@ RAIZ = Path(__file__).resolve().parent.parent
 SCHEMA_SQL = Path(__file__).resolve().parent / "schema.sql"
 
 
-def conectar(db_path: str | Path) -> sqlite3.Connection:
-    """Abre (criando pastas se preciso) e devolve uma conexão com FKs ligadas."""
+def _pg_dsn() -> str:
+    """Se DATABASE_URL estiver setada, o app usa Postgres (Supabase); senão, SQLite local."""
+    return os.getenv("DATABASE_URL", "").strip()
+
+
+class _PgConn:
+    """Deixa o código que fala 'SQLite' (placeholders '?', row['coluna'], conn.execute)
+    rodar sobre Postgres/Supabase SEM reescrever as queries. Traduz '?'->'%s' (escapando
+    '%' literais antes) e devolve linhas como dict. autocommit=True: robusto pros coletores
+    (um erro num item não envenena a transação dos próximos)."""
+
+    def __init__(self, dsn: str) -> None:
+        import psycopg
+        from psycopg.rows import dict_row
+        # prepare_threshold=None: compatível com o pooler de transação do Supabase (pgbouncer).
+        self._c = psycopg.connect(dsn, autocommit=True, row_factory=dict_row, prepare_threshold=None)
+        # inclui 'extensions' no path pra achar unaccent() (Supabase instala extensões lá).
+        try:
+            self._c.execute("SET search_path TO public, extensions")
+        except Exception:  # noqa: BLE001
+            pass
+
+    @staticmethod
+    def _q(sql: str) -> str:
+        return sql.replace("%", "%%").replace("?", "%s")
+
+    def execute(self, sql, params=()):
+        return self._c.execute(self._q(sql), params)
+
+    def executemany(self, sql, seq):
+        cur = self._c.cursor()
+        cur.executemany(self._q(sql), list(seq))
+        return cur
+
+    def commit(self):
+        pass  # autocommit=True já efetiva cada statement
+
+    def rollback(self):
+        try:
+            self._c.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def cursor(self):
+        return self._c.cursor()
+
+    def close(self):
+        try:
+            self._c.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def conectar(db_path: str | Path = "dados/precos.db"):
+    """Postgres (Supabase) se DATABASE_URL estiver setada; senão, SQLite local (dev)."""
+    dsn = _pg_dsn()
+    if dsn:
+        return _PgConn(dsn)
     db_path = Path(db_path)
     if not db_path.is_absolute():
         db_path = RAIZ / db_path
@@ -30,8 +87,11 @@ def conectar(db_path: str | Path) -> sqlite3.Connection:
     return conn
 
 
-def inicializar(conn: sqlite3.Connection) -> None:
-    """Cria as tabelas/índices se não existirem e migra colunas novas."""
+def inicializar(conn) -> None:
+    """Cria tabelas/índices e migra colunas (SQLite). No Postgres o schema já foi aplicado
+    via supabase/*.sql, então aqui é no-op."""
+    if _pg_dsn():
+        return
     conn.executescript(SCHEMA_SQL.read_text(encoding="utf-8"))
     _migrar(conn)
     conn.commit()
@@ -240,8 +300,10 @@ def podar_historico(conn: sqlite3.Connection, manter_dias: int = 90) -> dict:
       2) descarta snapshots mais antigos que `manter_dias` dias.
     `precos_atual` (tabela quente) e o snapshot mais recente de cada par são sempre
     preservados. Devolve a contagem antes/depois. NÃO roda VACUUM (ver manutencao.py)."""
-    antes = int(conn.execute("SELECT COUNT(*) FROM precos").fetchone()[0])
-    # 1) colapsa intra-dia: por (ean, mercado, dia) sobra só o id mais alto (= mais recente)
+    from datetime import datetime, timedelta, timezone
+    antes = int(conn.execute("SELECT COUNT(*) AS n FROM precos").fetchone()["n"])
+    # 1) colapsa intra-dia: por (ean, mercado, dia) sobra só o id mais alto (= mais recente).
+    # substr(coletado_em,1,10) = o dia (YYYY-MM-DD); funciona igual no SQLite e no Postgres.
     conn.execute(
         """
         DELETE FROM precos
@@ -251,17 +313,20 @@ def podar_historico(conn: sqlite3.Connection, manter_dias: int = 90) -> dict:
         )
         """
     )
-    # 2) corta histórico antigo, mas nunca o último snapshot de cada par
+    # 2) corta histórico antigo, mas nunca o último snapshot de cada par. Corte por STRING ISO
+    # (coletado_em é ISO 8601 UTC, que ordena lexicograficamente = cronologicamente) — sem
+    # julianday, roda nos dois bancos.
+    corte = (datetime.now(timezone.utc) - timedelta(days=manter_dias)).isoformat()
     conn.execute(
         """
         DELETE FROM precos
-        WHERE julianday('now') - julianday(coletado_em) > ?
+        WHERE coletado_em < ?
           AND id NOT IN (SELECT MAX(id) FROM precos GROUP BY ean, mercado_id)
         """,
-        (manter_dias,),
+        (corte,),
     )
     conn.commit()
-    depois = int(conn.execute("SELECT COUNT(*) FROM precos").fetchone()[0])
+    depois = int(conn.execute("SELECT COUNT(*) AS n FROM precos").fetchone()["n"])
     return {"antes": antes, "depois": depois, "removidos": antes - depois}
 
 

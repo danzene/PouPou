@@ -868,6 +868,55 @@ def alertas():
         conn.close()
 
 
+_RM_CAMPINAS = {  # municípios da Região Metropolitana de Campinas (compara com a cidade do ViaCEP)
+    "campinas", "hortolandia", "sumare", "valinhos", "vinhedo", "paulinia", "indaiatuba",
+    "americana", "santa barbara d'oeste", "nova odessa", "cosmopolis", "artur nogueira",
+    "jaguariuna", "pedreira", "monte mor", "engenheiro coelho", "holambra",
+    "santo antonio de posse", "morungaba",
+}
+
+
+def _sem_acento(s: str | None) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "")
+                   if not unicodedata.combining(c)).lower().strip()
+
+
+@app.get("/cep/{cep}")
+def cep_lookup(cep: str):
+    """Consulta o CEP (ViaCEP) e sugere os mercados da REGIÃO da pessoa. Serve pra
+    personalizar o cadastro ('digite o CEP → já marco seus mercados') e confirmar
+    cobertura. Não guarda o CEP; é só uma consulta pública de localização."""
+    digs = "".join(ch for ch in (cep or "") if ch.isdigit())
+    if len(digs) != 8:
+        return {"ok": False, "erro": "CEP inválido (precisa de 8 números)."}
+    try:
+        r = httpx.get(f"https://viacep.com.br/ws/{digs}/json/", timeout=8.0,
+                      headers={"User-Agent": "PouPou/1.0"})
+        j = r.json()
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "erro": "Não consegui consultar o CEP agora."}
+    if not isinstance(j, dict) or j.get("erro"):
+        return {"ok": False, "erro": "CEP não encontrado."}
+    cidade, uf, bairro = j.get("localidade") or "", j.get("uf") or "", j.get("bairro") or ""
+    cnorm = _sem_acento(cidade)
+    conn = _conn()
+    try:
+        mercados = conn.execute("SELECT slug, cidade FROM mercados WHERE ativo = 1").fetchall()
+    finally:
+        conn.close()
+    if cnorm in _RM_CAMPINAS:
+        sugeridos = [m["slug"] for m in mercados if "campinas" in _sem_acento(m["cidade"])]
+        regiao = "Região de Campinas"
+    elif cnorm == "sao paulo":
+        sugeridos = [m["slug"] for m in mercados if "sao paulo" in _sem_acento(m["cidade"])]
+        regiao = "São Paulo (capital)"
+    else:
+        sugeridos, regiao = [], None
+    return {"ok": True, "cidade": cidade, "uf": uf, "bairro": bairro,
+            "regiao": regiao, "coberto": bool(sugeridos), "mercados": sugeridos}
+
+
 @app.get("/cesta")
 def cesta(authorization: str | None = Header(None), mercados: str | None = None):
     """Compara o custo TOTAL da lista (do usuário logado) em cada mercado, com cobertura e a

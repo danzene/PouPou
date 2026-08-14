@@ -545,6 +545,14 @@
   .onb-check svg{ width:12px; height:12px; }
   .onb-tile.on .onb-check{ display:flex; }
   .onb-skip{ display:block; width:100%; margin-top:8px; background:none; border:none; color:var(--mut); font-size:13px; font-weight:600; cursor:pointer; padding:6px; }
+  .onb-cep{ margin-bottom:14px; }
+  .onb-cep-row{ display:flex; gap:7px; }
+  .onb-cep-row input{ flex:1; min-width:0; height:40px; border:1.5px solid var(--line); border-radius:var(--r-btn); padding:0 12px; font-size:14px; background:var(--surface); color:var(--ink); }
+  .onb-cep-row input:focus{ outline:none; border-color:var(--green); }
+  .onb-cep-btn{ height:40px; padding:0 13px; border:none; border-radius:var(--r-btn); background:var(--green); color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+  .onb-cep-msg{ font-size:12.5px; margin-top:7px; color:var(--mut); line-height:1.4; }
+  .onb-cep-msg.ok{ color:var(--green-dark); font-weight:600; }
+  .onb-cep-msg.err{ color:#c0392b; }
   /* toggle "Meus mercados / Todos" na lista */
   .lista-modo{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:2px 0 14px; }
   .lm-seg{ display:inline-flex; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-pill); padding:3px; gap:2px; }
@@ -1534,19 +1542,53 @@ function renderOnboarding(){
   const u=usuario(); const nome=(u&&u.nome)?esc(u.nome.split(" ")[0]):"";
   const tiles=[...MERCADOS].map(m=>{
     const on=_onbSel.has(m.slug);
-    return `<button type="button" class="onb-tile ${on?"on":""}" aria-pressed="${on}" onclick="onbToggle('${m.slug}')">
+    return `<button type="button" class="onb-tile ${on?"on":""}" data-slug="${m.slug}" aria-pressed="${on}" onclick="onbToggle('${m.slug}')">
       <span class="onb-check">${ic("check")}</span>${badgeMini(m)}<span class="onb-nm">${esc(m.nome)}</span></button>`;
   }).join("");
   const n=_onbSel.size;
   $("#onbBox").innerHTML=`
     <div class="auth-brand"><h2>Pou<span class="p2">Pou</span></h2></div>
     <h3 class="onb-tit">${nome?`Boas-vindas, ${nome}! 🎉`:"Boas-vindas! 🎉"}</h3>
-    <p class="onb-sub">Quais supermercados você costuma usar? A gente destaca eles na comparação e mostra onde você economiza.</p>
+    <p class="onb-sub">Quais supermercados você usa? A gente destaca eles na comparação e mostra onde economizar.</p>
+    <div class="onb-cep">
+      <div class="onb-cep-row">
+        <input id="onbCep" type="text" inputmode="numeric" maxlength="9" placeholder="Seu CEP (opcional)" oninput="onbCepMask(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();onbBuscarCep();}">
+        <button type="button" class="onb-cep-btn" onclick="onbBuscarCep()">Achar meus mercados</button>
+      </div>
+      <div id="onbCepMsg" class="onb-cep-msg"></div>
+    </div>
     <div class="onb-grid">${tiles}</div>
     <button class="auth-btn" type="button" onclick="onbConcluir()">${n?`Continuar com ${n} mercado${n>1?"s":""}`:"Escolha ao menos 1 (ou pule)"}</button>
     <button class="onb-skip" type="button" onclick="onbPular()">Pular por agora</button>`;
 }
-function onbToggle(slug){ if(_onbSel.has(slug)) _onbSel.delete(slug); else _onbSel.add(slug); renderOnboarding(); }
+// atualiza seleção/botão SEM re-renderizar (preserva o campo de CEP e sua mensagem)
+function onbSyncTiles(){
+  document.querySelectorAll('#onbBox .onb-tile').forEach(t=>{
+    const on=_onbSel.has(t.dataset.slug); t.classList.toggle('on',on); t.setAttribute('aria-pressed',on);
+  });
+  const n=_onbSel.size, btn=document.querySelector('#onbBox .auth-btn');
+  if(btn) btn.textContent=n?`Continuar com ${n} mercado${n>1?"s":""}`:"Escolha ao menos 1 (ou pule)";
+}
+function onbToggle(slug){ if(_onbSel.has(slug)) _onbSel.delete(slug); else _onbSel.add(slug); onbSyncTiles(); }
+function onbCepMask(el){ let v=el.value.replace(/\D/g,"").slice(0,8); if(v.length>5) v=v.slice(0,5)+"-"+v.slice(5); el.value=v; }
+async function onbBuscarCep(){
+  const el=$("#onbCep"), msg=$("#onbCepMsg"), cep=(el.value||"").replace(/\D/g,"");
+  if(cep.length!==8){ msg.textContent="Digite os 8 números do CEP."; msg.className="onb-cep-msg err"; return; }
+  msg.textContent="Buscando sua região…"; msg.className="onb-cep-msg";
+  try{
+    const d=await fetch(`${API}/cep/${cep}`).then(r=>r.json());
+    if(!d.ok){ msg.textContent=d.erro||"Não achei esse CEP."; msg.className="onb-cep-msg err"; return; }
+    const loc=`📍 ${d.bairro?d.bairro+", ":""}${d.cidade}-${d.uf}`;
+    if(d.coberto&&d.mercados.length){
+      _onbSel=new Set(d.mercados); onbSyncTiles();
+      msg.textContent=`${loc} · marquei ${d.mercados.length} mercado${d.mercados.length>1?"s":""} da sua região ⭐ (ajuste se quiser)`;
+      msg.className="onb-cep-msg ok";
+    }else{
+      msg.textContent=`${loc}. Por ora focamos na Região de Campinas — escolha os mercados na mão abaixo.`;
+      msg.className="onb-cep-msg";
+    }
+  }catch(e){ msg.textContent="Erro ao buscar o CEP."; msg.className="onb-cep-msg err"; }
+}
 function onbConcluir(){
   const favs=[...MERCADOS].map(m=>m.slug).filter(s=>_onbSel.has(s));   // ordem estável = ordem da lista
   setFavMercados(favs); salvarFavoritos(); const n=favs.length;

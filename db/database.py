@@ -197,9 +197,9 @@ def upsert_produto(
         ON CONFLICT(ean) DO UPDATE SET
             nome_canonico = CASE
                 WHEN excluded.nome_canonico IS NOT NULL
-                     AND length(COALESCE(excluded.nome_canonico, '')) > length(COALESCE(nome_canonico, ''))
+                     AND length(COALESCE(excluded.nome_canonico, '')) > length(COALESCE(produtos.nome_canonico, ''))
                 THEN excluded.nome_canonico
-                ELSE nome_canonico
+                ELSE produtos.nome_canonico
             END,
             marca         = COALESCE(produtos.marca, excluded.marca),
             categoria     = COALESCE(produtos.categoria, excluded.categoria),

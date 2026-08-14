@@ -79,10 +79,12 @@ class ColetorVTEX(Coletor):
         self.max_por_termo = max_por_termo
         self.contato = contato
         self._falhas_seguidas = 0   # disjuntor: falhas HTTP consecutivas
-        self._max_falhas = 6        # aborta o mercado após tantas falhas seguidas
+        self._max_falhas = 12       # aborta o mercado só após MUITAS falhas seguidas
+                                    # (WAFs bursty devolvem rachos de 429 antes de voltar;
+                                    #  6 era baixo demais e derrubava o mercado no meio)
 
     # -- requisição resiliente -------------------------------------------
-    def _get(self, client: httpx.Client, url: str, tentativas: int = 3) -> httpx.Response | None:
+    def _get(self, client: httpx.Client, url: str, tentativas: int = 5) -> httpx.Response | None:
         """GET com retry+backoff curto em 429/5xx (auto-cura rate-limit transitório).
         DISJUNTOR: se o mercado falha muitas vezes SEGUIDAS (rate-limit persistente),
         levanta MercadoIndisponivel pra ABORTAR o mercado rápido em vez de pendurar
@@ -96,14 +98,14 @@ class ColetorVTEX(Coletor):
                 if i == tentativas - 1:
                     log.warning("[%s] rede falhou (%s): %s", self.slug, url[-60:], exc)
                     break
-                time.sleep(espera); espera = min(espera * 2, 8); continue
+                time.sleep(espera); espera = min(espera * 2, 20); continue
             if r.status_code == 429 or 500 <= r.status_code < 600:
                 if i == tentativas - 1:
                     log.warning("[%s] HTTP %s após %d tentativas", self.slug, r.status_code, tentativas)
                     break
                 ra = r.headers.get("retry-after")
                 pausa = float(ra) if (ra and ra.replace(".", "", 1).isdigit()) else espera
-                time.sleep(min(pausa, 8)); espera = min(espera * 2, 8); continue
+                time.sleep(min(pausa, 20)); espera = min(espera * 2, 20); continue
             self._falhas_seguidas = 0
             return r
         # esgotou as tentativas: conta a falha e decide se abre o disjuntor
@@ -159,20 +161,37 @@ class ColetorVTEX(Coletor):
         fqpath = f"{prefixo}{node['id']}"
         total = self._total_categoria(client, fqpath)
         filhos = node.get("children") or []
-        if total > (OFFSET_MAX + JANELA) and filhos:      # estoura o teto -> desce
+        # Desce nos filhos quando (a) a categoria estoura o teto de offset (2500) e tem
+        # filhos, OU (b) o total é DESCONHECIDO (a consulta falhou) e há filhos — assim
+        # um único 429 numa categoria-pai não poda o galho inteiro (era a causa de só
+        # ~7% do catálogo entrar). Categorias-pai com total conhecido <= 2550 são
+        # paginadas direto (o fq=C:pai já traz a subárvore inteira).
+        if filhos and (total < 0 or total > (OFFSET_MAX + JANELA)):
             for filho in filhos:
                 yield from self._varrer_categoria(client, filho, fqpath + "/", categoria, vistos)
         else:
-            yield from self._paginar_categoria(client, fqpath, total, categoria, vistos)
+            # folha com total desconhecido: pagina até a página vazia/curta (o teto de
+            # offset e a detecção de página curta param no fim real, então inflar é seguro).
+            alvo = total if total >= 0 else (OFFSET_MAX + JANELA)
+            yield from self._paginar_categoria(client, fqpath, alvo, categoria, vistos)
 
     def _total_categoria(self, client, fqpath: str) -> int:
+        """Total de itens da categoria (header 'resources': '0-49/1234' -> 1234).
+        Devolve -1 quando o total é DESCONHECIDO (requisição falhou por rate-limit,
+        ou o header não veio) — distinto de 0 (categoria realmente vazia). Quem chama
+        NUNCA deve podar um galho inteiro por causa de uma consulta que só falhou."""
         url = f"{self.url_base}{CAMINHO_BUSCA_FQ}?fq=C:{fqpath}&_from=0&_to=0"
         r = self._get(client, url)
         time.sleep(self.delay)
         if r is None:
-            return 0
+            return -1
         res = r.headers.get("resources") or ""
-        return int(res.split("/")[-1]) if "/" in res else 0
+        if "/" not in res:
+            return -1  # header ausente/inesperado -> desconhecido (não poda o galho)
+        try:
+            return int(res.split("/")[-1])
+        except ValueError:
+            return -1
 
     def _paginar_categoria(self, client, fqpath, total, categoria, vistos) -> Iterator[ItemColeta]:
         frm = 0

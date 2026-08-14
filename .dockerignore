@@ -1,0 +1,14 @@
+# Fora da imagem: ambiente local, banco local gigante, segredos, git e docs.
+.venv/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+dados/
+*.db
+*.db-journal
+.git/
+.github/
+*.md
+docs/
+tasks/

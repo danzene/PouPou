@@ -845,7 +845,8 @@ def cesta(authorization: str | None = Header(None)):
 
         # acumuladores por mercado
         acc = {m["id"]: {"slug": m["slug"], "nome": m["nome"], "cor_badge": m["cor_badge"],
-                         "total": 0.0, "cobertura": 0, "faltantes": []} for m in mercados}
+                         "total": 0.0, "cobertura": 0, "faltantes": [], "completar_custo": 0.0}
+               for m in mercados}
         itens_out = []
         mix_total = 0.0
         mix_mercados = set()
@@ -893,6 +894,12 @@ def cesta(authorization: str | None = Header(None)):
                                     "preco": melhor["preco"], "subtotal": round(melhor["preco"] * qtd, 2),
                                     "url": melhor["url"]})
                 dv["subtotal"] += melhor["preco"] * qtd
+                # COMPARAÇÃO JUSTA: quem NÃO tem esse item "completa" pelo menor preço em outra
+                # loja — assim cada loja tem o total da FEIRA INTEIRA (mesma cesta, comparável).
+                custo_i = melhor["preco"] * qtd
+                for m in mercados:
+                    if m["slug"] not in slugs_com:
+                        acc[m["id"]]["completar_custo"] += custo_i
             # ---- ECONOMIA (sensação de economia) ----
             eco_merc_item = eco_dias_item = 0.0
             ref_hist = None
@@ -926,18 +933,25 @@ def cesta(authorization: str | None = Header(None)):
                             "rotulo": r.get("rotulo")} for r in ranking],
             })
 
+        LIMITE_FALTA = 4  # loja "pra fazer a feira" = falta no MÁXIMO isso; o resto some do ranking
         mercados_out = list(acc.values())
         for m in mercados_out:
             m["total"] = round(m["total"], 2)
             m["completo"] = (m["cobertura"] == n_itens and n_itens > 0)
-        # ordena: completos primeiro, depois maior cobertura, depois menor total
-        mercados_out.sort(key=lambda m: (not m["completo"], -m["cobertura"], m["total"]))
+            m["faltam"] = n_itens - m["cobertura"]
+            # total da FEIRA INTEIRA nessa loja: o que ela tem + o que falta pelo menor preço fora
+            m["completo_total"] = round(m["total"] + m["completar_custo"], 2)
+            m["viavel"] = (m["cobertura"] > 0 and m["faltam"] <= LIMITE_FALTA)  # dá pra fazer a feira aqui
+            m.pop("completar_custo", None)
+        # ranking JUSTO: lojas viáveis primeiro, ordenadas pelo total da feira inteira (menor 1º)
+        mercados_out.sort(key=lambda m: (not m["viavel"], m["completo_total"]))
 
-        completos = [m for m in mercados_out if m["completo"]]
-        melhor_mercado = completos[0] if completos else (mercados_out[0] if mercados_out else None)
+        viaveis = [m for m in mercados_out if m["viavel"]]
+        melhor_mercado = viaveis[0] if viaveis else (mercados_out[0] if mercados_out else None)
+        # economia do ranking = feira inteira mais cara vs mais barata entre as lojas viáveis
         economia = None
-        if len(completos) >= 2:
-            economia = round(completos[-1]["total"] - completos[0]["total"], 2)
+        if len(viaveis) >= 2:
+            economia = round(viaveis[-1]["completo_total"] - viaveis[0]["completo_total"], 2)
 
         # estratégia "dividido": divisão por mercado (maior subtotal primeiro)
         divisao_lst = sorted(divisao.values(), key=lambda d: -d["subtotal"])
@@ -945,10 +959,10 @@ def cesta(authorization: str | None = Header(None)):
             d["subtotal"] = round(d["subtotal"], 2)
         mix_total = round(mix_total, 2)
 
-        # quanto o "dividido" economiza a mais que comprar tudo na melhor loja única
+        # quanto o "dividido" (otimizado) economiza vs fazer a feira inteira na loja única mais barata
         economia_dividido = None
-        if melhor_mercado and melhor_mercado["completo"]:
-            economia_dividido = round(melhor_mercado["total"] - mix_total, 2)
+        if melhor_mercado:
+            economia_dividido = round(melhor_mercado["completo_total"] - mix_total, 2)
 
         return _gate_cesta({
             "n_itens": n_itens,

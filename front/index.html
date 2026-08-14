@@ -1184,38 +1184,29 @@ function ecoDetalhe(d){
 }
 /* ranking de mercados (comprando tudo numa loja só) */
 function rankingMercados(d){
-  const mkts=d.mercados||[]; if(!mkts.length) return "";
-  // Só compara lojas que têm TODOS os itens — uma loja incompleta parece barata só
-  // porque lhe faltam itens, então não entra na comparação de "mais cara/barata".
-  const completos=mkts.filter(m=>m.completo).sort((a,b)=>a.total-b.total);
-  const parciais=mkts.filter(m=>!m.completo).sort((a,b)=>(b.cobertura-a.cobertura)||(a.total-b.total));
-  const minC=completos.length?completos[0].total:null;
+  // COMPARAÇÃO JUSTA: só lojas onde dá pra fazer a feira (falta pouco), pelo total da FEIRA
+  // INTEIRA (o que a loja tem + o que falta pelo menor preço fora). Já vem ordenado do servidor.
+  const mkts=(d.mercados||[]).filter(m=>m.viavel);
+  if(!mkts.length) return "";
+  const min=mkts[0].completo_total;
   const medal=["🥇","🥈","🥉"];
-  const rowC=(m,i)=>{
-    const diff=m.total-minC;
+  const linhas=mkts.slice(0,6).map((m,i)=>{
+    const diff=m.completo_total-min;
     const extra=i===0
-      ? `<div class="d ok">mais barata</div>`
+      ? `<div class="d ok">mais barata pra sua feira</div>`
       : `<div class="d num">R$ ${diff.toFixed(2).replace(".",",")} a mais</div>`;
+    const sub=m.completo
+      ? `tem todos os ${d.n_itens} itens`
+      : `tem ${m.cobertura}, + ${m.faltam} ${m.faltam===1?"item pego":"itens pegos"} no mais barato fora`;
     return `<div class="mrank-row">
       <span class="mrank-medal">${medal[i]||"·"}</span>
-      <div class="mrank-info"><div class="mrank-nm">${badgeMini(m)} ${esc(m.nome)}${seloFav(m)} <span class="mrank-cover full">${m.cobertura}/${d.n_itens}</span></div>
-        <div class="mrank-sub">tem todos os itens</div></div>
-      <div class="mrank-val"><div class="t num">${brl(m.total)}</div>${extra}</div>
-    </div>`; };
-  const rowP=(m)=>{
-    const n=m.faltantes.length, prim=n?esc(m.faltantes[0].nome.split(" ").slice(0,3).join(" ")):"";
-    const falta=n?`faltam ${n} ${n===1?"item":"itens"}${prim?` — ${prim}${n>1?"…":""}`:""}`:"itens parciais";
-    return `<div class="mrank-row parcial">
-      <span class="mrank-medal">·</span>
-      <div class="mrank-info"><div class="mrank-nm">${badgeMini(m)} ${esc(m.nome)}${seloFav(m)} <span class="mrank-cover">${m.cobertura}/${d.n_itens}</span></div>
-        <div class="mrank-sub mrank-falta">${falta}</div></div>
-      <div class="mrank-val"><div class="t num muted">${brl(m.total)}</div><div class="d muted">não tem tudo</div></div>
-    </div>`; };
-  const linhas=completos.slice(0,6).map(rowC).join("")+parciais.slice(0,4).map(rowP).join("");
-  const nota=completos.length
-    ? `<p class="mrank-nota">Quanto sua cesta inteira custaria em cada loja que <b>tem os ${d.n_itens} itens</b>. O valor em <b class="tred">vermelho</b> é quanto ela sai <b>mais cara</b> que a loja mais barata.</p>`
-    : `<p class="mrank-nota">Nenhuma loja tem os ${d.n_itens} itens sozinha — abaixo, quanto cada uma soma e o que falta.</p>`;
-  return `<div class="sec-title">Comprando tudo em uma loja só</div>${nota}<div class="mrank">${linhas}</div>`;
+      <div class="mrank-info"><div class="mrank-nm">${badgeMini(m)} ${esc(m.nome)}${seloFav(m)} <span class="mrank-cover ${m.completo?"full":""}">${m.cobertura}/${d.n_itens}</span></div>
+        <div class="mrank-sub">${sub}</div></div>
+      <div class="mrank-val"><div class="t num">${brl(m.completo_total)}</div>${extra}</div>
+    </div>`;
+  }).join("");
+  const nota=`<p class="mrank-nota">Quanto sua <b>feira inteira</b> (${d.n_itens} itens) sai em cada loja: o que ela tem + os que faltam pelo <b>menor preço em outra</b>. Assim a comparação é justa. O valor em <b class="tred">vermelho</b> é quanto sai <b>mais caro</b> que a mais barata.</p>`;
+  return `<div class="sec-title">Sua feira inteira, comparada de forma justa</div>${nota}<div class="mrank">${linhas}</div>`;
 }
 function cardItemCesta(it){
   const uni=it.rotulo?" "+it.rotulo.replace(/R\$/,"").trim():"";
@@ -1280,9 +1271,7 @@ async function loadCesta(){
     let vs="";
     if(mm){
       const mmNome=prem?`${badgeMini(mm)} ${esc(mm.nome)}`:`<span class="mkt-oculto">${ic("lock")} a loja mais barata</span>`;
-      const umaLoja=mm.completo
-        ? `<div class="vs-card"><div class="vs-tag">Compra em 1 mercado</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.total)}</div><div class="vs-sub">os ${d.n_itens} itens numa loja só</div></div>`
-        : `<div class="vs-card"><div class="vs-tag">Loja mais completa</div><div class="vs-mkt">${mmNome}</div><div class="vs-sub" style="margin-top:8px">tem ${mm.cobertura} de ${d.n_itens} itens</div></div>`;
+      const umaLoja=`<div class="vs-card"><div class="vs-tag">${mm.completo?"Compra em 1 mercado":"Feira quase toda numa loja"}</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.completo_total!=null?mm.completo_total:mm.total)}</div><div class="vs-sub">${mm.completo?`os ${d.n_itens} itens numa loja só`:`tem ${mm.cobertura}/${d.n_itens} · +${mm.faltam} pego no mais barato`}</div></div>`;
       const otim=`<div class="vs-card best"><div class="vs-tag">Compra otimizada</div><div class="vs-mkt">${d.mix.n_mercados} mercados</div><div class="vs-val num">${brl(d.mix.total)}</div><div class="vs-sub">${(poupa!=null&&poupa>0)?`economia de <b style="color:var(--green-dark)">${brl(poupa)}</b>`:"pegando cada item no menor preço"}</div></div>`;
       vs=`<div class="vs">${umaLoja}<div class="vs-mid">vs</div>${otim}</div>`;
     }

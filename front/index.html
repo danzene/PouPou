@@ -531,6 +531,20 @@
   .mkt-row .fav svg{ width:17px; height:17px; }
   .mkt-row.on .fav{ background:var(--yellow); border-color:var(--yellow); color:#5c3d00; }
   .mkt-row .ord{ font-size:11px; font-weight:700; color:var(--green-dark); min-width:20px; text-align:center; }
+  /* onboarding de personalização (pós-cadastro) */
+  .onb-box{ max-width:460px; }
+  .onb-tit{ font-size:20px; font-weight:800; color:var(--ink); text-align:center; margin:8px 0 4px; }
+  .onb-sub{ font-size:13.5px; color:var(--mut); text-align:center; line-height:1.45; margin:0 0 16px; }
+  .onb-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:9px; margin-bottom:16px; max-height:44vh; overflow:auto; padding:2px; }
+  .onb-tile{ position:relative; display:flex; align-items:center; gap:9px; text-align:left; background:var(--surface); border:1.5px solid var(--line); border-radius:var(--r-btn); padding:10px 11px; cursor:pointer; transition:border-color .12s, background .12s; }
+  .onb-tile:hover{ border-color:var(--green); }
+  .onb-tile.on{ border-color:var(--green); background:var(--green-light); }
+  .onb-tile .badge{ width:30px; height:30px; flex:none; }
+  .onb-nm{ font-size:12.5px; font-weight:700; color:var(--ink); line-height:1.15; }
+  .onb-check{ position:absolute; top:6px; right:6px; width:18px; height:18px; border-radius:50%; background:var(--green); color:#fff; display:none; align-items:center; justify-content:center; }
+  .onb-check svg{ width:12px; height:12px; }
+  .onb-tile.on .onb-check{ display:flex; }
+  .onb-skip{ display:block; width:100%; margin-top:8px; background:none; border:none; color:var(--mut); font-size:13px; font-weight:600; cursor:pointer; padding:6px; }
   .fav-star{ display:inline-flex; vertical-align:-2px; } .fav-star svg{ width:14px; height:14px; color:var(--yellow); fill:var(--yellow); }
 
   /* preço ancorado + trial + segmentado + ROI */
@@ -660,6 +674,10 @@
 
 <div class="login-modal" id="loginModal" role="dialog" aria-modal="true" aria-label="Entrar no PouPou">
   <div class="login-box" id="loginBox"></div>
+</div>
+
+<div class="login-modal" id="onbModal" role="dialog" aria-modal="true" aria-label="Personalize o PouPou">
+  <div class="login-box onb-box" id="onbBox"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -1387,6 +1405,7 @@ async function carregarPerfil(){
   try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome").eq("id",SESSAO.user.id).maybeSingle();
     if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome};
   }catch(e){}
+  await carregarFavoritos();   // hidrata "meus mercados" da conta (sync entre dispositivos)
 }
 function salvarPerfil(campos){
   Object.assign(PERFIL, campos);                        // cache reflete já (render é síncrono)
@@ -1464,7 +1483,8 @@ async function authSubmit(ev){ ev.preventDefault();
     await carregarPerfil();
     const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
     fecharLogin(); atualizarContaUI(); atualizarBadge();   // carrega a feira do usuário
-    if(cb) cb();
+    if(criar) abrirOnboarding(cb);    // conta nova -> personaliza (escolher mercados) antes de seguir
+    else if(cb) cb();
   }catch(e){ err.textContent="Erro de conexão. Tente de novo."; reset(); }
   return false;
 }
@@ -1477,13 +1497,68 @@ function traduzErroAuth(m){
   if(m.includes("rate limit")||m.includes("too many")||m.includes("seconds")) return "Muitas tentativas. Espere um minutinho.";
   return "Não deu pra entrar agora. Tente de novo.";
 }
-async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; CESTA_EANS=new Set(); atualizarContaUI(); atualizarBadge(); loadPerfil(); }
+async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; CESTA_EANS=new Set(); setFavMercados([]); atualizarContaUI(); atualizarBadge(); loadPerfil(); }
+
+/* ------- onboarding de personalização (aparece 1x, logo após CRIAR a conta) -------
+   Deixa a pessoa escolher os mercados que usa; viram favoritos (destaque na comparação
+   + sync na conta). Rápido e pulável — não é barreira antes de liberar o app. */
+let _onbCb=null, _onbSel=null;
+function abrirOnboarding(cb){
+  const done=(typeof cb==="function")?cb:null;
+  if(!MERCADOS.length){ if(done) done(); return; }   // sem mercados carregados: não trava o fluxo
+  _onbCb=done; _onbSel=new Set(favMercados());
+  renderOnboarding(); $("#onbModal").classList.add("show");
+}
+function renderOnboarding(){
+  const u=usuario(); const nome=(u&&u.nome)?esc(u.nome.split(" ")[0]):"";
+  const tiles=[...MERCADOS].map(m=>{
+    const on=_onbSel.has(m.slug);
+    return `<button type="button" class="onb-tile ${on?"on":""}" aria-pressed="${on}" onclick="onbToggle('${m.slug}')">
+      <span class="onb-check">${ic("check")}</span>${badgeMini(m)}<span class="onb-nm">${esc(m.nome)}</span></button>`;
+  }).join("");
+  const n=_onbSel.size;
+  $("#onbBox").innerHTML=`
+    <div class="auth-brand"><h2>Pou<span class="p2">Pou</span></h2></div>
+    <h3 class="onb-tit">${nome?`Boas-vindas, ${nome}! 🎉`:"Boas-vindas! 🎉"}</h3>
+    <p class="onb-sub">Quais supermercados você costuma usar? A gente destaca eles na comparação e mostra onde você economiza.</p>
+    <div class="onb-grid">${tiles}</div>
+    <button class="auth-btn" type="button" onclick="onbConcluir()">${n?`Continuar com ${n} mercado${n>1?"s":""}`:"Escolha ao menos 1 (ou pule)"}</button>
+    <button class="onb-skip" type="button" onclick="onbPular()">Pular por agora</button>`;
+}
+function onbToggle(slug){ if(_onbSel.has(slug)) _onbSel.delete(slug); else _onbSel.add(slug); renderOnboarding(); }
+function onbConcluir(){
+  const favs=[...MERCADOS].map(m=>m.slug).filter(s=>_onbSel.has(s));   // ordem estável = ordem da lista
+  setFavMercados(favs); salvarFavoritos(); const n=favs.length;
+  fecharOnboarding();
+  if(n) toast(`${n} mercado${n>1?"s":""} marcado${n>1?"s":""} como seu${n>1?"s":""} ⭐`);
+}
+function onbPular(){ fecharOnboarding(); }
+function fecharOnboarding(){ $("#onbModal").classList.remove("show"); const cb=_onbCb; _onbCb=null; if(typeof cb==="function") cb(); }
 
 function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
   t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2800); }
 
 function favMercados(){ try{ return JSON.parse(localStorage.getItem(FAV_KEY)||"[]"); }catch(e){ return []; } }
 function setFavMercados(a){ try{ localStorage.setItem(FAV_KEY,JSON.stringify(a)); }catch(e){} }
+// Sync dos mercados favoritos com a conta (tabela favoritos no Supabase, RLS dono-só).
+// Carrega no login (a conta é a fonte da verdade entre dispositivos); grava com debounce.
+async function carregarFavoritos(){
+  if(!sb||!SESSAO) return;
+  try{ const {data}=await sb.from("favoritos").select("mercado_slug,ordem").eq("user_id",SESSAO.user.id).order("ordem",{ascending:true});
+    if(data&&data.length) setFavMercados(data.map(r=>r.mercado_slug));
+  }catch(e){}
+}
+let _favTimer=null;
+function salvarFavoritos(){
+  if(!sb||!SESSAO) return;                 // sem conta: fica só no localStorage
+  clearTimeout(_favTimer);
+  _favTimer=setTimeout(()=>{
+    const uid=SESSAO.user.id, favs=favMercados();
+    sb.from("favoritos").delete().eq("user_id",uid).then(({error})=>{
+      if(!error&&favs.length){ sb.from("favoritos").insert(favs.map((s,i)=>({user_id:uid,mercado_slug:s,ordem:i}))).then(()=>{},()=>{}); }
+    },()=>{});
+  },600);
+}
 function ehFav(m){ const s=(m&&(m.slug||m.mercado_slug))||""; return s&&favMercados().includes(s); }
 function seloFav(m){ return ehFav(m)?` <span class="fav-star" title="Seu mercado">${ic("star")}</span>`:""; }
 
@@ -1589,12 +1664,12 @@ function renderMeusMercados(){
 function toggleFav(slug){
   const favs=favMercados(); const i=favs.indexOf(slug);
   if(i>=0) favs.splice(i,1); else favs.push(slug);
-  setFavMercados(favs); const el=$("#mktPick"); if(el) el.innerHTML=renderMeusMercados();
+  setFavMercados(favs); salvarFavoritos(); const el=$("#mktPick"); if(el) el.innerHTML=renderMeusMercados();
 }
 function moverFav(slug,dir){
   const favs=favMercados(); const i=favs.indexOf(slug); if(i<0) return;
   const j=i+dir; if(j<0||j>=favs.length) return;
-  [favs[i],favs[j]]=[favs[j],favs[i]]; setFavMercados(favs);
+  [favs[i],favs[j]]=[favs[j],favs[i]]; setFavMercados(favs); salvarFavoritos();
   const el=$("#mktPick"); if(el) el.innerHTML=renderMeusMercados();
 }
 

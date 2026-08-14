@@ -1,0 +1,23 @@
+# Blueprint do Render — PouPou (MercadoBarato).
+# Um único serviço web: o FastAPI serve a API, o front (front/index.html) e as logos.
+# Mesmo-origem (const API="" no front) => sem CORS.
+#
+# O ÚNICO segredo é DATABASE_URL (Supabase → Settings → Database → Connection string,
+# use o SESSION POOLER). Fica com sync:false: você cola no painel do Render, NUNCA no git.
+# SUPABASE_URL e a anon key têm default público embutido no código, então não precisam
+# de env var (mas dá pra sobrescrever com SUPABASE_URL / SUPABASE_ANON_KEY se quiser).
+services:
+  - type: web
+    name: poupou
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: DATABASE_URL
+        sync: false

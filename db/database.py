@@ -32,7 +32,10 @@ class _PgConn:
         import psycopg
         from psycopg.rows import dict_row
         # prepare_threshold=None: compatível com o pooler de transação do Supabase (pgbouncer).
-        self._c = psycopg.connect(dsn, autocommit=True, row_factory=dict_row, prepare_threshold=None)
+        # connect_timeout: falha rápido (10s) em vez de pendurar o request/boot indefinidamente
+        # se o banco não responder (ex.: rede do host novo ainda não resolveu a rota).
+        self._c = psycopg.connect(dsn, autocommit=True, row_factory=dict_row,
+                                  prepare_threshold=None, connect_timeout=10)
         # inclui 'extensions' no path pra achar unaccent() (Supabase instala extensões lá).
         try:
             self._c.execute("SET search_path TO public, extensions")

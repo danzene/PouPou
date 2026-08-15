@@ -14,6 +14,7 @@ Roda com:  python -m uvicorn api.main:app --port 8000
 """
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import time
@@ -107,10 +108,16 @@ def _gate_cesta(resp: dict, premium: bool) -> dict:
         it["precos"] = []                # tira os preços por mercado
     return resp
 
-# Garante schema/migrações (tabelas links, lista) ao subir a API.
-_boot = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
-database.inicializar(_boot)
-_boot.close()
+# Garante schema/migrações (tabelas links, lista) ao subir a API. RESILIENTE: se o banco
+# não responder no boot (host novo/rede lenta), NÃO derruba a API — senão o uvicorn nem
+# começa a servir e o proxy do host devolve 502 em TUDO (até no /, que nem toca o banco).
+# Cada request reconecta por conta própria; o schema no Postgres já existe (init é no-op lá).
+try:
+    _boot = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
+    database.inicializar(_boot)
+    _boot.close()
+except Exception as _boot_err:  # noqa: BLE001
+    logging.getLogger("api").warning("boot: init do banco falhou, seguindo mesmo assim: %s", _boot_err)
 
 _ROTULO = {"kg": "R$/kg", "l": "R$/L", "un": "R$/un"}
 _SPARK_N = 12  # nº máximo de pontos na sparkline

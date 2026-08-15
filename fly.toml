@@ -1,24 +1,29 @@
-# Fly.io — PouPou (MercadoBarato). Servidor em SÃO PAULO (gru), colado no Supabase.
-# O segredo DATABASE_URL entra por `fly secrets set` (nunca no git).
-# Se o nome "poupou" estiver em uso, o `fly launch` sugere outro — deixe ele ajustar.
-app = "poupou"
-primary_region = "gru"
+# fly.toml app configuration file generated for poupou on 2026-08-15T05:48:02Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'poupou'
+primary_region = 'ams'
+
+[build]
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"     # hiberna quando ocioso (barato); acorda rápido
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0        # troque p/ 1 se quiser sempre quente (sem cold start)
+  min_machines_running = 0
 
   [[http_service.checks]]
-    interval = "30s"
-    timeout = "5s"
-    grace_period = "10s"
-    method = "GET"
-    path = "/"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/'
 
 [[vm]]
-  cpu_kind = "shared"
+  memory = '512mb'
+  cpu_kind = 'shared'
   cpus = 1
-  memory = "512mb"
+  memory_mb = 256

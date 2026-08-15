@@ -159,16 +159,45 @@ def _ref_historico(conn: sqlite3.Connection, ean: str, mercado_id: int, atual: f
     return sum(anteriores) / len(anteriores)
 
 
+# colunas do ranking (reusadas na versão por-1-ean e na versão EM LOTE)
+_RANKING_COLS = """m.id AS mercado_id, m.nome AS mercado, m.slug AS mercado_slug,
+               m.cor_badge, m.logo_url, m.loja_ref,
+               pa.ean AS ean, pa.preco, pa.preco_por_unidade, pr.unidade, pa.origem, pa.coletado_em,
+               pa.so_no_site, pa.preco_de, pa.desconto_pct, pa.oferta_tipo,
+               lk.url AS url"""
+
+
+def _linha_ranking(r, spark: list | None = None) -> dict:
+    """Monta uma linha do ranking a partir da row do banco (mesma forma nas duas versões)."""
+    spark = spark or []
+    return {
+        "mercado_id": r["mercado_id"],
+        "mercado": r["mercado"],
+        "mercado_slug": r["mercado_slug"],
+        "cor_badge": r["cor_badge"],
+        "logo_url": r["logo_url"],
+        "loja_ref": r["loja_ref"],
+        "preco": round(r["preco"], 2),
+        "preco_por_unidade": r["preco_por_unidade"],
+        "rotulo_unidade": _ROTULO.get(r["unidade"]),
+        "origem": r["origem"],
+        "coletado_em": r["coletado_em"],
+        "url": r["url"],
+        "so_no_site": bool(r["so_no_site"]),
+        "preco_de": r["preco_de"],
+        "desconto_pct": r["desconto_pct"],
+        "oferta_tipo": r["oferta_tipo"] if "oferta_tipo" in r.keys() else None,
+        "sparkline": spark,
+        "tendencia": _tendencia(spark),
+    }
+
+
 def _ranking_enriquecido(conn: sqlite3.Connection, ean: str, com_sparkline: bool = True) -> list[dict]:
     # Lê da tabela quente precos_atual (1 linha por ean+mercado) — rápido mesmo com
     # milhões de snapshots no histórico. Sparkline (que varre o histórico) só sob demanda.
     linhas = conn.execute(
-        """
-        SELECT m.id AS mercado_id, m.nome AS mercado, m.slug AS mercado_slug,
-               m.cor_badge, m.logo_url, m.loja_ref,
-               pa.preco, pa.preco_por_unidade, pr.unidade, pa.origem, pa.coletado_em,
-               pa.so_no_site, pa.preco_de, pa.desconto_pct, pa.oferta_tipo,
-               lk.url AS url
+        f"""
+        SELECT {_RANKING_COLS}
         FROM precos_atual pa
         JOIN mercados m  ON m.id = pa.mercado_id
         JOIN produtos pr ON pr.ean = pa.ean
@@ -178,34 +207,42 @@ def _ranking_enriquecido(conn: sqlite3.Connection, ean: str, com_sparkline: bool
         """,
         (ean,),
     ).fetchall()
-    out = []
+    return [
+        _linha_ranking(r, _sparkline(conn, ean, r["mercado_id"]) if com_sparkline else [])
+        for r in linhas
+    ]
+
+
+def _rankings_lote(conn, eans: list[str]) -> dict[str, list[dict]]:
+    """Ranking de VÁRIOS eans numa query só (evita o N+1 das listagens). Sem sparkline.
+    Devolve {ean: [linhas ordenadas por preço]}. Uma query em vez de uma por produto —
+    é o que derruba /categoria de ~60 idas ao banco pra 1."""
+    if not eans:
+        return {}
+    ph = ",".join(["?"] * len(eans))
+    linhas = conn.execute(
+        f"""
+        SELECT {_RANKING_COLS}
+        FROM precos_atual pa
+        JOIN mercados m  ON m.id = pa.mercado_id
+        JOIN produtos pr ON pr.ean = pa.ean
+        LEFT JOIN links lk ON lk.ean = pa.ean AND lk.mercado_id = pa.mercado_id
+        WHERE pa.ean IN ({ph}) AND m.ativo = 1
+        ORDER BY pa.ean, pa.preco ASC
+        """,
+        tuple(eans),
+    ).fetchall()
+    out: dict[str, list[dict]] = {}
     for r in linhas:
-        spark = _sparkline(conn, ean, r["mercado_id"]) if com_sparkline else []
-        out.append({
-            "mercado_id": r["mercado_id"],
-            "mercado": r["mercado"],
-            "mercado_slug": r["mercado_slug"],
-            "cor_badge": r["cor_badge"],
-            "logo_url": r["logo_url"],
-            "loja_ref": r["loja_ref"],
-            "preco": round(r["preco"], 2),
-            "preco_por_unidade": r["preco_por_unidade"],
-            "rotulo_unidade": _ROTULO.get(r["unidade"]),
-            "origem": r["origem"],
-            "coletado_em": r["coletado_em"],
-            "url": r["url"],
-            "so_no_site": bool(r["so_no_site"]),
-            "preco_de": r["preco_de"],
-            "desconto_pct": r["desconto_pct"],
-            "oferta_tipo": r["oferta_tipo"] if "oferta_tipo" in r.keys() else None,
-            "sparkline": spark,
-            "tendencia": _tendencia(spark),
-        })
+        out.setdefault(r["ean"], []).append(_linha_ranking(r))
     return out
 
 
-def _produto_dict(conn: sqlite3.Connection, prod: sqlite3.Row, com_sparkline: bool = True) -> dict:
-    ranking = _ranking_enriquecido(conn, prod["ean"], com_sparkline=com_sparkline)
+def _produto_dict(conn: sqlite3.Connection, prod: sqlite3.Row, com_sparkline: bool = True,
+                  ranking: list[dict] | None = None) -> dict:
+    # ranking pré-calculado (via _rankings_lote) evita o N+1 nas listagens; senão busca só deste ean.
+    if ranking is None:
+        ranking = _ranking_enriquecido(conn, prod["ean"], com_sparkline=com_sparkline)
     return {
         "ean": prod["ean"],
         "nome": prod["nome_canonico"],
@@ -218,6 +255,14 @@ def _produto_dict(conn: sqlite3.Connection, prod: sqlite3.Row, com_sparkline: bo
         "menor_preco": ranking[0]["preco"] if ranking else None,
         "ranking": ranking,
     }
+
+
+def _produtos_lote(conn, prods) -> list[dict]:
+    """Monta uma lista de produtos com UMA query de ranking pro conjunto todo (sem N+1).
+    Substitui o padrão antigo de 1 query por produto — é o que derruba /categoria de ~60
+    idas ao banco pra ~2."""
+    rk = _rankings_lote(conn, [p["ean"] for p in prods])
+    return [_produto_dict(conn, p, com_sparkline=False, ranking=rk.get(p["ean"], [])) for p in prods]
 
 
 # Cesta básica: staples do dia a dia. Pra cada termo, pega o produto presente no MAIOR número
@@ -239,7 +284,7 @@ def cesta_basica_itens():
     quase todas) e mais barato. Uma feira pronta com o essencial do dia a dia."""
     conn = _conn()
     try:
-        itens, vistos = [], set()
+        encontrados, vistos = [], set()
         for rotulo, termo in CESTA_BASICA_TERMOS:
             base = database.normalizar_nome(termo)
             padrao, inicio = f"%{base}%", f"{base}%"
@@ -256,9 +301,10 @@ def cesta_basica_itens():
             ).fetchone()
             if r and r["ean"] not in vistos:
                 vistos.add(r["ean"])
-                d = _produto_dict(conn, r, com_sparkline=False)
-                d["rotulo_basico"] = rotulo
-                itens.append(d)
+                encontrados.append((rotulo, r))
+        itens = _produtos_lote(conn, [r for _, r in encontrados])  # 1 query de ranking p/ todos
+        for (rotulo, _r), d in zip(encontrados, itens):
+            d["rotulo_basico"] = rotulo
         return {"itens": itens, "n": len(itens)}
     finally:
         conn.close()
@@ -303,7 +349,7 @@ def categoria(slug: str, limite: int = 60):
         return {
             "categoria": {"slug": cat["slug"], "nome": cat["nome"],
                           "disponivel": bool(cat["disponivel"])},
-            "produtos": [_produto_dict(conn, p, com_sparkline=False) for p in prods],
+            "produtos": _produtos_lote(conn, prods),
         }
     finally:
         conn.close()
@@ -590,15 +636,22 @@ def buscar(q: str):
     conn = _conn()
     try:
         achados = buscar_produtos(conn, q, limite=40)
-        # buscar_produtos devolve (ean, nome_canonico, marca, n_mercados);
-        # busca o produto completo pra enriquecer.
+        # busca os produtos completos + rankings EM LOTE (sem N+1: era 1 query de produto
+        # + 1 de ranking por resultado ~= 80 idas; vira ~2).
+        eans = [a["ean"] for a in achados]
         resultados = []
-        for a in achados:
-            prod = conn.execute(
+        if eans:
+            ph = ",".join(["?"] * len(eans))
+            prod_rows = conn.execute(
                 "SELECT ean, nome_canonico, marca, categoria, unidade, qtd_embalagem, imagem_url "
-                "FROM produtos WHERE ean = ?", (a["ean"],)
-            ).fetchone()
-            resultados.append(_produto_dict(conn, prod, com_sparkline=False))
+                f"FROM produtos WHERE ean IN ({ph})", tuple(eans)
+            ).fetchall()
+            por_ean = {p["ean"]: p for p in prod_rows}
+            rk = _rankings_lote(conn, eans)
+            resultados = [
+                _produto_dict(conn, por_ean[e], com_sparkline=False, ranking=rk.get(e, []))
+                for e in eans if e in por_ean  # preserva a ordem de relevância
+            ]
         pereciveis = _buscar_pereciveis(conn, q)
         return {"q": q, "resultados": resultados, "pereciveis": pereciveis}
     finally:

@@ -1787,12 +1787,15 @@ async function loadAdmin(){
   catAtiva=null; marcarNav(); $("#btnCesta").setAttribute("aria-pressed","false"); $("#q").value="";
   saida.innerHTML=`<p class="state">Carregando painel…</p>`; ctx.textContent="";
   try{
-    const [met,col,usu,mkt]=await Promise.all([
-      fetchAuth(`${API}/admin/metricas`).then(r=>r.json()),
-      fetchAuth(`${API}/admin/coleta`).then(r=>r.json()),
-      fetchAuth(`${API}/admin/usuarios`).then(r=>r.json()),
-      fetchAuth(`${API}/admin/mercados`).then(r=>r.json()),
+    const rs=await Promise.all([
+      fetchAuth(`${API}/admin/metricas`), fetchAuth(`${API}/admin/coleta`),
+      fetchAuth(`${API}/admin/usuarios`), fetchAuth(`${API}/admin/mercados`),
     ]);
+    if(rs.some(r=>!r.ok)){   // 403 (não-admin/sessão expirada): mensagem clara, não painel vazio
+      saida.innerHTML=`<p class="state"><span class="big">${ic("lock")}</span>Não consegui abrir o painel (acesso negado ou sessão expirada).<br>Tente sair e entrar de novo.<br><button class="btn-primary" style="margin-top:14px;width:auto;padding:0 20px" onclick="loadPerfil()">Voltar</button></p>`;
+      return;
+    }
+    const [met,col,usu,mkt]=await Promise.all(rs.map(r=>r.json()));
     ADMIN_DATA={met,col,usu,mkt}; renderAdmin();
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar o painel admin.</p>`; }
 }

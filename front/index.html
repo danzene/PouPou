@@ -1791,11 +1791,6 @@ function loadPerfil(secao){
         <p class="fine">Pagamento via Mercado Pago (Pix ou cartão). Cancele quando quiser.</p></div>`;
   }
 
-  const estados=[["gratis","Grátis"],["trial","Em trial"],["assinante","Assinante"]];
-  const modoTeste=`<div class="pf-sec"><h4>Modo teste</h4>
-      <p class="hint">Simula os estados pra você ver o app em cada um (enquanto a cobrança real não entra).</p>
-      <div class="seg">${estados.map(([v,l])=>`<button type="button" class="${plano()===v?"on":""}" onclick="testePlano('${v}')">${l}</button>`).join("")}</div></div>`;
-
   const meus=`<div class="pf-sec"><h4>Meus mercados</h4>
       <p class="hint">Marque os supermercados que você usa. Eles aparecem em destaque na comparação.</p>
       <div class="mkt-pick" id="mktPick">${renderMeusMercados()}</div></div>`;
@@ -1805,7 +1800,7 @@ function loadPerfil(secao){
         <span class="switch"><input type="checkbox" id="tgTema" ${document.documentElement.dataset.theme==="dark"?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label></div>`;
 
   ctx.textContent="";
-  saida.innerHTML=hero+assine+modoTeste+meus+cfg;
+  saida.innerHTML=hero+assine+meus+cfg;
   if(secao==="assinar"){ const c=saida.querySelector(".assine-card"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
 
@@ -1869,10 +1864,6 @@ async function admSetPlano(uid, plano){
 async function admToggleMercado(slug, ativo){
   try{ const r=await fetchAuth(`${API}/admin/mercado/${slug}/ativo`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ativo})});
     toast(r.ok?(ativo?"Mercado ativado ✓":"Mercado desativado ✓"):"Erro"); }catch(e){ toast("Erro"); }
-}
-function testePlano(v){
-  if(v==="trial"){ lsSet(TRIAL_INI_KEY,new Date().toISOString()); lsSet(TRIAL_USADO_KEY,"1"); }
-  setPlano(v); loadPerfil();
 }
 function renderMeusMercados(){
   const favs=favMercados();

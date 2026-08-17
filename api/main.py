@@ -57,7 +57,7 @@ _MP_TOLERANCIA_TS = 300   # janela anti-replay do webhook (5 min)
 # Preço e duração num só lugar: o SERVIDOR escolhe o valor a partir do id do plano —
 # o cliente NUNCA manda preço. 'meses' é pra recorrência no cartão (auto_recurring).
 PLANOS = {
-    "mensal": {"valor": 9.90, "dias": 30, "meses": 1, "titulo": "PouPou+ Mensal"},
+    "mensal": {"valor": 1.00, "dias": 30, "meses": 1, "titulo": "PouPou+ Mensal"},  # TESTE: R$1 — REVERTER p/ 9.90
     "anual": {"valor": 99.90, "dias": 365, "meses": 12, "titulo": "PouPou+ Anual"},
 }
 

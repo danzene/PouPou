@@ -99,3 +99,15 @@ CREATE TABLE IF NOT EXISTS pereciveis (
 );
 CREATE INDEX IF NOT EXISTS idx_pereciveis_norm ON pereciveis(nome_norm);
 -- (idx_pereciveis_cat é criado em database._migrar, após garantir a coluna categoria)
+
+-- Histórico de preço dos FRESCOS (append-only, só nas mudanças — espelha `precos` p/ EAN).
+-- Guardado por (mercado_id, cod_interno); nome_norm ajuda a cruzar por nome no gráfico.
+CREATE TABLE IF NOT EXISTS pereciveis_hist (
+  mercado_id   INTEGER NOT NULL,
+  cod_interno  TEXT NOT NULL,
+  nome_norm    TEXT,
+  preco        REAL NOT NULL,
+  coletado_em  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pereciveis_hist ON pereciveis_hist(mercado_id, cod_interno, coletado_em);
+CREATE INDEX IF NOT EXISTS idx_pereciveis_hist_norm ON pereciveis_hist(nome_norm, coletado_em);

@@ -720,6 +720,43 @@ def historico(ean: str):
         conn.close()
 
 
+@app.get("/historico-fresco/{chave}")
+def historico_fresco(chave: str):
+    """Séries de preço (por mercado) de um item FRESCO, casado pela chave de agrupamento.
+    Mesma estrutura do /historico dos EAN — reusa o mesmo gráfico no front. Por mercado,
+    segue o item MAIS BARATO (alinha com o ranking)."""
+    conn = _conn()
+    try:
+        atuais = conn.execute(
+            """SELECT p.mercado_id, p.cod_interno, p.nome, p.preco, p.coletado_em,
+                      m.nome AS mercado, m.cor_badge
+               FROM pereciveis p JOIN mercados m ON m.id = p.mercado_id WHERE m.ativo = 1"""
+        ).fetchall()
+        por_mercado: dict[str, dict] = {}
+        for r in atuais:
+            if database.chave_fresco(r["nome"]) != chave:
+                continue
+            cur = por_mercado.get(r["mercado"])
+            if cur is None or r["preco"] < cur["preco"]:
+                por_mercado[r["mercado"]] = {
+                    "mercado_id": r["mercado_id"], "cod_interno": r["cod_interno"],
+                    "cor_badge": r["cor_badge"], "preco": r["preco"], "coletado_em": r["coletado_em"]}
+        series = []
+        for merc, v in por_mercado.items():
+            pontos = [{"preco": round(h["preco"], 2), "coletado_em": h["coletado_em"]}
+                      for h in conn.execute(
+                          "SELECT preco, coletado_em FROM pereciveis_hist "
+                          "WHERE mercado_id = ? AND cod_interno = ? ORDER BY coletado_em",
+                          (v["mercado_id"], v["cod_interno"]))]
+            # âncora: o histórico só guarda MUDANÇAS; junta o preço ATUAL como último ponto
+            if not pontos or pontos[-1]["coletado_em"] != v["coletado_em"]:
+                pontos.append({"preco": round(v["preco"], 2), "coletado_em": v["coletado_em"]})
+            series.append({"mercado": merc, "cor_badge": v["cor_badge"], "pontos": pontos})
+        return {"chave": chave, "series": series}
+    finally:
+        conn.close()
+
+
 FRESCO_PREFIX = "f:"  # chave sintética de item fresco na lista (não tem EAN)
 
 

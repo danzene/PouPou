@@ -287,6 +287,9 @@
     padding:14px 16px; margin-bottom:12px; display:flex; align-items:center; gap:14px; }
   .per-main{ flex:1; min-width:0; }
   .per-lojas{ margin-top:6px; display:flex; flex-direction:column; gap:5px; }
+  .per-hist-btn{ margin-top:8px; display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:12px; font-weight:600; color:var(--mut); background:none; border:none; padding:2px 0; cursor:pointer; transition:color .12s; }
+  .per-hist-btn:hover{ color:var(--green-dark); }
+  .per-hist-btn svg{ flex:none; opacity:.9; }
   .per-loja{ display:flex; align-items:center; gap:8px; font-size:13.5px; }
   .per-loja .nm{ color:var(--mut); } .per-loja b{ color:var(--ink); font-weight:600; }
   .per-raw{ font-size:11.5px; color:var(--faint); } .per-raw::before{ content:"·"; margin:0 4px; }
@@ -857,6 +860,46 @@ function _pontosChave(){
   const linha=(l,p)=> p?`<div class="pt"><span class="l">${l}</span><span class="v num">${brl(p.preco)}</span></div>`:"";
   return `<div class="dp-pontos">${linha("Hoje",hoje)}${(p7&&p7!==hoje)?linha("7 dias atrás",p7):""}${(p30&&p30!==hoje&&p30!==p7)?linha("30 dias atrás",p30):""}</div>`;
 }
+// escapa string p/ dentro de um JS string em atributo onclick (aspas/barras)
+function jsesc(s){ return String(s==null?"":s).replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/"/g,"&quot;"); }
+
+// drawer de item FRESCO: reaproveita o MESMO gráfico (drRenderChart/DRAWER), sem
+// ranking/paywall/ean — o valor aqui é o histórico de preço que os frescos não tinham.
+async function abrirFresco(chave, nome){
+  try{
+    const hist=await fetch(`${API}/historico-fresco/${encodeURIComponent(chave)}`).then(r=>r.json());
+    const mkts=(hist.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
+    DRAWER={ean:null, hist, periodo:30, mercado:mkts[0]||null, cheap:mkts[0]||null, prod:null, fresco:{chave,nome}};
+    renderDrawerFresco(nome);
+  }catch(e){ /* ignora */ }
+}
+function renderDrawerFresco(nome){
+  const cheapPts=_serie(DRAWER.cheap);
+  const v=_variacao(cheapPts,7);
+  const varHTML=v?`<div class="dp-var ${v.dir}">${v.dir==="down"?"↓":v.dir==="up"?"↑":"→"} ${v.dir==="flat"?"estável":brl(Math.abs(v.abs))} nos últimos 7 dias</div>`:"";
+  const ver=_veredito(cheapPts);
+  const verHTML=ver?`<div class="verdict ${ver.c}"><span class="vdot"></span><div><div class="vt">${ver.t}</div><div class="vs">${ver.s}</div></div></div>`:"";
+  const mkts=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
+  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts">${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" onclick="drSetMercado('${jsesc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
+  const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
+  const ov=document.createElement("div"); ov.className="drawer-ov"; ov.id="drawerOv";
+  ov.setAttribute("onclick","fecharProduto(event)");
+  ov.innerHTML=`<div class="drawer" role="dialog" aria-modal="true" aria-label="Histórico do item fresco">
+    <div class="drawer-top"><span class="eyebrow">Fresco · por peso</span>
+      <button class="drawer-x" type="button" aria-label="Fechar" onclick="fecharProduto()">×</button></div>
+    <div class="drawer-scroll">
+      <h2 class="dp-nome">${esc(nome)}</h2>
+      ${varHTML}${verHTML}
+      <div class="dp-sec">Histórico de preço</div>
+      ${perTabs}${mktTabs}
+      <div id="drChart"></div>
+      <p class="per-nota" style="margin-top:12px">Frescos são casados pelo nome (sem código de barras); o histórico segue o preço por kg do item mais barato em cada mercado, e cresce conforme a coleta.</p>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  document.addEventListener("keydown",_escFecha);
+  drRenderChart();
+}
 async function abrirProduto(ean){
   try{
     const [prod,hist]=await Promise.all([
@@ -1075,11 +1118,12 @@ function cardPerecivel(g,ord,modo){
   const promo=g.precos.length?badgesPromo(g.precos[0]):"";
   const naLista=g.chave&&CESTA_EANS.has("f:"+g.chave);
   const addBtn=g.chave?`<button class="per-add ${naLista?"in":""}" type="button" data-chave="${esc(g.chave)}" data-nome="${esc(g.nome)}" onclick="addFrescoBtn(this)">${naLista?"✓ na lista":"+ lista"}</button>`:"";
+  const histBtn=g.chave?`<button class="per-hist-btn" type="button" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-4 4"/></svg> histórico de preço</button>`:"";
   const right=bandeja
     ? `<span class="lbl-menor">bandeja a partir de</span><div class="per-preco num">${brl(g.menor_pacote)}</div><span class="per-sub num">${brl(g.menor_preco)}${uG} melhor</span>`
     : `<span class="lbl-menor">a partir de</span><div class="per-preco num">${brl(g.menor_preco)}${uG}</div>`;
   return `<div class="per-card">${thumb(g.imagem_url,g.nome)}
-    <div class="per-main"><div class="prod-nome">${esc(g.nome)}</div><div class="per-lojas">${lojas}</div>${promo}${fresc}</div>
+    <div class="per-main"><div class="prod-nome">${esc(g.nome)}</div><div class="per-lojas">${lojas}</div>${histBtn}${promo}${fresc}</div>
     <div class="per-right">${right}${addBtn}</div>
   </div>`;
 }

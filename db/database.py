@@ -497,6 +497,18 @@ def upsert_perecivel(
         return
     if oferta_tipo is None and desconto_pct:
         oferta_tipo = "oferta"
+    nnorm = normalizar_nome(nome)
+    # histórico append-only, só na MUDANÇA de preço (dedup) — igual `precos` faz p/ EAN
+    ant = conn.execute(
+        "SELECT preco FROM pereciveis WHERE mercado_id = ? AND cod_interno = ?",
+        (mercado_id, cod_interno),
+    ).fetchone()
+    if ant is None or ant["preco"] is None or abs(float(ant["preco"]) - float(preco)) > 0.005:
+        conn.execute(
+            "INSERT INTO pereciveis_hist (mercado_id, cod_interno, nome_norm, preco, coletado_em) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (mercado_id, cod_interno, nnorm, preco, coletado_em),
+        )
     conn.execute(
         """
         INSERT INTO pereciveis (mercado_id, cod_interno, nome, nome_norm, categoria, preco,
@@ -517,7 +529,7 @@ def upsert_perecivel(
             desconto_pct = excluded.desconto_pct,
             oferta_tipo = excluded.oferta_tipo
         """,
-        (mercado_id, cod_interno, nome, normalizar_nome(nome), classificar_perecivel(nome), preco,
+        (mercado_id, cod_interno, nome, nnorm, classificar_perecivel(nome), preco,
          unidade, imagem_url, url, coletado_em,
          1 if so_no_site else 0, preco_de, desconto_pct, oferta_tipo),
     )

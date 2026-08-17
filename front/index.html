@@ -1772,11 +1772,8 @@ function loadPerfil(secao){
       <label class="modo-teste"><span class="lbl">Tema escuro<small>conforto pra vista à noite</small></span>
         <span class="switch"><input type="checkbox" id="tgTema" ${document.documentElement.dataset.theme==="dark"?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label></div>`;
 
-  const admin=ehAdmin()?`<div class="pf-sec pf-admin"><h4>Administração</h4>
-      <p class="hint">Você é admin — painel de gestão do PouPou (coleta, usuários, mercados, métricas).</p>
-      <button class="pf-admin-btn" type="button" onclick="loadAdmin()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> Abrir painel admin</button></div>`:"";
   ctx.textContent="";
-  saida.innerHTML=hero+admin+assine+modoTeste+meus+cfg;
+  saida.innerHTML=hero+assine+modoTeste+meus+cfg;
   if(secao==="assinar"){ const c=saida.querySelector(".assine-card"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
 

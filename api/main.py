@@ -1354,6 +1354,13 @@ def admin_metricas(authorization: str | None = Header(None)):
         conn.close()
 
 
+@app.get("/gestao")
+def gestao():
+    """Página SEPARADA de administração (login próprio, sem link no app do cliente).
+    A trava real continua nos endpoints /admin/* (checam is_admin); esta página é só a casca."""
+    return FileResponse(RAIZ / "front" / "admin.html")
+
+
 @app.get("/")
 def home():
     return FileResponse(FRONT)

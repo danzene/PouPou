@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Gestão PouPou</title>
+<style>
+  :root{ --bg:#0e1512; --surface:#15201b; --surface2:#1b2a22; --line:#26362c; --ink:#e8f0ea; --mut:#9db0a5; --faint:#6f847a; --green:#2ecc71; --green-dark:#27a35a; --green-light:#12331f; --r:14px; --r-btn:10px; --r-pill:999px; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .num{ font-variant-numeric:tabular-nums; }
+  /* ---- login ---- */
+  .wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login{ width:100%; max-width:380px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:28px 24px; }
+  .brand{ text-align:center; font-size:24px; font-weight:800; margin-bottom:4px; }
+  .brand span{ color:var(--green); }
+  .sub{ text-align:center; color:var(--mut); font-size:13px; margin-bottom:20px; }
+  label{ display:block; font-size:12px; color:var(--mut); margin:12px 0 5px; font-weight:600; }
+  input{ width:100%; height:44px; background:var(--surface2); border:1.5px solid var(--line); border-radius:var(--r-btn); padding:0 12px; color:var(--ink); font-size:15px; }
+  input:focus{ outline:none; border-color:var(--green); }
+  .btn{ width:100%; height:46px; margin-top:18px; background:var(--green); color:#04150a; border:none; border-radius:var(--r-btn); font-size:15px; font-weight:800; cursor:pointer; }
+  .btn:disabled{ opacity:.6; cursor:default; }
+  .err{ color:#e57373; font-size:13px; margin-top:12px; min-height:1px; text-align:center; }
+  .note{ text-align:center; color:var(--faint); font-size:11.5px; margin-top:16px; }
+  /* ---- painel ---- */
+  .top{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 22px; border-bottom:1px solid var(--line); background:var(--surface); position:sticky; top:0; z-index:2; }
+  .top .t{ font-size:17px; font-weight:800; } .top .t span{ color:var(--green); }
+  .who{ display:flex; align-items:center; gap:12px; font-size:13px; color:var(--mut); }
+  .sair{ background:var(--surface2); color:var(--ink); border:1px solid var(--line); border-radius:var(--r-pill); padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .body{ max-width:960px; margin:0 auto; padding:22px 18px 60px; }
+  .sec{ font-size:13px; font-weight:800; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin:26px 0 12px; }
+  .sec .m{ color:var(--mut); font-weight:600; text-transform:none; letter-spacing:0; }
+  .cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:10px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:13px; text-align:center; }
+  .card .n{ font-size:22px; font-weight:800; } .card .l{ font-size:11.5px; color:var(--mut); margin-top:3px; }
+  .list{ display:flex; flex-direction:column; gap:8px; }
+  .row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-btn); padding:11px 13px; }
+  .row.off{ opacity:.5; }
+  .row .mk{ flex:1 1 130px; } .row .mk b{ font-size:14px; } .row .mk .s{ display:block; font-size:11.5px; color:var(--faint); }
+  .met{ display:flex; flex-direction:column; align-items:flex-end; min-width:56px; }
+  .met .v{ font-size:14px; font-weight:700; } .met .l{ font-size:10.5px; color:var(--faint); }
+  .ok{ color:var(--green); } .warn{ color:#e0b64a; } .bad{ color:#e57373; }
+  .when{ font-size:11.5px; color:var(--mut); min-width:70px; text-align:right; }
+  .urow{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-btn); padding:11px 13px; }
+  .urow .info{ flex:1; min-width:0; } .urow .info b{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; } .urow .info .s{ font-size:11.5px; color:var(--faint); }
+  .tag{ display:inline-block; font-size:10px; font-weight:700; color:var(--green); background:var(--green-light); border-radius:var(--r-pill); padding:1px 7px; margin-left:6px; }
+  select{ background:var(--surface2); color:var(--ink); border:1px solid var(--line); border-radius:var(--r-pill); padding:6px 10px; font-size:13px; font-weight:600; cursor:pointer; }
+  .sw{ position:relative; width:44px; height:24px; flex:none; }
+  .sw input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .sw .t{ position:absolute; inset:0; background:var(--line); border-radius:12px; transition:.15s; }
+  .sw .t::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:.15s; }
+  .sw input:checked + .t{ background:var(--green); } .sw input:checked + .t::after{ transform:translateX(20px); }
+  .state{ text-align:center; color:var(--mut); padding:40px 0; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0b1a12; border:1px solid var(--green-dark); color:var(--ink); padding:10px 18px; border-radius:var(--r-pill); font-size:13px; opacity:0; transition:.2s; pointer-events:none; z-index:9; }
+  .toast.show{ opacity:1; }
+  .hidden{ display:none; }
+</style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="loginView" class="wrap">
+    <form class="login" onsubmit="return entrar(event)">
+      <div class="brand">Pou<span>Pou</span> · Gestão</div>
+      <div class="sub">Acesso restrito à administração</div>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" placeholder="admin@…" required>
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" placeholder="sua senha" required>
+      <button class="btn" type="submit" id="btnEntrar">Entrar</button>
+      <p class="err" id="err"></p>
+      <p class="note">Página privada. Só administradores autorizados entram.</p>
+    </form>
+  </div>
+
+  <!-- PAINEL -->
+  <div id="painelView" class="hidden">
+    <div class="top">
+      <div class="t">Pou<span>Pou</span> · Painel</div>
+      <div class="who"><span id="whoEmail"></span><button class="sair" onclick="sair()">Sair</button></div>
+    </div>
+    <div class="body" id="painel"><div class="state">Carregando…</div></div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const API="";
+const SUPABASE_URL="https://ijtnozcomqzxfaidurso.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqdG5vemNvbXF6eGZhaWR1cnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NzY2MTAsImV4cCI6MjEwMjI1MjYxMH0.9Hl9d2fK0yiD7WAaMZZfRuqAJeJ5F8skGIpWNkpfl9o";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON,{auth:{persistSession:true,autoRefreshToken:true}});
+let TOKEN=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=v=>(v==null?0:v).toLocaleString("pt-BR");
+function toast(m){ let t=$(".toast"); if(!t){ t=document.createElement("div"); t.className="toast"; document.body.appendChild(t); } t.textContent=m; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2600); }
+function relTempo(iso){ if(!iso) return "—"; const d=(Date.now()-new Date(iso).getTime())/1000; if(d<3600) return Math.round(d/60)+" min"; if(d<86400) return Math.round(d/3600)+"h"; return Math.round(d/86400)+"d"; }
+async function api(path,opts){ opts=opts||{}; opts.headers=Object.assign({},opts.headers||{},TOKEN?{Authorization:"Bearer "+TOKEN}:{}); return fetch(API+path,opts); }
+
+async function entrar(ev){ ev.preventDefault();
+  const email=$("#email").value.trim(), senha=$("#senha").value, err=$("#err"), btn=$("#btnEntrar");
+  err.textContent=""; btn.disabled=true; btn.textContent="Entrando…";
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email,password:senha});
+    if(error||!data.session){ err.textContent="E-mail ou senha incorretos."; btn.disabled=false; btn.textContent="Entrar"; return false; }
+    TOKEN=data.session.access_token;
+    // valida se é admin: um endpoint /admin/* devolve 200 só p/ is_admin
+    const r=await api("/admin/metricas");
+    if(r.status===200){ $("#whoEmail").textContent=email; mostrarPainel(await r.json()); }
+    else{ await sb.auth.signOut(); TOKEN=null; err.textContent="Esta conta não tem acesso à administração."; btn.disabled=false; btn.textContent="Entrar"; }
+  }catch(e){ err.textContent="Erro ao entrar. Tente de novo."; btn.disabled=false; btn.textContent="Entrar"; }
+  return false;
+}
+async function sair(){ try{ await sb.auth.signOut(); }catch(e){} TOKEN=null; location.reload(); }
+
+async function mostrarPainel(metrica){
+  $("#loginView").classList.add("hidden"); $("#painelView").classList.remove("hidden");
+  try{
+    const [col,usu,mkt]=await Promise.all([
+      api("/admin/coleta").then(r=>r.json()), api("/admin/usuarios").then(r=>r.json()), api("/admin/mercados").then(r=>r.json())
+    ]);
+    render(metrica,col,usu,mkt);
+  }catch(e){ $("#painel").innerHTML=`<div class="state">Erro ao carregar os dados.</div>`; }
+}
+function render(m,col,usu,mkt){
+  const cards=[["Usuários",m.usuarios],["Assinantes",m.assinantes],["Em trial",m.em_trial],["Com lista",m.usuarios_com_lista],["Itens em listas",m.itens_em_listas],["Favoritos",m.favoritos],["Produtos",m.produtos],["Preços",m.precos_atuais],["Frescos",m.frescos],["Mercados ativos",m.mercados_ativos]];
+  const cardsH=`<div class="cards">${cards.map(([l,v])=>`<div class="card"><div class="n num">${num(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`;
+  const colH=(col.mercados||[]).map(x=>{ const c=x.pct_24h>=80?"ok":x.pct_24h>=40?"warn":"bad";
+    return `<div class="row ${x.ativo?"":"off"}"><div class="mk"><b>${esc(x.nome)}</b><span class="s">${esc(x.plataforma||"")}${x.ativo?"":" · inativo"}</span></div>
+      <div class="met"><span class="v num">${num(x.n_produtos)}</span><span class="l">produtos</span></div>
+      <div class="met"><span class="v num ${c}">${x.pct_24h}%</span><span class="l">em 24h</span></div>
+      <div class="met"><span class="v num">${x.carnes_frescas_24h}</span><span class="l">carnes 24h</span></div>
+      <div class="when">${x.ultima?relTempo(x.ultima):"nunca"}</div></div>`; }).join("");
+  const usuH=(usu.usuarios||[]).map(u=>{ const o=["gratis","trial","assinante"].map(p=>`<option value="${p}" ${u.plano===p?"selected":""}>${p}</option>`).join("");
+    return `<div class="urow"><div class="info"><b>${esc(u.email||u.nome||(u.id||"").slice(0,8))}${u.is_admin?'<span class="tag">admin</span>':""}</b><span class="s">criado ${u.criado_em?relTempo(u.criado_em):"—"}</span></div>
+      <select onchange="setPlano('${esc(u.id)}',this.value)">${o}</select></div>`; }).join("");
+  const mktH=(mkt.mercados||[]).map(x=>`<div class="urow"><div class="info"><b>${esc(x.nome)}</b><span class="s">${esc(x.plataforma||"")} · ${esc(x.cidade||"")}</span></div>
+      <label class="sw"><input type="checkbox" ${x.ativo?"checked":""} onchange="toggleMercado('${esc(x.slug)}',this.checked)"><span class="t"></span></label></div>`).join("");
+  const pp=Object.entries(usu.por_plano||{}).map(([k,v])=>`${k} ${v}`).join(" · ");
+  $("#painel").innerHTML=`
+    <div class="sec">Métricas</div>${cardsH}
+    <div class="sec">Saúde da coleta <span class="m">últimas 24h</span></div><div class="list">${colH}</div>
+    <div class="sec">Usuários <span class="m">${usu.total} · ${pp}</span></div><div class="list">${usuH}</div>
+    <div class="sec">Mercados <span class="m">ligar/desligar</span></div><div class="list">${mktH}</div>`;
+}
+async function setPlano(uid,plano){
+  try{ const r=await api(`/admin/usuario/${uid}/plano`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})}); toast(r.ok?`Plano → ${plano} ✓`:"Erro"); }catch(e){ toast("Erro"); }
+}
+async function toggleMercado(slug,ativo){
+  try{ const r=await api(`/admin/mercado/${slug}/ativo`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ativo})}); toast(r.ok?(ativo?"Ativado ✓":"Desativado ✓"):"Erro"); }catch(e){ toast("Erro"); }
+}
+// se já houver sessão de admin salva, entra direto
+(async function(){
+  try{ const {data}=await sb.auth.getSession();
+    if(data.session){ TOKEN=data.session.access_token; const r=await api("/admin/metricas");
+      if(r.status===200){ $("#whoEmail").textContent=data.session.user.email||""; mostrarPainel(await r.json()); }
+      else{ TOKEN=null; }
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

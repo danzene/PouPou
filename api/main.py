@@ -14,6 +14,9 @@ Roda com:  python -m uvicorn api.main:app --port 8000
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import os
 import sqlite3
@@ -23,7 +26,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from analise import normalizar
@@ -45,6 +48,24 @@ SUPABASE_ANON = os.getenv(
     "eGZhaWR1cnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NzY2MTAsImV4cCI6MjEwMjI1MjYxMH0."
     "9Hl9d2fK0yiD7WAaMZZfRuqAJeJ5F8skGIpWNkpfl9o")  # chave PÚBLICA (anon)
 _tok_cache: dict = {}   # token -> (user_id, expira_em): evita bater no Supabase a cada request
+
+# ---- Mercado Pago (pagamentos) ----
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")            # SECRETO (Fly secret) — nunca no front
+MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "")        # SECRETO — assina os webhooks
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://poupou.fly.dev").rstrip("/")
+_MP_TOLERANCIA_TS = 300   # janela anti-replay do webhook (5 min)
+# Preço e duração num só lugar: o SERVIDOR escolhe o valor a partir do id do plano —
+# o cliente NUNCA manda preço. 'meses' é pra recorrência no cartão (auto_recurring).
+PLANOS = {
+    "mensal": {"valor": 9.90, "dias": 30, "meses": 1, "titulo": "PouPou+ Mensal"},
+    "anual": {"valor": 99.90, "dias": 365, "meses": 12, "titulo": "PouPou+ Anual"},
+}
+
+
+def _mp():
+    """SDK do Mercado Pago (import tardio: não quebra o boot se o pacote faltar num env)."""
+    import mercadopago
+    return mercadopago.SDK(MP_ACCESS_TOKEN)
 
 
 def _uid_do_header(authorization: str | None) -> str | None:
@@ -69,15 +90,53 @@ def _uid_do_header(authorization: str | None) -> str | None:
     return uid
 
 
+_email_cache: dict = {}
+
+
+def _email_do_header(authorization: str | None) -> str | None:
+    """E-mail do usuário logado (via Supabase /auth/v1/user). Necessário pro payer_email do
+    preapproval. Cacheado 5 min por token."""
+    if not authorization:
+        return None
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    token = parts[1]
+    ent = _email_cache.get(token)
+    if ent and ent[1] > time.time():
+        return ent[0]
+    try:
+        r = httpx.get(f"{SUPABASE_URL}/auth/v1/user",
+                      headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON}, timeout=8)
+        email = r.json().get("email") if r.status_code == 200 else None
+    except Exception:  # noqa: BLE001
+        email = None
+    if email:
+        _email_cache[token] = (email, time.time() + 300)
+    return email
+
+
 def _premium(conn, uid: str | None) -> bool:
-    """True se o usuário é assinante OU está com o reverse trial de 3 dias ativo (lê profiles)."""
+    """True se o usuário é assinante COM validade no futuro OU está com o reverse trial
+    de 3 dias ativo (lê profiles). A assinatura agora expira: plano='assinante' só libera
+    enquanto plano_expira_em > agora (cada pagamento aprovado estende essa data no webhook)."""
     if not uid:
         return False
-    r = conn.execute("SELECT plano, trial_ini FROM profiles WHERE id = ?", (uid,)).fetchone()
+    r = conn.execute("SELECT plano, trial_ini, plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
     if not r:
         return False
     if r["plano"] == "assinante":
-        return True
+        exp = r["plano_expira_em"]
+        if not exp:
+            return True   # compat: assinante legado sem validade (pré-Mercado Pago)
+        if isinstance(exp, str):
+            try:
+                exp = datetime.fromisoformat(exp)
+            except ValueError:
+                return True
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < exp
     if r["plano"] == "trial" and r["trial_ini"]:
         ini = r["trial_ini"]
         if isinstance(ini, str):
@@ -121,6 +180,75 @@ def _gate_cesta(resp: dict, premium: bool) -> dict:
         it["melhor"] = {"preco": m.get("preco"), "rotulo": m.get("rotulo")} if m else None  # só o menor preço
         it["precos"] = []                # tira os preços por mercado
     return resp
+
+def _valida_assinatura_mp(x_signature: str | None, x_request_id: str | None,
+                          data_id: str | None) -> bool:
+    """Valida o webhook do Mercado Pago: HMAC-SHA256 sobre o manifest 'id:..;request-id:..;ts:..;'.
+    Sem secret/assinatura -> rejeita. Janela anti-replay de 5 min."""
+    if not (x_signature and x_request_id and data_id and MP_WEBHOOK_SECRET):
+        return False
+    ts = v1 = None
+    for parte in x_signature.split(","):
+        chave, _, valor = parte.partition("=")
+        chave, valor = chave.strip(), valor.strip()
+        if chave == "ts":
+            ts = valor
+        elif chave == "v1":
+            v1 = valor
+    if not (ts and v1):
+        return False
+    try:
+        if abs(time.time() - int(ts)) > _MP_TOLERANCIA_TS:
+            return False
+    except ValueError:
+        return False
+    did = data_id.lower() if data_id.isalnum() else data_id
+    manifest = f"id:{did};request-id:{x_request_id};ts:{ts};"
+    esperado = hmac.new(MP_WEBHOOK_SECRET.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(esperado, v1)
+
+
+def _registra_evento(conn, payment_id, topico, status, uid, plano_id, valor, raw) -> bool:
+    """Grava o evento MP e devolve True só se for NOVO. Idempotência: a mesma (payment_id,status)
+    entra 1x (UNIQUE), então reprocessar um webhook não estende o acesso de novo."""
+    cur = conn.execute(
+        "INSERT INTO mp_eventos (payment_id, topico, status, uid, plano_alvo, valor, raw) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb) ON CONFLICT (payment_id, status) DO NOTHING",
+        (str(payment_id), topico, status, uid, plano_id, valor, json.dumps(raw, default=str)))
+    return getattr(cur, "rowcount", 0) != 0
+
+
+def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapproval_id=None) -> str:
+    """Marca plano='assinante' e estende plano_expira_em a partir do MAIOR entre agora e a
+    validade atual (não perde dias já pagos). Escreve via _conn() (owner, ignora RLS)."""
+    dias = PLANOS[plano_id]["dias"]
+    agora = datetime.now(timezone.utc)
+    base = agora
+    r = conn.execute("SELECT plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
+    if r and r["plano_expira_em"]:
+        atual = r["plano_expira_em"]
+        if isinstance(atual, str):
+            try:
+                atual = datetime.fromisoformat(atual)
+            except ValueError:
+                atual = agora
+        if atual.tzinfo is None:
+            atual = atual.replace(tzinfo=timezone.utc)
+        if atual > agora:
+            base = atual
+    nova = (base + timedelta(days=dias)).isoformat()
+    if preapproval_id is not None:
+        conn.execute(
+            "UPDATE profiles SET plano='assinante', plano_expira_em=?, ultimo_pagamento_em=?, "
+            "mp_status=?, mp_preapproval_id=?, atualizado_em=? WHERE id=?",
+            (nova, agora.isoformat(), mp_status, preapproval_id, agora.isoformat(), uid))
+    else:
+        conn.execute(
+            "UPDATE profiles SET plano='assinante', plano_expira_em=?, ultimo_pagamento_em=?, "
+            "mp_status=?, atualizado_em=? WHERE id=?",
+            (nova, agora.isoformat(), mp_status, agora.isoformat(), uid))
+    return nova
+
 
 # Garante schema/migrações (tabelas links, lista) ao subir a API. RESILIENTE: se o banco
 # não responder no boot (host novo/rede lenta), NÃO derruba a API — senão o uvicorn nem
@@ -1276,6 +1404,266 @@ def admin_usuarios(authorization: str | None = Header(None)):
                              "plano": plano, "trial_ini": r["trial_ini"],
                              "criado_em": r["criado_em"], "is_admin": bool(r["is_admin"])})
         return {"usuarios": usuarios, "total": len(usuarios), "por_plano": por_plano}
+    finally:
+        conn.close()
+
+
+@app.post("/assinatura/criar")
+def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(None)):
+    """Cria o pagamento no Mercado Pago e devolve o init_point pra redirecionar o usuário.
+      - metodo='pix'    -> Checkout Pro avulso (Pix ou cartão à vista); libera N dias no webhook.
+      - metodo='cartao' -> assinatura recorrente (/preapproval); renova sozinho.
+    O SERVIDOR escolhe o valor pelo id do plano — o cliente NUNCA manda preço."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    if not MP_ACCESS_TOKEN:
+        raise HTTPException(status_code=503, detail="Pagamento ainda não configurado")
+    b = body or {}
+    plano_id = b.get("plano")
+    metodo = (b.get("metodo") or "pix").lower()
+    if plano_id not in PLANOS:
+        raise HTTPException(status_code=400, detail="plano inválido")
+    p = PLANOS[plano_id]
+    if metodo == "cartao":
+        # assinatura recorrente no cartão (renova sozinho) — fluxo redirect (/preapproval)
+        return _criar_preapproval(uid, plano_id, _email_do_header(authorization))
+    # ---- Pix / avulso: Checkout Pro (uma cobrança; libera N dias) ----
+    pref = {
+        "items": [{"id": f"poupou-{plano_id}", "title": p["titulo"],
+                   "description": f"PouPou+ — acesso por {p['dias']} dias",
+                   "quantity": 1, "currency_id": "BRL", "unit_price": p["valor"]}],
+        "external_reference": f"{uid}:{plano_id}:avulso",
+        "back_urls": {"success": f"{PUBLIC_BASE_URL}/?pagamento=sucesso",
+                      "failure": f"{PUBLIC_BASE_URL}/?pagamento=falha",
+                      "pending": f"{PUBLIC_BASE_URL}/?pagamento=pendente"},
+        "auto_return": "approved",
+        "notification_url": f"{PUBLIC_BASE_URL}/webhooks/mercadopago",
+        "statement_descriptor": "POUPOU",
+        "metadata": {"uid": uid, "plano": plano_id},
+    }
+    try:
+        res = _mp().preference().create(pref).get("response", {})
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("mp preference: %s", e)
+        raise HTTPException(status_code=502, detail="Falha ao criar pagamento")
+    init = res.get("init_point") or res.get("sandbox_init_point")
+    if not init:
+        raise HTTPException(status_code=502, detail="Falha ao criar pagamento")
+    return {"init_point": init, "ref_id": res.get("id")}
+
+
+def _criar_preapproval(uid, plano_id, email) -> dict:
+    """Assinatura recorrente no cartão via REDIRECT: cria o preapproval 'pending' (o MP coleta
+    o cartão na página dele) e devolve o init_point. O acesso só é liberado no webhook."""
+    if not email:
+        raise HTTPException(status_code=400, detail="E-mail do usuário indisponível")
+    p = PLANOS[plano_id]
+    body = {
+        "reason": p["titulo"],
+        "external_reference": f"{uid}:{plano_id}:cartao",
+        "payer_email": email,
+        "auto_recurring": {"frequency": p["meses"], "frequency_type": "months",
+                           "transaction_amount": p["valor"], "currency_id": "BRL"},
+        "back_url": f"{PUBLIC_BASE_URL}/?pagamento=sucesso",
+        "status": "pending",
+    }
+    try:
+        res = _mp().preapproval().create(body).get("response", {})
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("mp preapproval: %s", e)
+        raise HTTPException(status_code=502, detail="Falha ao criar assinatura")
+    init = res.get("init_point")
+    pid = res.get("id")
+    if not init:
+        raise HTTPException(status_code=502, detail="Falha ao criar assinatura")
+    if pid:   # guarda a assinatura pendente (pra cancelar depois); acesso só vem no webhook
+        conn = _conn()
+        try:
+            conn.execute("UPDATE profiles SET mp_preapproval_id=?, mp_status='pending', atualizado_em=? "
+                         "WHERE id=?", (pid, datetime.now(timezone.utc).isoformat(), uid))
+        finally:
+            conn.close()
+    return {"init_point": init, "ref_id": pid, "recorrente": True}
+
+
+def _mp_get(path: str) -> dict:
+    """GET cru na API do MP (recursos sem método no SDK Python, ex.: /authorized_payments/{id})."""
+    try:
+        r = httpx.get(f"https://api.mercadopago.com{path}",
+                      headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"}, timeout=15)
+        return r.json() if r.status_code == 200 else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _proc_payment(payment_id) -> None:
+    """Confirma um pagamento avulso (Checkout Pro) e, se aprovado, estende o acesso."""
+    if not payment_id:
+        return
+    pay = _mp().payment().get(payment_id).get("response", {})
+    status = pay.get("status")
+    ext = (pay.get("external_reference") or "").split(":")
+    uid = ext[0] if ext else ""
+    plano_id = ext[1] if len(ext) > 1 else ""
+    if status == "approved" and uid and plano_id in PLANOS:
+        conn = _conn()
+        try:
+            if _registra_evento(conn, payment_id, "payment", status, uid, plano_id,
+                                 pay.get("transaction_amount"), pay):
+                _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+        finally:
+            conn.close()
+
+
+def _proc_authorized_payment(ap_id) -> None:
+    """Cada cobrança recorrente do cartão. Sucesso = status 'processed' + payment.status
+    'approved'. O external_reference já vem no objeto -> identifica o usuário sem buscar o
+    preapproval. Idempotente pelo id da fatura (não estende 2x em reenvio)."""
+    if not ap_id:
+        return
+    ap = _mp_get(f"/authorized_payments/{ap_id}")
+    ok = ap.get("status") == "processed" and (ap.get("payment") or {}).get("status") == "approved"
+    if not ok:
+        return
+    ext = (ap.get("external_reference") or "").split(":")
+    uid = ext[0] if ext else ""
+    plano_id = ext[1] if len(ext) > 1 else ""
+    pre_id = ap.get("preapproval_id")
+    if uid and plano_id in PLANOS:
+        conn = _conn()
+        try:
+            if _registra_evento(conn, ap_id, "subscription_authorized_payment", "approved",
+                                 uid, plano_id, ap.get("transaction_amount"), ap):
+                _estende_assinatura(conn, uid, plano_id, mp_status="authorized", preapproval_id=pre_id)
+        finally:
+            conn.close()
+
+
+def _proc_preapproval(pre_id) -> None:
+    """Mudança de status da assinatura (pending/authorized/paused/cancelled). Só atualiza o
+    mp_status; o acesso é estendido pelas cobranças. Cancelar NÃO tira o acesso já pago
+    (mantém até plano_expira_em; só não renova)."""
+    if not pre_id:
+        return
+    sub = _mp_get(f"/preapproval/{pre_id}")
+    status = sub.get("status")
+    ext = (sub.get("external_reference") or "").split(":")
+    uid = ext[0] if ext else ""
+    if uid and status:
+        conn = _conn()
+        try:
+            conn.execute("UPDATE profiles SET mp_status=?, mp_preapproval_id=?, atualizado_em=? "
+                         "WHERE id=?", (status, pre_id, datetime.now(timezone.utc).isoformat(), uid))
+        finally:
+            conn.close()
+
+
+@app.post("/webhooks/mercadopago")
+async def webhook_mp(request: Request):
+    """Recebe notificações do Mercado Pago. Valida a assinatura (HMAC), consulta o status REAL
+    na API do MP e só então mexe no plano (nunca confia no payload). Responde 200 rápido."""
+    data_id = request.query_params.get("data.id") or request.query_params.get("id")
+    if not _valida_assinatura_mp(request.headers.get("x-signature"),
+                                 request.headers.get("x-request-id"), data_id):
+        raise HTTPException(status_code=401, detail="assinatura inválida")
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        body = {}
+    topico = (body.get("type") or body.get("topic")
+              or request.query_params.get("type") or request.query_params.get("topic"))
+    try:
+        if topico == "payment":
+            _proc_payment(data_id)
+        elif topico == "subscription_authorized_payment":   # cada cobrança recorrente do cartão
+            _proc_authorized_payment(data_id)
+        elif topico == "subscription_preapproval":           # status da assinatura (authorized/cancelled/…)
+            _proc_preapproval(data_id)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("webhook mp %s/%s: %s", topico, data_id, e)
+    return Response(status_code=200)
+
+
+@app.get("/assinatura/status")
+def assinatura_status(authorization: str | None = Header(None)):
+    """Status da assinatura do usuário (o front confirma por aqui após voltar do checkout —
+    a fonte da verdade é o profiles, atualizado pelo webhook, não a back_url)."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    conn = _conn()
+    try:
+        r = conn.execute(
+            "SELECT plano, plano_expira_em, mp_preapproval_id, mp_status FROM profiles WHERE id = ?",
+            (uid,)).fetchone()
+        ativo = _premium(conn, uid)
+        exp = r["plano_expira_em"] if r else None
+        dias = None
+        if exp:
+            e = exp if not isinstance(exp, str) else datetime.fromisoformat(exp)
+            if e.tzinfo is None:
+                e = e.replace(tzinfo=timezone.utc)
+            dias = max(0, (e - datetime.now(timezone.utc)).days)
+        return {"plano": (r["plano"] if r else "gratis"), "ativo": ativo, "expira_em": exp,
+                "dias_restantes": dias,
+                "recorrente": bool(r and r["mp_preapproval_id"] and r["mp_status"] not in ("cancelled", None)),
+                "mp_status": (r["mp_status"] if r else None)}
+    finally:
+        conn.close()
+
+
+@app.post("/assinatura/cancelar")
+def assinatura_cancelar(authorization: str | None = Header(None)):
+    """Cancela a assinatura recorrente no Mercado Pago. As cobranças param; o acesso já pago
+    segue até plano_expira_em (sem reembolso do ciclo corrente)."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    if not MP_ACCESS_TOKEN:
+        raise HTTPException(status_code=503, detail="Pagamento não configurado")
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT mp_preapproval_id FROM profiles WHERE id = ?", (uid,)).fetchone()
+        pid = r["mp_preapproval_id"] if r else None
+        if not pid:
+            raise HTTPException(status_code=400, detail="Sem assinatura recorrente ativa")
+        try:
+            _mp().preapproval().update(pid, {"status": "cancelled"})
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger("api").warning("mp cancelar: %s", e)
+            raise HTTPException(status_code=502, detail="Falha ao cancelar no Mercado Pago")
+        conn.execute("UPDATE profiles SET mp_status='cancelled', atualizado_em=? WHERE id=?",
+                     (datetime.now(timezone.utc).isoformat(), uid))
+        return {"ok": True, "status": "cancelled",
+                "aviso": "As cobranças param. Seu acesso segue até o fim do período já pago."}
+    finally:
+        conn.close()
+
+
+@app.post("/trial/iniciar")
+def trial_iniciar(authorization: str | None = Header(None)):
+    """Começa o reverse trial de 3 dias — AGORA no servidor (o cliente não escreve mais
+    profiles). Só libera se ainda não usou o trial e está no grátis. Idempotente-ish:
+    se já é assinante/trial, devolve o estado atual sem regredir."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT plano, trial_ini, trial_usado FROM profiles WHERE id = ?", (uid,)).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+        if r["plano"] == "assinante":
+            return {"ok": True, "plano": "assinante", "ja": True}
+        if r["trial_usado"] or r["plano"] == "trial":
+            return {"ok": False, "plano": r["plano"], "trial_ini": r["trial_ini"],
+                    "motivo": "trial_ja_usado"}
+        agora = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "UPDATE profiles SET plano = 'trial', trial_ini = ?, trial_usado = true, atualizado_em = ? "
+            "WHERE id = ?", (agora, agora, uid))
+        return {"ok": True, "plano": "trial", "trial_ini": agora}
     finally:
         conn.close()
 

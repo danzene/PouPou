@@ -607,6 +607,20 @@
   .trial-chip{ display:inline-block; font-size:12.5px; font-weight:600; color:var(--green-dark); background:var(--green-light); border-radius:var(--r-pill); padding:4px 12px; margin-bottom:10px; }
   .trial-chip.on{ color:#7a4e00; background:var(--yellow-soft); border:1px solid var(--yellow); }
   :root[data-theme="dark"] .trial-chip.on{ color:var(--yellow); }
+  /* seletor de plano (mensal/anual) + botões de pagamento */
+  .assine-card .plano-sel{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:4px 0 14px; }
+  .assine-card .ps{ display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left; padding:10px 12px; border:1.5px solid var(--line,rgba(127,127,127,.28)); background:var(--surface); border-radius:var(--r-btn); cursor:pointer; color:var(--mut); font:inherit; }
+  .assine-card .ps span{ font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; }
+  .assine-card .ps b{ font-size:18px; font-weight:800; color:var(--ink); line-height:1; }
+  .assine-card .ps b i{ font-size:12px; font-weight:600; color:var(--mut); font-style:normal; }
+  .assine-card .ps em.badge-off{ font-size:10px; font-weight:700; color:var(--green-dark); background:var(--green-light); border-radius:var(--r-pill); padding:1px 6px; font-style:normal; }
+  .assine-card .ps.on{ border-color:var(--green); background:var(--green-light); color:var(--green-dark); }
+  .assine-card .btn-pay{ width:100%; margin-top:8px; }
+  .assine-card .btn-ghost{ width:100%; height:46px; margin-top:8px; border:1.5px solid var(--green); background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:14.5px; cursor:pointer; }
+  .assine-card .btn-ghost:hover{ background:var(--green-light); }
+  .assine-card .ou{ text-align:center; font-size:12px; color:var(--mut); margin:12px 0 2px; }
+  .assine-card .pf-sub-sec{ margin-top:14px; border-top:1px solid var(--line,rgba(127,127,127,.22)); padding-top:12px; }
+  .assine-card .renew-lbl{ font-size:12.5px; font-weight:700; color:var(--green-dark); margin-bottom:8px; }
   .trial-banner{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#7a4e00; background:var(--yellow-soft);
     border:1px solid var(--yellow); border-radius:var(--r-btn); padding:10px 14px; margin-bottom:14px; }
   :root[data-theme="dark"] .trial-banner{ color:var(--yellow); }
@@ -1520,7 +1534,9 @@ const sb=(window.supabase&&SUPABASE_URL)?window.supabase.createClient(SUPABASE_U
 
 // Sessão + perfil ficam em cache na memória (os renders são síncronos); hidratados no login/init.
 let SESSAO=null;
-let PERFIL={plano:"gratis", trial_ini:null, trial_usado:false, nome:null};
+let PERFIL={plano:"gratis", trial_ini:null, trial_usado:false, nome:null, plano_expira_em:null, mp_preapproval_id:null, mp_status:null};
+let PLANO_SEL="mensal";   // plano escolhido no card de assinatura (mensal|anual)
+function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(); }
 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
@@ -1531,33 +1547,47 @@ function trialIni(){ return PERFIL.trial_ini?new Date(PERFIL.trial_ini):null; }
 function diasRestantesTrial(){ const ini=trialIni(); if(!ini) return 0;
   return Math.max(0, Math.ceil((ini.getTime()+TRIAL_DIAS*864e5-Date.now())/864e5)); }
 function trialAtivo(){ return plano()==="trial" && diasRestantesTrial()>0; }
-function acessoPremium(){ return plano()==="assinante" || trialAtivo(); }
+// assinante agora EXPIRA: só é premium enquanto plano_expira_em > agora (o servidor é a
+// fonte da verdade; isto mantém a UI do cliente alinhada e não mostra "PouPou+" vencido).
+function assinanteAtivo(){
+  if(plano()!=="assinante") return false;
+  if(!PERFIL.plano_expira_em) return true;                 // compat: assinante legado sem data
+  return new Date(PERFIL.plano_expira_em).getTime() > Date.now();
+}
+function acessoPremium(){ return assinanteAtivo() || trialAtivo(); }
 function trialJaUsado(){ return !!PERFIL.trial_usado; }
 function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("pro",acessoPremium()); }
 
 // Perfil (plano/trial) na conta do Supabase. O cache atualiza na hora; o banco em seguida.
 async function carregarPerfil(){
-  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null,is_admin:false}; return; }
-  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome,is_admin").eq("id",SESSAO.user.id).maybeSingle();
-    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome, is_admin:!!data.is_admin};
+  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null,is_admin:false,plano_expira_em:null,mp_preapproval_id:null,mp_status:null}; return; }
+  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome,is_admin,plano_expira_em,mp_preapproval_id,mp_status").eq("id",SESSAO.user.id).maybeSingle();
+    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome, is_admin:!!data.is_admin, plano_expira_em:data.plano_expira_em, mp_preapproval_id:data.mp_preapproval_id, mp_status:data.mp_status};
   }catch(e){}
   await carregarFavoritos();   // hidrata "meus mercados" da conta (sync entre dispositivos)
 }
 function ehAdmin(){ return !!(PERFIL && PERFIL.is_admin); }
-function salvarPerfil(campos){
-  Object.assign(PERFIL, campos);                        // cache reflete já (render é síncrono)
-  if(sb&&SESSAO){ sb.from("profiles").upsert({id:SESSAO.user.id, ...campos, atualizado_em:new Date().toISOString()}).then(()=>{},()=>{}); }
-  atualizarContaUI();
+// O PLANO É DO SERVIDOR: o cliente não escreve mais em profiles (a RLS bloqueia). O trial
+// começa por um endpoint autenticado; o assinante só muda pelo webhook do pagamento.
+async function iniciarTrial(){
+  if(!sb||!SESSAO) return false;
+  try{
+    const r=await fetchAuth(`${API}/trial/iniciar`,{method:"POST"}).then(x=>x.json());
+    await carregarPerfil();        // re-hidrata do servidor (fonte da verdade)
+    atualizarContaUI();
+    return !!(r&&r.ok);
+  }catch(e){ return false; }
 }
-function setPlano(p){ salvarPerfil({plano:p}); }
-function iniciarTrial(){ salvarPerfil({plano:"trial", trial_ini:new Date().toISOString(), trial_usado:true}); }
 
 /* CLÍMAX: clique em "ver onde comprar". Sem conta -> login. Com conta e trial disponível ->
-   começa o trial de 3 dias. Trial já usado/expirado -> tela de assinatura. */
-function desbloquear(){
+   começa o trial de 3 dias (server-side). Trial já usado/expirado -> tela de assinatura. */
+async function desbloquear(){
   if(!estaLogado()){ abrirLogin(desbloquear); return; }
   if(acessoPremium()){ reabrir(); return; }
-  if(!trialJaUsado()){ iniciarTrial(); toast(`Acesso completo liberado por ${TRIAL_DIAS} dias 🎉`); reabrir(); return; }
+  if(!trialJaUsado()){
+    const ok=await iniciarTrial();
+    if(ok){ toast(`Acesso completo liberado por ${TRIAL_DIAS} dias 🎉`); reabrir(); return; }
+  }
   loadPerfil("assinar");
 }
 /* re-renderiza a vista aberta (drawer/lista/listagem) já com os mercados liberados */
@@ -1566,11 +1596,47 @@ function reabrir(){
   if($("#btnCesta").getAttribute("aria-pressed")==="true"){ loadCesta(); return; }
   if(catAtiva && catAtiva.indexOf("fresco")!==0){ const c=categorias.find(x=>x.slug===catAtiva); if(c) loadCategoria(c.slug,c.nome); }
 }
-function assinarAgora(){
-  if(!estaLogado()){ abrirLogin(assinarAgora); return; }
-  if(!trialJaUsado()){ iniciarTrial(); toast(`Acesso liberado por ${TRIAL_DIAS} dias 🎉`); }
-  else { setPlano("assinante"); toast("Assinatura ativada ✓ (teste)"); }
-  loadPerfil();
+// Cobrança REAL: cria o pagamento no Mercado Pago e redireciona pro checkout (init_point).
+//   metodo='cartao' -> assinatura recorrente (renova sozinho); 'pix' -> avulso (libera N dias).
+async function assinarAgora(plano, metodo){
+  if(!estaLogado()){ abrirLogin(()=>assinarAgora(plano,metodo)); return; }
+  plano=(plano==="anual")?"anual":"mensal"; metodo=(metodo==="cartao")?"cartao":"pix";
+  const btns=[...document.querySelectorAll(".btn-pay")]; btns.forEach(b=>b.disabled=true);
+  const solta=()=>btns.forEach(b=>b.disabled=false);
+  try{
+    const r=await fetchAuth(`${API}/assinatura/criar`,{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({plano,metodo})});
+    if(!r.ok){ toast(r.status===503?"Pagamento ainda não configurado":"Não foi possível iniciar o pagamento"); solta(); return; }
+    const d=await r.json();
+    if(d.init_point){ window.location.href=d.init_point; }   // vai pro checkout do Mercado Pago
+    else{ toast("Não foi possível iniciar o pagamento"); solta(); }
+  }catch(e){ toast("Erro ao iniciar o pagamento"); solta(); }
+}
+async function cancelarAssinatura(){
+  if(!confirm("Cancelar a renovação automática? Seu acesso continua até o fim do período já pago.")) return;
+  try{
+    const r=await fetchAuth(`${API}/assinatura/cancelar`,{method:"POST"});
+    if(r.ok){ toast("Renovação cancelada — acesso mantido até o vencimento."); await carregarPerfil(); loadPerfil(); }
+    else{ const d=await r.json().catch(()=>({})); toast(d.detail||"Não foi possível cancelar"); }
+  }catch(e){ toast("Erro ao cancelar"); }
+}
+// volta do checkout do Mercado Pago. A back_url NÃO é prova de pagamento — a verdade vem do
+// webhook (que atualiza o profiles). Aqui a gente re-checa o perfil algumas vezes até liberar.
+async function tratarRetornoPagamento(){
+  const qp=new URLSearchParams(location.search);
+  const pg=qp.get("pagamento");
+  if(!pg) return;
+  history.replaceState({}, "", location.pathname);   // limpa a query da URL
+  if(pg==="sucesso"){
+    let ok=acessoPremium();
+    for(let i=0;i<5 && !ok;i++){ await new Promise(r=>setTimeout(r,2000)); await carregarPerfil(); ok=acessoPremium(); }
+    toast(ok?"PouPou+ ativo ✓ 🎉":"Pagamento recebido — liberando em instantes…");
+    atualizarContaUI();
+  } else if(pg==="pendente"){
+    toast("Pagamento pendente — o Pix pode levar alguns minutos.");
+  } else {
+    toast("Pagamento não concluído.");
+  }
 }
 
 /* ------- login no clímax (modal; NÃO é a primeira tela) ------- */
@@ -1752,7 +1818,7 @@ function bloqueado(inner,titulo,sub){
 /* ---------------- tela de conta / assinatura / meus mercados ---------------- */
 function loadPerfil(secao){
   catAtiva=null; marcarNav(); $("#btnCesta").setAttribute("aria-pressed","false"); $("#q").value="";
-  const u=usuario(), prem=acessoPremium(), emTrial=trialAtivo(), assinante=plano()==="assinante";
+  const u=usuario(), prem=acessoPremium(), emTrial=trialAtivo(), assinante=assinanteAtivo();
   const status = assinante?"Assinante PouPou+":(emTrial?`Acesso grátis — ${diasRestantesTrial()} dia(s) restantes`:"Conta grátis");
   const hero=`<div class="pf-hero">
       <div class="row">
@@ -1772,23 +1838,44 @@ function loadPerfil(secao){
       <li><span class="ok">${ic("check")}</span> Seus <b>mercados favoritos</b> em destaque na comparação</li>
     </ul>`;
 
+  // seletor de plano (mensal/anual) + botões de pagamento (cartão recorrente / Pix avulso)
+  const selMensal = PLANO_SEL!=="anual";
+  const diasSel = selMensal ? "30 dias" : "365 dias";
+  const seletor = `<div class="plano-sel">
+      <button type="button" class="ps ${selMensal?'on':''}" onclick="setPlanoSel('mensal')"><span>Mensal</span><b>${PRECO_MENSAL}<i>/mês</i></b></button>
+      <button type="button" class="ps ${selMensal?'':'on'}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">2 meses grátis</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
+    </div>`;
+  const payBtns = `
+      <button class="btn-primary btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','cartao')">${ic("crown")} Assinar no cartão — renova sozinho</button>
+      <button class="btn-ghost btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','pix')">Pagar no Pix — libera ${diasSel}</button>
+      <p class="fine">Cartão: renova automático, cancele quando quiser. Pix: cada pagamento libera ${diasSel} (avulso). Via Mercado Pago.</p>`;
+
   let assine;
   if(assinante){
-    assine=`<div class="assine-card pro"><h3>${ic("crown")} Você é PouPou+</h3>
-        <p class="sub2">Tudo liberado — economize à vontade. Obrigado por apoiar!</p>${benef}</div>`;
+    const recorrente = PERFIL.mp_preapproval_id && PERFIL.mp_status!=="cancelled";
+    const exp = PERFIL.plano_expira_em ? new Date(PERFIL.plano_expira_em) : null;
+    const dias = exp ? Math.max(0, Math.ceil((exp.getTime()-Date.now())/864e5)) : null;
+    const linha = recorrente
+      ? `<p class="sub2">✓ Renova automático${dias!=null?` — próxima cobrança em ~${dias} dia(s)`:""}. Obrigado por apoiar!</p>`
+      : (dias!=null ? `<p class="sub2">✓ Acesso ativo — vence em <b>${dias} dia(s)</b>.</p>` : `<p class="sub2">Tudo liberado. Obrigado por apoiar!</p>`);
+    const acao = recorrente
+      ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação</button>`
+      : `<div class="pf-sub-sec"><div class="renew-lbl">Renovar / mudar plano</div>${seletor}${payBtns}</div>`;
+    assine=`<div class="assine-card pro"><h3>${ic("crown")} Você é PouPou+</h3>${linha}${benef}${acao}</div>`;
   } else {
     const chip = emTrial
       ? `<div class="trial-chip on">⏳ Seu acesso completo termina em <b>${diasRestantesTrial()} dia(s)</b></div>`
       : (trialJaUsado()? "" : `<div class="trial-chip">✨ Comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão</div>`);
-    const btn = trialJaUsado()? `Assinar por ${PRECO_MENSAL}/mês` : `Começar — ${TRIAL_DIAS} dias grátis`;
+    const trialBtn = (!trialJaUsado() && !emTrial)
+      ? `<button class="btn-primary btn-pay" type="button" onclick="desbloquear()">Começar — ${TRIAL_DIAS} dias grátis</button>
+         <div class="ou">ou assine agora</div>` : "";
     assine=`<div class="assine-card">${chip}
         <h3>${ic("crown")} PouPou+</h3>
-        <div class="preco"><span class="de-preco">${PRECO_DE}</span> ${PRECO_MENSAL}<small>/mês</small></div>
-        <div class="preco-anual">ou <b>${PRECO_ANUAL}/ano</b> <span class="badge-off">melhor preço</span></div>
+        ${seletor}
         ${benef}
         <div class="roi">${ic("check")} Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+. Ele se paga na primeira compra.</div>
-        <button class="btn-primary" type="button" onclick="assinarAgora()">${btn}</button>
-        <p class="fine">Pagamento via Mercado Pago (Pix ou cartão). Cancele quando quiser.</p></div>`;
+        ${trialBtn}
+        ${payBtns}</div>`;
   }
 
   const meus=`<div class="pf-sec"><h4>Meus mercados</h4>
@@ -1932,6 +2019,7 @@ $("#btnCesta").addEventListener("click",loadCesta);
     try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
     sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); });
   }
+  await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
   atualizarContaUI();
   atualizarBadge();
   try{ const mk=await fetch(`${API}/mercados`).then(r=>r.json());

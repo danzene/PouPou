@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   plano       text not null default 'gratis',   -- 'gratis' | 'trial' | 'assinante'
   trial_ini   timestamptz,                       -- início do reverse trial de 3 dias
   trial_usado boolean not null default false,    -- já usou o trial alguma vez?
+  is_admin    boolean not null default false,    -- acesso ao painel /admin (setar via SQL p/ o dono)
   criado_em   timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );

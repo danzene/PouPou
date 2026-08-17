@@ -564,6 +564,37 @@
   .lm-seg button.on{ background:var(--surface); color:var(--green-dark); box-shadow:0 1px 3px rgba(0,0,0,.12); }
   .lm-hint{ font-size:12px; color:var(--mut); text-align:center; }
   .lm-empty{ background:var(--surface-2); border:1px dashed var(--line); border-radius:var(--r-card); padding:16px; text-align:center; color:var(--mut); font-size:14px; margin-bottom:14px; }
+  /* painel admin */
+  .pf-admin-btn{ display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:14px; font-weight:700; color:#fff; background:var(--green-dark); border:none; border-radius:var(--r-btn); padding:11px 16px; cursor:pointer; }
+  .adm-top{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .adm-back{ font:inherit; font-size:13px; font-weight:600; color:var(--mut); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-pill); padding:6px 12px; cursor:pointer; }
+  .adm-title{ font-size:18px; font-weight:800; color:var(--ink); }
+  .adm-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:9px; margin-bottom:8px; }
+  .adm-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:12px; text-align:center; }
+  .adm-cn{ font-size:20px; font-weight:800; color:var(--ink); line-height:1.1; }
+  .adm-cl{ font-size:11.5px; color:var(--mut); margin-top:3px; }
+  .adm-list{ display:flex; flex-direction:column; gap:7px; margin-bottom:6px; }
+  .adm-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-btn); padding:10px 12px; }
+  .adm-row.off{ opacity:.55; }
+  .adm-mkt{ flex:1 1 120px; display:flex; flex-direction:column; }
+  .adm-mkt b{ font-size:14px; color:var(--ink); }
+  .adm-sub{ font-size:11.5px; color:var(--faint); }
+  .adm-m{ display:flex; flex-direction:column; align-items:flex-end; min-width:52px; }
+  .adm-mv{ font-size:14px; font-weight:700; color:var(--ink); }
+  .adm-ml{ font-size:10.5px; color:var(--faint); }
+  .adm-when{ align-items:flex-end; font-size:11.5px; color:var(--mut); min-width:66px; text-align:right; }
+  .pill-ok{ color:var(--green-dark); } .pill-warn{ color:#b8860b; } .pill-bad{ color:#c0392b; }
+  .adm-urow{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-btn); padding:10px 12px; }
+  .adm-uinfo{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .adm-uinfo b{ font-size:13.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .adm-tag{ display:inline-block; font-size:10px; font-weight:700; color:var(--green-dark); background:var(--green-light); border-radius:var(--r-pill); padding:1px 7px; margin-left:6px; }
+  .adm-sel{ font:inherit; font-size:13px; font-weight:600; color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-pill); padding:6px 10px; cursor:pointer; }
+  .adm-sw{ position:relative; width:42px; height:24px; flex:none; cursor:pointer; }
+  .adm-sw input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .adm-sw-t{ position:absolute; inset:0; background:var(--line); border-radius:12px; transition:.15s; }
+  .adm-sw-t::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:.15s; }
+  .adm-sw input:checked + .adm-sw-t{ background:var(--green); }
+  .adm-sw input:checked + .adm-sw-t::after{ transform:translateX(18px); }
   .fav-star{ display:inline-flex; vertical-align:-2px; } .fav-star svg{ width:14px; height:14px; color:var(--yellow); fill:var(--yellow); }
 
   /* preço ancorado + trial + segmentado + ROI */
@@ -1474,12 +1505,13 @@ function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("p
 
 // Perfil (plano/trial) na conta do Supabase. O cache atualiza na hora; o banco em seguida.
 async function carregarPerfil(){
-  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; return; }
-  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome").eq("id",SESSAO.user.id).maybeSingle();
-    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome};
+  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null,is_admin:false}; return; }
+  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome,is_admin").eq("id",SESSAO.user.id).maybeSingle();
+    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome, is_admin:!!data.is_admin};
   }catch(e){}
   await carregarFavoritos();   // hidrata "meus mercados" da conta (sync entre dispositivos)
 }
+function ehAdmin(){ return !!(PERFIL && PERFIL.is_admin); }
 function salvarPerfil(campos){
   Object.assign(PERFIL, campos);                        // cache reflete já (render é síncrono)
   if(sb&&SESSAO){ sb.from("profiles").upsert({id:SESSAO.user.id, ...campos, atualizado_em:new Date().toISOString()}).then(()=>{},()=>{}); }
@@ -1740,9 +1772,71 @@ function loadPerfil(secao){
       <label class="modo-teste"><span class="lbl">Tema escuro<small>conforto pra vista à noite</small></span>
         <span class="switch"><input type="checkbox" id="tgTema" ${document.documentElement.dataset.theme==="dark"?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label></div>`;
 
+  const admin=ehAdmin()?`<div class="pf-sec pf-admin"><h4>Administração</h4>
+      <p class="hint">Você é admin — painel de gestão do PouPou (coleta, usuários, mercados, métricas).</p>
+      <button class="pf-admin-btn" type="button" onclick="loadAdmin()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> Abrir painel admin</button></div>`:"";
   ctx.textContent="";
-  saida.innerHTML=hero+assine+modoTeste+meus+cfg;
+  saida.innerHTML=hero+admin+assine+modoTeste+meus+cfg;
   if(secao==="assinar"){ const c=saida.querySelector(".assine-card"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
+}
+
+/* ---------------- painel admin (só is_admin) ---------------- */
+let ADMIN_DATA=null;
+async function loadAdmin(){
+  if(!ehAdmin()){ toast("Acesso restrito"); return; }
+  catAtiva=null; marcarNav(); $("#btnCesta").setAttribute("aria-pressed","false"); $("#q").value="";
+  saida.innerHTML=`<p class="state">Carregando painel…</p>`; ctx.textContent="";
+  try{
+    const [met,col,usu,mkt]=await Promise.all([
+      fetchAuth(`${API}/admin/metricas`).then(r=>r.json()),
+      fetchAuth(`${API}/admin/coleta`).then(r=>r.json()),
+      fetchAuth(`${API}/admin/usuarios`).then(r=>r.json()),
+      fetchAuth(`${API}/admin/mercados`).then(r=>r.json()),
+    ]);
+    ADMIN_DATA={met,col,usu,mkt}; renderAdmin();
+  }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar o painel admin.</p>`; }
+}
+function _admNum(v){ return (v==null?0:v).toLocaleString("pt-BR"); }
+function renderAdmin(){
+  const m=ADMIN_DATA.met;
+  const cards=[["Usuários",m.usuarios],["Assinantes",m.assinantes],["Em trial",m.em_trial],["Com lista",m.usuarios_com_lista],["Itens em listas",m.itens_em_listas],["Favoritos",m.favoritos],["Produtos",m.produtos],["Preços",m.precos_atuais],["Frescos",m.frescos],["Mercados ativos",m.mercados_ativos]];
+  const metHTML=`<div class="adm-cards">${cards.map(([l,v])=>`<div class="adm-card"><div class="adm-cn num">${_admNum(v)}</div><div class="adm-cl">${l}</div></div>`).join("")}</div>`;
+  const colHTML=(ADMIN_DATA.col.mercados||[]).map(x=>{
+    const cls=x.pct_24h>=80?"ok":x.pct_24h>=40?"warn":"bad";
+    return `<div class="adm-row ${x.ativo?"":"off"}">
+      <div class="adm-mkt"><b>${esc(x.nome)}</b><span class="adm-sub">${esc(x.plataforma||"")}${x.ativo?"":" · inativo"}</span></div>
+      <div class="adm-m"><span class="adm-mv num">${_admNum(x.n_produtos)}</span><span class="adm-ml">produtos</span></div>
+      <div class="adm-m"><span class="adm-mv num pill-${cls}">${x.pct_24h}%</span><span class="adm-ml">em 24h</span></div>
+      <div class="adm-m"><span class="adm-mv num">${x.carnes_frescas_24h}</span><span class="adm-ml">carnes 24h</span></div>
+      <div class="adm-m adm-when">${x.ultima?relTempo(x.ultima):"nunca"}</div>
+    </div>`;
+  }).join("");
+  const usuHTML=(ADMIN_DATA.usu.usuarios||[]).map(u=>{
+    const opts=["gratis","trial","assinante"].map(p=>`<option value="${p}" ${u.plano===p?"selected":""}>${p}</option>`).join("");
+    return `<div class="adm-urow">
+      <div class="adm-uinfo"><b>${esc(u.email||u.nome||(u.id||"").slice(0,8))}</b>${u.is_admin?'<span class="adm-tag">admin</span>':""}<span class="adm-sub">criado ${u.criado_em?relTempo(u.criado_em):"—"}</span></div>
+      <select class="adm-sel" onchange="admSetPlano('${jsesc(u.id)}',this.value)">${opts}</select>
+    </div>`;
+  }).join("");
+  const mktHTML=(ADMIN_DATA.mkt.mercados||[]).map(x=>`<div class="adm-urow">
+      <div class="adm-uinfo"><b>${esc(x.nome)}</b><span class="adm-sub">${esc(x.plataforma||"")} · ${esc(x.cidade||"")}</span></div>
+      <label class="adm-sw"><input type="checkbox" ${x.ativo?"checked":""} onchange="admToggleMercado('${jsesc(x.slug)}',this.checked)"><span class="adm-sw-t"></span></label>
+    </div>`).join("");
+  const pp=Object.entries(ADMIN_DATA.usu.por_plano||{}).map(([k,v])=>`${k} ${v}`).join(" · ");
+  saida.innerHTML=`
+    <div class="adm-top"><button class="adm-back" type="button" onclick="loadPerfil()">← Conta</button><span class="adm-title">Painel admin</span></div>
+    <div class="sec-title">Métricas</div>${metHTML}
+    <div class="sec-title">Saúde da coleta <span class="muted">últimas 24h</span></div><div class="adm-list">${colHTML}</div>
+    <div class="sec-title">Usuários <span class="muted">${ADMIN_DATA.usu.total} · ${pp}</span></div><div class="adm-list">${usuHTML}</div>
+    <div class="sec-title">Mercados <span class="muted">ligar/desligar</span></div><div class="adm-list">${mktHTML}</div>`;
+}
+async function admSetPlano(uid, plano){
+  try{ const r=await fetchAuth(`${API}/admin/usuario/${uid}/plano`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})});
+    toast(r.ok?`Plano → ${plano} ✓`:"Erro ao atualizar"); }catch(e){ toast("Erro ao atualizar"); }
+}
+async function admToggleMercado(slug, ativo){
+  try{ const r=await fetchAuth(`${API}/admin/mercado/${slug}/ativo`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ativo})});
+    toast(r.ok?(ativo?"Mercado ativado ✓":"Mercado desativado ✓"):"Erro"); }catch(e){ toast("Erro"); }
 }
 function testePlano(v){
   if(v==="trial"){ lsSet(TRIAL_INI_KEY,new Date().toISOString()); lsSet(TRIAL_USADO_KEY,"1"); }

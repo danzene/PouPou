@@ -91,6 +91,20 @@ def _premium(conn, uid: str | None) -> bool:
     return False
 
 
+def _admin_uid(conn, authorization: str | None) -> str | None:
+    """Devolve o uid SÓ se o usuário autenticado for admin (is_admin em profiles); senão None.
+    Todo endpoint /admin/* passa por aqui — sem admin, 403."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        return None
+    r = conn.execute("SELECT is_admin FROM profiles WHERE id = ?", (uid,)).fetchone()
+    return uid if (r and r["is_admin"]) else None
+
+
+def _cutoff_horas(horas: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
+
+
 def _gate_cesta(resp: dict, premium: bool) -> dict:
     """TRAVA NO SERVIDOR: pra quem NÃO é premium, remove o "onde comprar" (rota, ranking,
     preço por mercado e qual loja) do payload — o dado acionável nem sai do backend. Mantém
@@ -1206,6 +1220,138 @@ def logo(fname: str):
     if p.parent != LOGOS_DIR.resolve() or not p.is_file():
         raise HTTPException(status_code=404, detail="logo não encontrada")
     return FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ============================ ADMIN (exige is_admin) ============================
+@app.get("/admin/coleta")
+def admin_coleta(authorization: str | None = Header(None)):
+    """Saúde da coleta por mercado: produtos, % atualizado nas últimas 24h, última coleta, carnes frescas."""
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        c24 = _cutoff_horas(24)
+        rows = conn.execute(
+            """SELECT m.slug, m.nome, m.plataforma, m.ativo,
+                      COUNT(pa.ean) AS n_produtos,
+                      SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS frescos_24h,
+                      MAX(pa.coletado_em) AS ultima
+               FROM mercados m LEFT JOIN precos_atual pa ON pa.mercado_id = m.id
+               GROUP BY m.id, m.slug, m.nome, m.plataforma, m.ativo""",
+            (c24,),
+        ).fetchall()
+        carnes = {r["slug"]: (r["n"] or 0) for r in conn.execute(
+            """SELECT m.slug, SUM(CASE WHEN p.coletado_em >= ? THEN 1 ELSE 0 END) AS n
+               FROM mercados m LEFT JOIN pereciveis p ON p.mercado_id = m.id AND p.categoria = 'carnes'
+               GROUP BY m.slug""", (c24,))}
+        out = []
+        for r in rows:
+            n, f = (r["n_produtos"] or 0), (r["frescos_24h"] or 0)
+            out.append({"slug": r["slug"], "nome": r["nome"], "plataforma": r["plataforma"],
+                        "ativo": bool(r["ativo"]), "n_produtos": n,
+                        "pct_24h": round(100 * f / n) if n else 0, "ultima": r["ultima"],
+                        "carnes_frescas_24h": carnes.get(r["slug"], 0)})
+        out.sort(key=lambda x: (not x["ativo"], -x["n_produtos"]))
+        return {"mercados": out}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/usuarios")
+def admin_usuarios(authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        rows = conn.execute(
+            """SELECT p.id, u.email, p.nome, p.plano, p.trial_ini, p.criado_em, p.is_admin
+               FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
+               ORDER BY p.criado_em DESC"""
+        ).fetchall()
+        usuarios, por_plano = [], {}
+        for r in rows:
+            plano = r["plano"] or "gratis"
+            por_plano[plano] = por_plano.get(plano, 0) + 1
+            usuarios.append({"id": r["id"], "email": r["email"], "nome": r["nome"],
+                             "plano": plano, "trial_ini": r["trial_ini"],
+                             "criado_em": r["criado_em"], "is_admin": bool(r["is_admin"])})
+        return {"usuarios": usuarios, "total": len(usuarios), "por_plano": por_plano}
+    finally:
+        conn.close()
+
+
+@app.post("/admin/usuario/{uid}/plano")
+def admin_set_plano(uid: str, body: dict = Body(...), authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        plano = (body or {}).get("plano")
+        if plano not in ("gratis", "trial", "assinante"):
+            raise HTTPException(status_code=400, detail="plano inválido")
+        agora = datetime.now(timezone.utc).isoformat()
+        if plano == "trial":
+            conn.execute("UPDATE profiles SET plano = ?, trial_ini = ?, atualizado_em = ? WHERE id = ?",
+                         (plano, agora, agora, uid))
+        else:
+            conn.execute("UPDATE profiles SET plano = ?, atualizado_em = ? WHERE id = ?",
+                         (plano, agora, uid))
+        return {"ok": True, "id": uid, "plano": plano}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/mercados")
+def admin_mercados(authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        rows = conn.execute(
+            "SELECT slug, nome, plataforma, cidade, ativo, loja_ref FROM mercados ORDER BY ativo DESC, nome"
+        ).fetchall()
+        return {"mercados": [{"slug": r["slug"], "nome": r["nome"], "plataforma": r["plataforma"],
+                              "cidade": r["cidade"], "ativo": bool(r["ativo"]), "loja_ref": r["loja_ref"]}
+                             for r in rows]}
+    finally:
+        conn.close()
+
+
+@app.post("/admin/mercado/{slug}/ativo")
+def admin_toggle_mercado(slug: str, body: dict = Body(...), authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        ativo = 1 if (body or {}).get("ativo") else 0
+        conn.execute("UPDATE mercados SET ativo = ? WHERE slug = ?", (ativo, slug))
+        return {"ok": True, "slug": slug, "ativo": bool(ativo)}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/metricas")
+def admin_metricas(authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        def n(sql):
+            return conn.execute(sql).fetchone()["n"]
+        return {
+            "usuarios": n("SELECT COUNT(*) n FROM profiles"),
+            "assinantes": n("SELECT COUNT(*) n FROM profiles WHERE plano = 'assinante'"),
+            "em_trial": n("SELECT COUNT(*) n FROM profiles WHERE plano = 'trial'"),
+            "usuarios_com_lista": n("SELECT COUNT(DISTINCT user_id) n FROM lista"),
+            "itens_em_listas": n("SELECT COUNT(*) n FROM lista"),
+            "favoritos": n("SELECT COUNT(*) n FROM favoritos"),
+            "produtos": n("SELECT COUNT(*) n FROM produtos"),
+            "precos_atuais": n("SELECT COUNT(*) n FROM precos_atual"),
+            "frescos": n("SELECT COUNT(*) n FROM pereciveis"),
+            "mercados_ativos": n("SELECT COUNT(*) n FROM mercados WHERE ativo = 1"),
+        }
+    finally:
+        conn.close()
 
 
 @app.get("/")

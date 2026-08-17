@@ -140,6 +140,20 @@
       "obs": "VIP Commerce. org=249 (bucket vipc-org-249), filial=1, cd=1. Token dinâmico."
     },
     {
+      "slug": "spani",
+      "nome": "Spani Atacadista",
+      "url_base": "https://www.spanionline.com.br",
+      "plataforma": "vipcommerce",
+      "cidade": "Campinas (RM)",
+      "cor_badge": "#F58220",
+      "logo_url": null,
+      "loja_ref": "cd-6",
+      "ativo": true,
+      "classe": "coletores.vipcommerce:ColetorVIPCommerce",
+      "params": {"org": "67", "domainkey": "spanionline.com.br", "filial": 1, "cd": 6, "api_base": "https://services-beta.vipcommerce.com.br/api-admin/v1"},
+      "obs": "VIP Commerce host -beta (services-beta.vipcommerce.com.br). org=67, filial=1, cd=6. Atacarejo, catálogo online (Campinas)."
+    },
+    {
       "slug": "paodeacucar",
       "nome": "Pão de Açúcar",
       "url_base": "https://www.paodeacucar.com",

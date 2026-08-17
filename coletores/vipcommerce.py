@@ -44,9 +44,10 @@ _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 _RE_JWT = re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
 
 
-def mintar_token(org: str, domainkey: str, *, timeout: float = 20.0, contato: str = "") -> str | None:
+def mintar_token(org: str, domainkey: str, *, api_base: str = SERVICES,
+                 timeout: float = 20.0, contato: str = "") -> str | None:
     """Gera um bearer token anônimo via login público da loja. Devolve o JWT ou None."""
-    url = f"{SERVICES}/org/{org}/auth/loja/login"
+    url = f"{api_base}/org/{org}/auth/loja/login"
     headers = {"User-Agent": _UA, "Accept": "application/json", "Content-Type": "application/json",
                "Origin": f"https://www.{domainkey}", "Referer": f"https://www.{domainkey}/",
                "DomainKey": domainkey, "OrganizationId": str(org)}
@@ -79,6 +80,7 @@ class ColetorVIPCommerce(Coletor):
         filial: int = 1,
         cd: int = 1,
         token_env: str = "",
+        api_base: str = SERVICES,   # algumas orgs usam host -beta (ex.: Spani)
         cidade: str | None = None,
         delay: float = 1.2,
         timeout: float = 20.0,
@@ -93,6 +95,7 @@ class ColetorVIPCommerce(Coletor):
         self.domainkey = domainkey
         self.filial = filial
         self.cd = cd
+        self.api_base = api_base
         # token do .env é só OVERRIDE opcional; o padrão é gerar dinamicamente.
         self._token_override = os.getenv(token_env, "").strip() if token_env else ""
         self.cidade = cidade
@@ -105,7 +108,7 @@ class ColetorVIPCommerce(Coletor):
 
     @property
     def _base_loja(self) -> str:
-        return f"{SERVICES}/org/{self.org}/filial/{self.filial}/centro_distribuicao/{self.cd}/loja"
+        return f"{self.api_base}/org/{self.org}/filial/{self.filial}/centro_distribuicao/{self.cd}/loja"
 
     def _headers(self) -> dict:
         return {
@@ -119,7 +122,7 @@ class ColetorVIPCommerce(Coletor):
         """Gera um token novo e atualiza o client. Não renova se há override manual."""
         if self._token_override:
             return False
-        novo = mintar_token(self.org, self.domainkey, timeout=self.timeout, contato=self.contato)
+        novo = mintar_token(self.org, self.domainkey, api_base=self.api_base, timeout=self.timeout, contato=self.contato)
         if novo:
             self._token = novo
             client.headers["Authorization"] = f"Bearer {novo}"
@@ -129,7 +132,7 @@ class ColetorVIPCommerce(Coletor):
 
     def coletar(self, sementes: list[tuple[str, str]]) -> Iterator[ItemColeta]:
         self._token = self._token_override or mintar_token(
-            self.org, self.domainkey, timeout=self.timeout, contato=self.contato) or ""
+            self.org, self.domainkey, api_base=self.api_base, timeout=self.timeout, contato=self.contato) or ""
         if not self._token:
             log.warning("[%s] não obtive token VIP (login falhou) — pulando mercado.", self.slug)
             return
@@ -148,7 +151,7 @@ class ColetorVIPCommerce(Coletor):
         from .mapa_categorias import mapear_categoria
 
         self._token = self._token_override or mintar_token(
-            self.org, self.domainkey, timeout=self.timeout, contato=self.contato) or ""
+            self.org, self.domainkey, api_base=self.api_base, timeout=self.timeout, contato=self.contato) or ""
         if not self._token:
             log.warning("[%s] não obtive token VIP — pulando mercado.", self.slug)
             return

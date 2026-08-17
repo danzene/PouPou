@@ -1563,7 +1563,7 @@ function renderLogin(){
       <p class="auth-err" id="authErr" aria-live="polite"></p>
       <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${TRIAL_DIAS} dias`:"Entrar"}</button>
     </form>
-    <p class="auth-note">Sua conta é protegida pelo Supabase. Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
+    <p class="auth-note">Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
 }
 async function authSubmit(ev){ ev.preventDefault();
   const email=($("#aEmail").value||"").trim().toLowerCase(), senha=$("#aSenha").value||"";

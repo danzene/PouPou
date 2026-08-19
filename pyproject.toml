@@ -1,4 +1,22 @@
-# Vercel: aponta o app FastAPI (que está em api/main.py, importando pacotes da raiz
-# analise/ e db/). As dependências continuam no requirements.txt.
+# Config de deploy do Vercel. O `uv` (usado no build do Vercel) exige a tabela [project].
+# As dependências ficam aqui (espelham o requirements.txt). package=false: é uma APLICAÇÃO,
+# não um pacote instalável — o uv não tenta "buildar" a raiz.
+[project]
+name = "poupou"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "psycopg[binary]>=3.1",
+    "mercadopago>=2.2",
+]
+
+[tool.uv]
+package = false
+
+# Vercel: o app FastAPI está em api/main.py (importando os pacotes analise/ e db/ da raiz).
 [tool.vercel]
 entrypoint = "api.main:app"

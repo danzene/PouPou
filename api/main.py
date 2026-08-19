@@ -1409,34 +1409,6 @@ def admin_usuarios(authorization: str | None = Header(None)):
         conn.close()
 
 
-@app.get("/debug/mp")
-def debug_mp():
-    """DIAGNÓSTICO TEMPORÁRIO — remover depois. Não expõe o token (só o prefixo)."""
-    out = {"public_base_url": PUBLIC_BASE_URL,
-           "mp_token_set": bool(MP_ACCESS_TOKEN),
-           "mp_token_prefix": (MP_ACCESS_TOKEN[:12] if MP_ACCESS_TOKEN else None),
-           "mp_token_len": len(MP_ACCESS_TOKEN),
-           "mp_webhook_secret_set": bool(MP_WEBHOOK_SECRET)}
-    try:
-        import mercadopago  # noqa
-        out["mercadopago_import"] = True
-    except Exception as e:  # noqa: BLE001
-        out["mercadopago_import"] = f"ERRO: {type(e).__name__}: {e}"
-        return out
-    try:
-        pref = {"items": [{"title": "debug", "quantity": 1, "currency_id": "BRL", "unit_price": 1.0}]}
-        res = _mp().preference().create(pref)
-        r = res.get("response", {}) if isinstance(res, dict) else {}
-        out["mp_call_status"] = res.get("status") if isinstance(res, dict) else str(type(res))
-        out["mp_has_init_point"] = bool(r.get("init_point"))
-        out["mp_response_keys"] = list(r.keys())[:15]
-        if not r.get("init_point"):
-            out["mp_response_sample"] = str(r)[:500]
-    except Exception as e:  # noqa: BLE001
-        out["mp_call_error"] = f"{type(e).__name__}: {str(e)[:400]}"
-    return out
-
-
 @app.post("/assinatura/criar")
 def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(None)):
     """Cria o pagamento no Mercado Pago e devolve o init_point pra redirecionar o usuário.

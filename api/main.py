@@ -50,9 +50,10 @@ SUPABASE_ANON = os.getenv(
 _tok_cache: dict = {}   # token -> (user_id, expira_em): evita bater no Supabase a cada request
 
 # ---- Mercado Pago (pagamentos) ----
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")            # SECRETO (Fly secret) — nunca no front
-MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "")        # SECRETO — assina os webhooks
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://poupou.fly.dev").rstrip("/")
+# .strip(): blinda contra espaço/tab/newline que vem colado no copy-paste do painel de env.
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()            # SECRETO — nunca no front
+MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "").strip()        # SECRETO — assina os webhooks
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://poupou.fly.dev").strip().rstrip("/")
 _MP_TOLERANCIA_TS = 300   # janela anti-replay do webhook (5 min)
 # Preço e duração num só lugar: o SERVIDOR escolhe o valor a partir do id do plano —
 # o cliente NUNCA manda preço. 'meses' é pra recorrência no cartão (auto_recurring).

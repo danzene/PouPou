@@ -1719,6 +1719,46 @@ def admin_toggle_mercado(slug: str, body: dict = Body(...), authorization: str |
         conn.close()
 
 
+@app.post("/admin/coleta/solicitar")
+def admin_coleta_solicitar(authorization: str | None = Header(None)):
+    """Enfileira um pedido de coleta (o coleta_watcher.py no PC do dono é quem roda o
+    coletar.py). Se já houver um pendente/rodando, devolve esse — não duplica."""
+    conn = _conn()
+    try:
+        uid = _admin_uid(conn, authorization)
+        if not uid:
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        r = conn.execute(
+            "SELECT id, status FROM coleta_jobs WHERE status IN ('pendente','rodando') ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if r:
+            return {"ok": True, "ja_existe": True, "id": r["id"], "status": r["status"]}
+        cur = conn.execute(
+            "INSERT INTO coleta_jobs (status, solicitado_por, solicitado_em) VALUES ('pendente', ?, ?) RETURNING id",
+            (uid, datetime.now(timezone.utc).isoformat()))
+        novo = cur.fetchone()
+        return {"ok": True, "id": (novo["id"] if novo else None), "status": "pendente"}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/coleta/jobs")
+def admin_coleta_jobs(authorization: str | None = Header(None)):
+    """Últimos pedidos de coleta + status (o painel usa pra acompanhar)."""
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        rows = conn.execute(
+            "SELECT id, status, solicitado_em, iniciado_em, terminado_em, resultado "
+            "FROM coleta_jobs ORDER BY id DESC LIMIT 10").fetchall()
+        return {"jobs": [{"id": r["id"], "status": r["status"], "solicitado_em": r["solicitado_em"],
+                          "iniciado_em": r["iniciado_em"], "terminado_em": r["terminado_em"],
+                          "resultado": r["resultado"]} for r in rows]}
+    finally:
+        conn.close()
+
+
 @app.get("/admin/metricas")
 def admin_metricas(authorization: str | None = Header(None)):
     conn = _conn()

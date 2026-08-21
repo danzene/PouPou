@@ -115,15 +115,19 @@ async function sair(){ try{ await sb.auth.signOut(); }catch(e){} TOKEN=null; loc
 async function mostrarPainel(metrica){
   $("#loginView").classList.add("hidden"); $("#painelView").classList.remove("hidden");
   try{
-    const [col,usu,mkt]=await Promise.all([
-      api("/admin/coleta").then(r=>r.json()), api("/admin/usuarios").then(r=>r.json()), api("/admin/mercados").then(r=>r.json())
+    const [col,usu,mkt,jobs]=await Promise.all([
+      api("/admin/coleta").then(r=>r.json()), api("/admin/usuarios").then(r=>r.json()),
+      api("/admin/mercados").then(r=>r.json()), api("/admin/coleta/jobs").then(r=>r.json()).catch(()=>({jobs:[]}))
     ]);
-    render(metrica,col,usu,mkt);
+    render(metrica,col,usu,mkt,jobs);
   }catch(e){ $("#painel").innerHTML=`<div class="state">Erro ao carregar os dados.</div>`; }
 }
-function render(m,col,usu,mkt){
+function render(m,col,usu,mkt,jobs){
   const cards=[["Usuários",m.usuarios],["Assinantes",m.assinantes],["Em trial",m.em_trial],["Com lista",m.usuarios_com_lista],["Itens em listas",m.itens_em_listas],["Favoritos",m.favoritos],["Produtos",m.produtos],["Preços",m.precos_atuais],["Frescos",m.frescos],["Mercados ativos",m.mercados_ativos]];
   const cardsH=`<div class="cards">${cards.map(([l,v])=>`<div class="card"><div class="n num">${num(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`;
+  const coletaH=`<div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
+      <button class="btn" id="btnColeta" onclick="solicitarColeta()" style="margin:0;height:46px">▶ Iniciar coleta de todos os mercados</button>
+      <div id="coletaStatus" style="font-size:12.5px;color:var(--mut)"></div></div>`;
   const colH=(col.mercados||[]).map(x=>{ const c=x.pct_24h>=80?"ok":x.pct_24h>=40?"warn":"bad";
     return `<div class="row ${x.ativo?"":"off"}"><div class="mk"><b>${esc(x.nome)}</b><span class="s">${esc(x.plataforma||"")}${x.ativo?"":" · inativo"}</span></div>
       <div class="met"><span class="v num">${num(x.n_produtos)}</span><span class="l">produtos</span></div>
@@ -137,10 +141,42 @@ function render(m,col,usu,mkt){
       <label class="sw"><input type="checkbox" ${x.ativo?"checked":""} onchange="toggleMercado('${esc(x.slug)}',this.checked)"><span class="t"></span></label></div>`).join("");
   const pp=Object.entries(usu.por_plano||{}).map(([k,v])=>`${k} ${v}`).join(" · ");
   $("#painel").innerHTML=`
+    <div class="sec">Coleta manual <span class="m">força uma coleta de todos os mercados agora</span></div>${coletaH}
     <div class="sec">Métricas</div>${cardsH}
     <div class="sec">Saúde da coleta <span class="m">últimas 24h</span></div><div class="list">${colH}</div>
     <div class="sec">Usuários <span class="m">${usu.total} · ${pp}</span></div><div class="list">${usuH}</div>
     <div class="sec">Mercados <span class="m">ligar/desligar</span></div><div class="list">${mktH}</div>`;
+  renderColeta((jobs&&jobs.jobs)||[]);
+}
+function renderColeta(jobs){
+  const box=$("#coletaStatus"); if(!box) return;
+  jobs=jobs||[];
+  const ativo=jobs.find(j=>j.status==="pendente"||j.status==="rodando");
+  const btn=$("#btnColeta"); if(btn) btn.disabled=!!ativo;
+  const rot={pendente:"⏳ na fila — seu PC pega em até ~3 min",rodando:"⚙️ coletando agora…",concluido:"✓ concluída",erro:"✕ erro"};
+  if(!jobs.length){
+    box.innerHTML="Nenhuma coleta manual ainda. (A coleta agendada roda sozinha; o botão força uma agora.)";
+  }else{
+    box.innerHTML=jobs.slice(0,5).map(j=>{
+      const cor=j.status==="concluido"?"ok":j.status==="erro"?"bad":"warn";
+      const quando=j.terminado_em?("terminou há "+relTempo(j.terminado_em)):(j.iniciado_em?("rodando há "+relTempo(j.iniciado_em)):("pedida há "+relTempo(j.solicitado_em)));
+      const res=(j.resultado&&j.status!=="rodando")?`<div style="color:var(--faint);font-size:11px;margin-top:2px;white-space:pre-wrap;max-height:60px;overflow:auto">${esc((j.resultado||"").slice(-220))}</div>`:"";
+      return `<div style="padding:7px 0;border-top:1px solid var(--line)"><span class="${cor}">${rot[j.status]||j.status}</span> <span style="color:var(--faint)">· ${quando}</span>${res}</div>`;
+    }).join("");
+  }
+  if(ativo){ if(!window._coletaPoll) window._coletaPoll=setInterval(atualizarColeta,5000); }
+  else if(window._coletaPoll){ clearInterval(window._coletaPoll); window._coletaPoll=null; }
+}
+async function atualizarColeta(){
+  try{ const j=await api("/admin/coleta/jobs").then(r=>r.json()); renderColeta(j.jobs); }catch(e){}
+}
+async function solicitarColeta(){
+  const btn=$("#btnColeta"); if(btn) btn.disabled=true;
+  try{
+    const r=await api("/admin/coleta/solicitar",{method:"POST"});
+    if(r.ok){ toast("Coleta solicitada ✓ — seu PC vai começar em instantes"); atualizarColeta(); }
+    else{ toast("Erro ao solicitar coleta"); if(btn) btn.disabled=false; }
+  }catch(e){ toast("Erro ao solicitar"); if(btn) btn.disabled=false; }
 }
 async function setPlano(uid,plano){
   try{ const r=await api(`/admin/usuario/${uid}/plano`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})}); toast(r.ok?`Plano → ${plano} ✓`:"Erro"); }catch(e){ toast("Erro"); }

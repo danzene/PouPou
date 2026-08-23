@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 from analise import normalizar
 from coletores.base import ItemColeta, ItemPerecivel
-from coletores.convertiez import ColetorConvertiez
+from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
 from db import database
 
 RAIZ = Path(__file__).resolve().parent
@@ -59,19 +59,41 @@ def main(argv: list[str]) -> int:
         log.info("Sem URLs conhecidas do %s (rode coletar.py antes).", SLUG)
         return 0
 
+    # FATIA ROTATIVA: refresca no máximo N itens por rodada (rotação por offset), pra NUNCA
+    # martelar o site com ~19 mil requisições de uma vez — foi isso que bloqueou o IP.
+    max_rodada = int(os.getenv("CONVERTIEZ_REFRESH_MAX", "2500"))
+    off_file = RAIZ / "dados" / "convertiez_refresh_offset.json"
+    try:
+        offset = int(json.loads(off_file.read_text(encoding="utf-8"))["offset"]) % len(urls)
+    except Exception:  # noqa: BLE001
+        offset = 0
+    if len(urls) > max_rodada:
+        fatia = urls[offset:offset + max_rodada]
+        if len(fatia) < max_rodada:
+            fatia += urls[:max_rodada - len(fatia)]  # dá a volta
+        proximo = (offset + max_rodada) % len(urls)
+    else:
+        fatia, proximo = urls, 0
+
     cfg = next(m for m in json.loads((RAIZ / "config" / "mercados.json").read_text(encoding="utf-8"))["mercados"]
                if m["slug"] == SLUG)
     col = ColetorConvertiez(slug=SLUG, nome=cfg["nome"], url_base=cfg["url_base"],
-                            delay=float(os.getenv("DELAY_CONVERTIEZ", "1.0")), contato=contato)
+                            delay=float(os.getenv("DELAY_CONVERTIEZ", "2.0")), contato=contato)
     base = col.url_base
     agora = datetime.now(timezone.utc).isoformat()
     n = falhas = 0
-    log.info("Refrescando %d itens conhecidos do %s…", len(urls), SLUG)
+    bloqueado = False
+    log.info("Refrescando %d de %d itens do %s (offset %d, fatia rotativa, delay=%.1fs)…",
+             len(fatia), len(urls), SLUG, offset, col.delay)
     with httpx.Client(headers=col._headers(), timeout=col.timeout, follow_redirects=True) as client:
-        for i, u in enumerate(urls):
+        for u in fatia:
             href = u[len(base):] if u.startswith(base) else u
             try:
                 item = col._produto(client, href, None)
+            except BloqueioDetectado as exc:
+                log.warning("PAROU (disjuntor): %s", exc)
+                bloqueado = True
+                break
             except Exception as exc:  # noqa: BLE001
                 falhas += 1
                 item = None
@@ -99,12 +121,21 @@ def main(argv: list[str]) -> int:
             n += 1
             if n % 50 == 0:
                 conn.commit()
-                log.info("  %d/%d atualizados…", n, len(urls))
+                log.info("  %d/%d atualizados…", n, len(fatia))
     conn.commit()
     database.rebuild_resumo(conn)
     conn.commit()
+    # só avança o offset se NÃO foi bloqueado (bloqueou -> repete a mesma fatia na próxima rodada,
+    # quando o site já tiver liberado, em vez de pular esses itens).
+    if not bloqueado:
+        try:
+            off_file.parent.mkdir(parents=True, exist_ok=True)
+            off_file.write_text(json.dumps({"offset": proximo}), encoding="utf-8")
+        except OSError:
+            pass
     conn.close()
-    log.info("OK: %d itens do %s atualizados (%d falhas).", n, SLUG, falhas)
+    log.info("OK: %d itens do %s atualizados (%d falhas)%s.",
+             n, SLUG, falhas, "  [BLOQUEADO — rodada abortada pelo disjuntor]" if bloqueado else "")
     return 0
 
 

@@ -80,7 +80,7 @@
       "loja_ref": null,
       "ativo": true,
       "classe": "coletores.convertiez:ColetorConvertiez",
-      "params": {"max_por_busca": 12, "limite_por_rodada": 3000},
+      "params": {"max_por_busca": 12, "limite_por_rodada": 1500},
       "obs": "Plataforma Convertiez. EAN só na página do produto (gtin13). Catálogo completo via sitemap (20k+ produtos) varrido em fatias rotativas de limite_por_rodada por dia; cobre tudo em ~7 dias e segue reatualizando."
     },
     {

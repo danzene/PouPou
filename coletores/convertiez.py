@@ -13,6 +13,7 @@ from __future__ import annotations
 import html as _html
 import json
 import logging
+import random
 import re
 import time
 from pathlib import Path
@@ -25,6 +26,11 @@ from .base import Coletor, ItemColeta, ItemPerecivel, robots_permite
 from .vtex import ean_valido
 
 log = logging.getLogger("coletor.convertiez")
+
+
+class BloqueioDetectado(Exception):
+    """O site derrubou várias requisições seguidas (bloqueio/anti-bot). Sobe pra ABORTAR
+    a rodada na hora, em vez de martelar um site bloqueado (foi o que causou o IP block)."""
 
 RAIZ = Path(__file__).resolve().parent.parent
 _RE_LOC = re.compile(r"<loc>([^<]+)</loc>", re.I)
@@ -89,6 +95,9 @@ class ColetorConvertiez(Coletor):
         self.max_por_busca = max_por_busca
         self.limite_por_rodada = max(1, limite_por_rodada)
         self.contato = contato
+        # disjuntor anti-bloqueio: N falhas de REDE seguidas -> aborta a rodada
+        self._falhas_seguidas = 0
+        self._max_falhas_seguidas = 6
 
     def _headers(self) -> dict:
         return {"User-Agent": _UA, "Accept": "text/html,application/xhtml+xml,*/*",
@@ -176,7 +185,22 @@ class ColetorConvertiez(Coletor):
                 yield from self._buscar_termo(client, termo, categoria)
 
     def _get(self, client: httpx.Client, url: str, tentativas: int = 4) -> httpx.Response | None:
-        """GET com pacing e retry+backoff em 429/5xx (auto-cura rate-limit)."""
+        """GET com DISJUNTOR: conta falhas de rede seguidas e ABORTA a rodada
+        (BloqueioDetectado) quando o site está derrubando tudo — assim a coleta nunca
+        fica martelando um site bloqueado (foi isso que causou o bloqueio do IP)."""
+        resp = self._get_raw(client, url, tentativas)
+        if resp is None:
+            self._falhas_seguidas += 1
+            if self._falhas_seguidas >= self._max_falhas_seguidas:
+                raise BloqueioDetectado(
+                    f"{self._falhas_seguidas} falhas de rede seguidas no {self.slug} — "
+                    "site bloqueando; abortando a rodada pra não piorar.")
+        else:
+            self._falhas_seguidas = 0
+        return resp
+
+    def _get_raw(self, client: httpx.Client, url: str, tentativas: int = 4) -> httpx.Response | None:
+        """GET com pacing (com jitter) e retry+backoff em 429/5xx (auto-cura rate-limit)."""
         espera = 2.0
         for i in range(tentativas):
             try:
@@ -187,7 +211,7 @@ class ColetorConvertiez(Coletor):
                     return None
                 time.sleep(espera); espera = min(espera * 2, 30); continue
             finally:
-                time.sleep(self.delay)
+                time.sleep(self.delay + random.uniform(0, self.delay * 0.7))  # jitter: menos "robótico"
             if resp.status_code == 429 or 500 <= resp.status_code < 600:
                 if i == tentativas - 1:
                     return resp

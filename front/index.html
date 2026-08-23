@@ -391,6 +391,10 @@
   .resumo .r{ flex:1; min-width:130px; background:var(--surface-2); border-radius:10px; padding:9px 12px; }
   .resumo .r .l{ font-size:11.5px; color:var(--mut); } .resumo .r .v{ font-size:15px; font-weight:600; color:var(--ink); margin-top:1px; }
   .resumo .r .v.down{ color:var(--green); } .resumo .r .v.up{ color:var(--red); }
+  /* legenda do gráfico "Todos os mercados" */
+  .chart-legenda{ display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; }
+  .chart-legenda .leg{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500; color:var(--mut); }
+  .chart-legenda .leg-dot{ width:10px; height:10px; border-radius:3px; flex:0 0 auto; }
   /* comparação de mercados no drawer */
   .cmp{ list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:var(--r-card); overflow:hidden; }
   .cmp li{ display:flex; align-items:center; gap:11px; padding:12px 14px; border-bottom:1px solid var(--line); }
@@ -944,7 +948,7 @@ function renderDrawerFresco(){
   const ver=_veredito(cheapPts);
   const verHTML=ver?`<div class="verdict ${ver.c}"><span class="vdot"></span><div><div class="vt">${ver.t}</div><div class="vs">${ver.s}</div></div></div>`:"";
   const mkts=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
-  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts">${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" onclick="drSetMercado('${jsesc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
+  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${jsesc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
   const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
   const cmp=rk.map((l,i)=>{
     const val=(l.comp!=null)?l.comp:l.preco;
@@ -1015,7 +1019,7 @@ function renderDrawer(prod){
   const ver=_veredito(cheapPts);
   const verHTML=ver?`<div class="verdict ${ver.c}"><span class="vdot"></span><div><div class="vt">${ver.t}</div><div class="vs">${ver.s}</div></div></div>`:"";
   const mkts=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
-  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts">${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" onclick="drSetMercado('${esc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
+  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${esc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
   const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
   const cmp=rk.map((l,i)=>`<li class="${i===0?"best":""}">${badgeMini({nome:l.mercado,cor_badge:l.cor_badge})}<span class="nm">${esc(l.mercado)}</span>${i===0?'<span class="best-lbl">menor preço</span>':""}<span class="pr num">${brl(l.preco)}</span>${verLinkTxt(l.url,l.mercado)}</li>`).join("");
   const ov=document.createElement("div"); ov.className="drawer-ov"; ov.id="drawerOv";
@@ -1056,9 +1060,10 @@ function renderDrawer(prod){
   drRenderChart();
 }
 function drSetPeriodo(d){ DRAWER.periodo=d; document.querySelectorAll("#drPer .tab").forEach((b,i)=>b.classList.toggle("on",PERIODOS[i].d===d)); drRenderChart(); }
-function drSetMercado(m){ DRAWER.mercado=m; document.querySelectorAll("#drMkts .tab").forEach(b=>b.classList.toggle("on",b.textContent===m)); drRenderChart(); }
+function drSetMercado(m){ DRAWER.mercado=m; document.querySelectorAll("#drMkts .tab").forEach(b=>b.classList.toggle("on",b.dataset.m===m)); drRenderChart(); }
 function drRenderChart(){
   const host=$("#drChart"); if(!host) return;
+  if(DRAWER.mercado==="__todos__"){ drRenderTodos(host); return; }   // comparar todos os mercados de uma vez
   const pts=_janela(_serie(DRAWER.mercado),DRAWER.periodo);
   if(pts.length<2){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há preços suficientes de <b>${esc(DRAWER.mercado||"")}</b> nesse período.<br>O histórico cresce conforme o app coleta a cada dia.</div></div>`; return; }
   const precos=pts.map(p=>p.preco), mn=Math.min(...precos), mx=Math.max(...precos), rg=(mx-mn)||1;
@@ -1090,6 +1095,45 @@ function drRenderChart(){
       const cy=dot.getBoundingClientRect().top-rect.top;
       tip.innerHTML=`<div class="d">${dataCurta(p.coletado_em)}</div><div>${esc(DRAWER.mercado)}</div><div class="p num">${brl(p.preco)}</div>`;
       tip.style.left=cx+"px"; tip.style.top=cy+"px"; tip.hidden=false; };
+    dot.addEventListener("mouseenter",show); dot.addEventListener("click",show);
+    dot.addEventListener("mouseleave",()=>{ tip.hidden=true; });
+  });
+}
+// modo "Todos": sobrepõe a linha de cada mercado (cor da marca), eixo X por tempo pra alinhar as datas.
+function drRenderTodos(host){
+  const series=(DRAWER.hist?.series||[]).map(s=>({mercado:s.mercado, cor:s.cor_badge||"#8a8a8a",
+      pts:_janela(s.pontos||[],DRAWER.periodo).slice().sort((a,b)=>new Date(a.coletado_em)-new Date(b.coletado_em))}))
+    .filter(s=>s.pts.length>=2);
+  if(!series.length){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há histórico suficiente pra comparar os mercados nesse período.<br>O histórico cresce conforme a coleta.</div></div>`; return; }
+  const allp=[], allt=[];
+  series.forEach(s=>s.pts.forEach(p=>{ allp.push(p.preco); allt.push(new Date(p.coletado_em).getTime()); }));
+  const mn=Math.min(...allp), mx=Math.max(...allp), rg=(mx-mn)||1;
+  const t0=Math.min(...allt), t1=Math.max(...allt), tr=(t1-t0)||1;
+  const W=1000,H=150,pad=12;
+  const X=t=>pad+((t-t0)/tr)*(W-2*pad), Y=p=>H-pad-((p-mn)/rg)*(H-2*pad);
+  let polys="", dots="";
+  series.forEach(s=>{
+    const d=s.pts.map(p=>`${X(new Date(p.coletado_em).getTime()).toFixed(1)},${Y(p.preco).toFixed(1)}`).join(" ");
+    polys+=`<polyline fill="none" stroke="${s.cor}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="${d}" vector-effect="non-scaling-stroke"/>`;
+    s.pts.forEach(p=>{ const x=X(new Date(p.coletado_em).getTime()), y=Y(p.preco);
+      dots+=`<circle class="chart-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="transparent" data-m="${esc(s.mercado)}" data-p="${p.preco}" data-d="${esc(p.coletado_em)}" data-c="${s.cor}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${s.cor}" pointer-events="none"/>`; });
+  });
+  const legenda=series.map(s=>`<span class="leg"><span class="leg-dot" style="background:${s.cor}"></span>${esc(s.mercado)}</span>`).join("");
+  host.innerHTML=`<div class="chart-wrap">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Comparação de preços entre mercados">${polys}${dots}</svg>
+    <div class="chart-tip" id="drTip" hidden></div>
+  </div>
+  <div class="chart-legenda">${legenda}</div>
+  <div class="resumo">
+    <div class="r"><div class="l">mercados</div><div class="v num">${series.length}</div></div>
+    <div class="r"><div class="l">menor no período</div><div class="v num">${brl(mn)}</div></div>
+    <div class="r"><div class="l">maior no período</div><div class="v num">${brl(mx)}</div></div>
+  </div>`;
+  const svg=host.querySelector("svg"), tip=$("#drTip"), wrap=host.querySelector(".chart-wrap");
+  svg.querySelectorAll(".chart-dot").forEach(dot=>{
+    const show=()=>{ const rect=wrap.getBoundingClientRect(), r=dot.getBoundingClientRect();
+      tip.innerHTML=`<div class="d">${dataCurta(dot.dataset.d)}</div><div style="color:${dot.dataset.c};font-weight:600">${esc(dot.dataset.m)}</div><div class="p num">${brl(+dot.dataset.p)}</div>`;
+      tip.style.left=(r.left-rect.left+r.width/2)+"px"; tip.style.top=(r.top-rect.top)+"px"; tip.hidden=false; };
     dot.addEventListener("mouseenter",show); dot.addEventListener("click",show);
     dot.addEventListener("mouseleave",()=>{ tip.hidden=true; });
   });

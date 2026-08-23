@@ -22,7 +22,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(RAIZ / ".env")
 from db import database  # noqa: E402
 
-MAX_MIN = 90  # se um job ficar 'rodando' mais que isso, considera travado
+MAX_MIN = 300  # se um job ficar 'rodando' mais que isso (5h), considera travado
 
 
 def agora() -> str:
@@ -74,7 +74,7 @@ ok, resumo = False, ""
 try:
     r = subprocess.run([sys.executable, str(RAIZ / "coletar.py")],
                        capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       timeout=60 * 60)  # teto de 1h
+                       timeout=60 * 60 * 4)  # teto de 4h (o full crawl de todos os mercados é lento)
     ok = (r.returncode == 0)
     resumo = "saída:\n" + (r.stdout or "")[-700:]
     if r.stderr:

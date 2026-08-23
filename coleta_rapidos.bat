@@ -5,7 +5,7 @@ REM outro, o refrescar_precos.bat (3/3h) mantem os VTEX fresquinhos de forma lev
 REM O historico so grava mudanca de preco (dedup no inserir_preco), entao nao ha
 REM snapshot repetido pra colapsar depois.
 cd /d "%~dp0"
-".venv\Scripts\python.exe" coletar.py savegnago covabra atacadao oba enxuto dalben taquaral tenda
+".venv\Scripts\python.exe" coletar.py savegnago covabra atacadao oba enxuto dalben taquaral tenda spani
 ".venv\Scripts\python.exe" notificar_alertas.py
 REM Manutencao diaria: poda historico (90 dias) + VACUUM. Roda por ultimo.
 ".venv\Scripts\python.exe" manutencao.py

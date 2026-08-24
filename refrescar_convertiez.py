@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -63,10 +63,20 @@ def main(argv: list[str]) -> int:
     # martelar o site com ~19 mil requisições de uma vez — foi isso que bloqueou o IP.
     max_rodada = int(os.getenv("CONVERTIEZ_REFRESH_MAX", "2500"))
     off_file = RAIZ / "dados" / "convertiez_refresh_offset.json"
-    try:
-        offset = int(json.loads(off_file.read_text(encoding="utf-8"))["offset"]) % len(urls)
-    except Exception:  # noqa: BLE001
-        offset = 0
+    # No GitHub Actions o disco é EFÊMERO (some a cada rodada), então o arquivo de offset
+    # zeraria sempre e a gente refrescaria eternamente a MESMA fatia. Solução: na nuvem o
+    # offset é DERIVADO DA DATA — cada dia anda uma fatia e dá a volta no catálogo sozinho,
+    # sem guardar estado. Local (dev) continua usando o arquivo.
+    na_nuvem = bool(os.getenv("GITHUB_ACTIONS"))
+    if na_nuvem:
+        n_fatias = max(1, -(-len(urls) // max_rodada))  # ceil(len/max_rodada)
+        dia = (datetime.now(timezone.utc).date() - date(2020, 1, 1)).days
+        offset = (dia % n_fatias) * max_rodada
+    else:
+        try:
+            offset = int(json.loads(off_file.read_text(encoding="utf-8"))["offset"]) % len(urls)
+        except Exception:  # noqa: BLE001
+            offset = 0
     if len(urls) > max_rodada:
         fatia = urls[offset:offset + max_rodada]
         if len(fatia) < max_rodada:
@@ -127,7 +137,7 @@ def main(argv: list[str]) -> int:
     conn.commit()
     # só avança o offset se NÃO foi bloqueado (bloqueou -> repete a mesma fatia na próxima rodada,
     # quando o site já tiver liberado, em vez de pular esses itens).
-    if not bloqueado:
+    if not bloqueado and not na_nuvem:
         try:
             off_file.parent.mkdir(parents=True, exist_ok=True)
             off_file.write_text(json.dumps({"offset": proximo}), encoding="utf-8")

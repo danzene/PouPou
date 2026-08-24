@@ -1,0 +1,61 @@
+name: Coleta Pague Menos (nuvem)
+
+# Roda a coleta do Pague Menos (plataforma Convertiez) a partir dos servidores do GitHub,
+# NAO do IP de casa (que o site bloqueou). O IP do runner muda a cada execucao, entao e
+# muito dificil bloquear; e a coleta e suave (disjuntor + fatia rotativa) pra nunca re-bloquear.
+# Grava direto no Supabase via DATABASE_URL (secret do repo).
+
+on:
+  schedule:
+    - cron: "0 8 * * *"   # todo dia 08:00 UTC = 05:00 no horario de Brasilia (madrugada, transito baixo)
+  workflow_dispatch: {}    # botao "Run workflow" pra rodar na hora, manual
+
+# Nunca deixa duas rodadas se atropelarem
+concurrency:
+  group: paguemenos-nuvem
+  cancel-in-progress: false
+
+jobs:
+  refrescar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60    # teto duro: protege a cota gratuita (2000 min/mes) mesmo se algo travar
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CONTATO: "contato@poupou.app"
+      # Fatia rotativa menor + ritmo gentil: ~1500 itens por dia, ~44 min por rodada.
+      # Cobre o catalogo (~19k) em ~13 dias e cabe folgado na cota gratuita.
+      CONVERTIEZ_REFRESH_MAX: "1500"
+      DELAY_CONVERTIEZ: "1.3"
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Conferir o secret DATABASE_URL
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Configure o secret DATABASE_URL em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "DATABASE_URL presente (valor oculto). OK."
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Teste rapido de alcance ao Pague Menos (so informativo)
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" \
+            "https://www.superpaguemenos.com.br/" || true)
+          echo "HTTP do Pague Menos a partir deste runner: $code"
+          echo "(se vier 200, o IP deste runner alcanca o site; o coletor cuida do resto)"
+
+      - name: Refrescar precos do Pague Menos (fatia do dia)
+        run: python refrescar_convertiez.py

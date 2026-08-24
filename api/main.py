@@ -40,6 +40,31 @@ LOGOS_DIR = RAIZ / "front" / "logos"
 
 app = FastAPI(title="Comparador de Preços — RM Campinas", version="0.5")
 
+
+@app.get("/debug/reach-pm")
+def _debug_reach_pm():
+    """TEMPORARIO: testa se o IP deste servidor (Vercel/datacenter) alcança o Pague Menos.
+    Serve pra decidir se dá pra coletar o Pague Menos da nuvem em vez do IP de casa (bloqueado).
+    REMOVER depois do teste."""
+    ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+    alvos = {
+        "home": "https://www.superpaguemenos.com.br/",
+        "sitemap": "https://www.superpaguemenos.com.br/sitemap.xml",
+    }
+    out = {}
+    with httpx.Client(headers={"User-Agent": ua, "Accept": "*/*"},
+                      timeout=20.0, follow_redirects=True) as c:
+        for nome, url in alvos.items():
+            try:
+                r = c.get(url)
+                out[nome] = {"status": r.status_code, "bytes": len(r.content),
+                             "ct": r.headers.get("content-type", ""),
+                             "amostra": r.text[:160]}
+            except Exception as exc:  # noqa: BLE001
+                out[nome] = {"erro": f"{type(exc).__name__}: {exc}"}
+    return out
+
 # ---- Auth (Supabase): valida o Bearer token e diz QUEM é o usuário + se é premium ----
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ijtnozcomqzxfaidurso.supabase.co").rstrip("/")
 SUPABASE_ANON = os.getenv(

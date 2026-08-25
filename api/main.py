@@ -41,57 +41,6 @@ LOGOS_DIR = RAIZ / "front" / "logos"
 app = FastAPI(title="Comparador de Preços — RM Campinas", version="0.5")
 
 
-@app.get("/debug/reach-pm")
-def _debug_reach_pm():
-    """TEMPORARIO: testa se o IP deste servidor (Vercel/datacenter) alcança o Pague Menos.
-    Serve pra decidir se dá pra coletar o Pague Menos da nuvem em vez do IP de casa (bloqueado).
-    REMOVER depois do teste."""
-    ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-          "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
-    alvos = {
-        "home": "https://www.superpaguemenos.com.br/",
-        "produto": "https://www.superpaguemenos.com.br/suco-em-po-clight-laranja-8g/p",
-    }
-    out = {}
-    with httpx.Client(headers={"User-Agent": ua, "Accept": "*/*"},
-                      timeout=20.0, follow_redirects=True) as c:
-        for nome, url in alvos.items():
-            try:
-                r = c.get(url)
-                txt = r.text
-                out[nome] = {"status": r.status_code, "bytes": len(r.content),
-                             "ct": r.headers.get("content-type", ""),
-                             "tem_gtin": "gtin13" in txt or "\"gtin\"" in txt,
-                             "tem_preco": "price" in txt.lower(),
-                             "amostra": txt[:160]}
-            except Exception as exc:  # noqa: BLE001
-                out[nome] = {"erro": f"{type(exc).__name__}: {exc}"}
-    return out
-
-
-@app.get("/debug/coletar-pm")
-def _debug_coletar_pm():
-    """TEMPORARIO: roda o CODIGO REAL do coletor num produto, a partir deste servidor.
-    Prova se o coletor consegue extrair preco+EAN do Pague Menos daqui. REMOVER depois."""
-    from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
-    col = ColetorConvertiez(slug="superpaguemenos", nome="Supermercados Pague Menos",
-                            url_base="https://www.superpaguemenos.com.br",
-                            delay=0.0, contato="contato@poupou.app")
-    href = "/suco-em-po-clight-laranja-8g/p"
-    with httpx.Client(headers=col._headers(), timeout=col.timeout, follow_redirects=True) as client:
-        try:
-            item = col._produto(client, href, None)
-        except BloqueioDetectado as e:
-            return {"resultado": "BLOQUEADO", "msg": str(e)}
-        except Exception as e:  # noqa: BLE001
-            return {"resultado": "ERRO", "tipo": type(e).__name__, "msg": str(e)}
-    if item is None:
-        return {"resultado": "None (nao parseou / sem preco / bloqueado)"}
-    return {"resultado": "OK", "tipo": type(item).__name__,
-            "nome": getattr(item, "nome", None), "preco": getattr(item, "preco", None),
-            "ean": getattr(item, "ean", None), "unidade": getattr(item, "unidade", None)}
-
-
 # ===================== COLETA NA NUVEM (Pague Menos, IP no Brasil) =====================
 # O Pague Menos bloqueia IP de fora do BR. Este servidor (Vercel gru1/SP) tem IP brasileiro
 # e PASSA, então a coleta roda AQUI, uma leva pequena por chamada (cabe nos 60s do Vercel).
@@ -113,16 +62,6 @@ def _coleta_pm_token_ok(conn, token: str | None) -> bool:
         return False
     esperado = (row["valor"] if row else "") or ""
     return bool(esperado) and hmac.compare_digest(token, esperado)
-
-
-@app.get("/debug/dsn-fp")
-def _debug_dsn_fp():
-    """TEMPORARIO: impressao digital nao-reversivel do DATABASE_URL, p/ comparar com o local
-    sem vazar o valor. REMOVER depois."""
-    raw = os.getenv("DATABASE_URL", "")
-    dsn = raw.strip()
-    return {"set": bool(dsn), "len_raw": len(raw), "len_strip": len(dsn),
-            "fp": hashlib.sha256(dsn.encode()).hexdigest()[:12] if dsn else None}
 
 
 @app.get("/cron/pm-batch")

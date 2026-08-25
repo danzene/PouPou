@@ -110,6 +110,16 @@ def _coleta_pm_token_ok(token: str | None) -> bool:
     return hmac.compare_digest(token, esperado)
 
 
+@app.get("/debug/dsn-fp")
+def _debug_dsn_fp():
+    """TEMPORARIO: impressao digital nao-reversivel do DATABASE_URL, p/ comparar com o local
+    sem vazar o valor. REMOVER depois."""
+    raw = os.getenv("DATABASE_URL", "")
+    dsn = raw.strip()
+    return {"set": bool(dsn), "len_raw": len(raw), "len_strip": len(dsn),
+            "fp": hashlib.sha256(dsn.encode()).hexdigest()[:12] if dsn else None}
+
+
 @app.get("/cron/pm-batch")
 def cron_pm_batch(x_coleta_token: str | None = Header(None)):
     """Coleta UMA leva (~30 produtos) do Pague Menos a partir deste servidor (IP no Brasil).

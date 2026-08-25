@@ -64,12 +64,38 @@ def _coleta_pm_token_ok(conn, token: str | None) -> bool:
     return bool(esperado) and hmac.compare_digest(token, esperado)
 
 
+def _pm_upsert_item(conn, mid: int, item, agora: str) -> None:
+    """Grava um item coletado (mesma lógica do coletar.py): perecível -> tabela pereciveis;
+    industrializado -> produto + preço + registra a URL em `links` (pra o refresh reachá-lo)."""
+    from coletores.base import ItemColeta, ItemPerecivel
+    if isinstance(item, ItemPerecivel):
+        database.upsert_perecivel(
+            conn, mercado_id=mid, cod_interno=item.cod_interno, nome=item.nome,
+            preco=item.preco, unidade=item.unidade, imagem_url=item.imagem_url,
+            url=item.url, coletado_em=agora, so_no_site=item.so_no_site,
+            preco_de=item.preco_de, desconto_pct=item.desconto_pct,
+            oferta_tipo=item.oferta_tipo)
+    elif isinstance(item, ItemColeta):
+        medida = normalizar.extrair_medida(item.nome)
+        ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
+        database.upsert_produto(
+            conn, ean=item.ean, nome=item.nome, marca=item.marca, categoria=item.categoria,
+            unidade=(medida.unidade if medida else item.unidade),
+            qtd_embalagem=(medida.qtd_base if medida else None), imagem_url=item.imagem_url)
+        database.inserir_preco(
+            conn, ean=item.ean, mercado_id=mid, preco=item.preco, preco_por_unidade=ppu,
+            coletado_em=agora, so_no_site=item.so_no_site, preco_de=item.preco_de,
+            desconto_pct=item.desconto_pct, oferta_tipo=item.oferta_tipo)
+        if item.url:
+            database.upsert_link(conn, ean=item.ean, mercado_id=mid, url=item.url,
+                                 atualizado_em=agora)
+
+
 @app.get("/cron/pm-batch")
 def cron_pm_batch(x_coleta_token: str | None = Header(None)):
     """Coleta UMA leva (~30 produtos) do Pague Menos a partir deste servidor (IP no Brasil).
     O cursor (posição no catálogo) fica no banco e roda sozinho a cada chamada — cobre o
     catálogo inteiro em várias chamadas e segue reatualizando."""
-    from coletores.base import ItemColeta, ItemPerecivel
     from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
 
     LEVA, DELAY = 30, 0.3
@@ -118,25 +144,7 @@ def cron_pm_batch(x_coleta_token: str | None = Header(None)):
                     continue
                 if item is None:
                     continue
-                if isinstance(item, ItemPerecivel):
-                    database.upsert_perecivel(
-                        conn, mercado_id=mid, cod_interno=item.cod_interno, nome=item.nome,
-                        preco=item.preco, unidade=item.unidade, imagem_url=item.imagem_url,
-                        url=item.url, coletado_em=agora, so_no_site=item.so_no_site,
-                        preco_de=item.preco_de, desconto_pct=item.desconto_pct)
-                elif isinstance(item, ItemColeta):
-                    medida = normalizar.extrair_medida(item.nome)
-                    ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
-                    database.upsert_produto(
-                        conn, ean=item.ean, nome=item.nome, marca=item.marca,
-                        categoria=item.categoria,
-                        unidade=(medida.unidade if medida else item.unidade),
-                        qtd_embalagem=(medida.qtd_base if medida else None),
-                        imagem_url=item.imagem_url)
-                    database.inserir_preco(
-                        conn, ean=item.ean, mercado_id=mid, preco=item.preco,
-                        preco_por_unidade=ppu, coletado_em=agora, so_no_site=item.so_no_site,
-                        preco_de=item.preco_de, desconto_pct=item.desconto_pct)
+                _pm_upsert_item(conn, mid, item, agora)
                 feitos += 1
         # só avança o cursor se NÃO bloqueou (bloqueou -> repete a mesma fatia na próxima)
         novo = pos if bloqueado else (pos + LEVA) % total
@@ -146,6 +154,62 @@ def cron_pm_batch(x_coleta_token: str | None = Header(None)):
             "atualizado_em = excluded.atualizado_em", (mid, novo, agora))
         return {"ok": True, "feitos": feitos, "de": pos, "para": novo,
                 "total": total, "bloqueado": bool(bloqueado)}
+    finally:
+        conn.close()
+
+
+@app.get("/cron/pm-descobrir")
+def cron_pm_descobrir(x_coleta_token: str | None = Header(None)):
+    """Descobre produtos NOVOS do Pague Menos: lê o sitemap (poucas requisições), acha URLs que
+    ainda não estão no banco e coleta uma leva delas (limitada, pra ser gentil). Uma vez no banco,
+    o refresh diário passa a mantê-las frescas. Chamar 1x/dia."""
+    from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
+
+    LEVA_DESC, DELAY = 20, 0.3
+    conn = _conn()
+    try:
+        if not _coleta_pm_token_ok(conn, x_coleta_token):
+            raise HTTPException(status_code=401, detail="token inválido")
+        m = conn.execute("SELECT id, nome, url_base FROM mercados WHERE slug = ?",
+                         (_COLETA_PM_SLUG,)).fetchone()
+        if not m:
+            raise HTTPException(status_code=500, detail="mercado não existe")
+        mid = m["id"]
+        col = ColetorConvertiez(slug=_COLETA_PM_SLUG, nome=m["nome"], url_base=m["url_base"],
+                                delay=DELAY, contato="contato@poupou.app")
+        base = col.url_base
+        agora = datetime.now(timezone.utc).isoformat()
+        known = set()
+        for r in conn.execute("SELECT url FROM links WHERE mercado_id=? AND url IS NOT NULL", (mid,)):
+            known.add(r["url"])
+        for r in conn.execute("SELECT url FROM pereciveis WHERE mercado_id=? AND url IS NOT NULL", (mid,)):
+            known.add(r["url"])
+        novos_coletados = bloqueado = 0
+        with httpx.Client(headers=col._headers(), timeout=col.timeout,
+                          follow_redirects=True) as client:
+            try:
+                sitemap = col._urls_sitemap(client)
+            except BloqueioDetectado:
+                return {"ok": False, "bloqueado": True, "obs": "bloqueio ao ler sitemap"}
+            if not sitemap:
+                return {"ok": True, "sitemap_total": 0, "obs": "sitemap vazio/indisponível"}
+            novos = [u for u in sitemap if u not in known]
+            for u in novos[:LEVA_DESC]:
+                href = u[len(base):] if u.startswith(base) else u
+                try:
+                    item = col._produto(client, href, None)
+                except BloqueioDetectado:
+                    bloqueado = 1
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+                if item is None:
+                    continue
+                _pm_upsert_item(conn, mid, item, agora)
+                novos_coletados += 1
+        return {"ok": True, "sitemap_total": len(sitemap), "conhecidos": len(known),
+                "novos_no_sitemap": len(novos), "novos_coletados": novos_coletados,
+                "bloqueado": bool(bloqueado)}
     finally:
         conn.close()
 

@@ -53,6 +53,14 @@ with httpx.Client(timeout=95.0) as cli:
         time.sleep(2)
 
 print(f"==> TOTAL de produtos re-checados nesta rodada: {total}")
+
+# descobrir produtos NOVOS (1 chamada: le o sitemap e coleta uma leva dos que faltam)
+try:
+    r = httpx.get(f"{base}/cron/pm-descobrir", headers=H, timeout=90.0)
+    print(f"descobrir novos: HTTP {r.status_code} {r.text[:200]}")
+except Exception as e:  # noqa: BLE001
+    print(f"descobrir erro: {type(e).__name__}: {e}")
+
 try:
     r = httpx.get(f"{base}/cron/pm-finalizar", headers=H, timeout=90.0)
     print(f"finalizar (resumo): HTTP {r.status_code} {r.text[:120]}")

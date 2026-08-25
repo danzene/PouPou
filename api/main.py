@@ -50,7 +50,7 @@ def _debug_reach_pm():
           "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
     alvos = {
         "home": "https://www.superpaguemenos.com.br/",
-        "sitemap": "https://www.superpaguemenos.com.br/sitemap.xml",
+        "produto": "https://www.superpaguemenos.com.br/suco-em-po-clight-laranja-8g/p",
     }
     out = {}
     with httpx.Client(headers={"User-Agent": ua, "Accept": "*/*"},
@@ -58,9 +58,12 @@ def _debug_reach_pm():
         for nome, url in alvos.items():
             try:
                 r = c.get(url)
+                txt = r.text
                 out[nome] = {"status": r.status_code, "bytes": len(r.content),
                              "ct": r.headers.get("content-type", ""),
-                             "amostra": r.text[:160]}
+                             "tem_gtin": "gtin13" in txt or "\"gtin\"" in txt,
+                             "tem_preco": "price" in txt.lower(),
+                             "amostra": txt[:160]}
             except Exception as exc:  # noqa: BLE001
                 out[nome] = {"erro": f"{type(exc).__name__}: {exc}"}
     return out

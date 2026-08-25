@@ -100,14 +100,19 @@ def _debug_coletar_pm():
 _COLETA_PM_SLUG = "superpaguemenos"
 
 
-def _coleta_pm_token_ok(token: str | None) -> bool:
-    """Token = HMAC-SHA256(chave=DATABASE_URL, msg='coleta-pm'). Só quem tem o DATABASE_URL
-    (o disparador) consegue gerar. Evita que qualquer um dispare coleta pelo nosso servidor."""
-    dsn = os.getenv("DATABASE_URL", "").strip()
-    if not dsn or not token:
+def _coleta_pm_token_ok(conn, token: str | None) -> bool:
+    """O token esperado fica na tabela app_config (chave='coleta_token'). Vercel e o disparador
+    (GitHub) leem o MESMO banco, então compartilham o segredo sem precisar de env em dois lugares.
+    Quem não tem acesso ao banco não consegue o token -> não dispara coleta pelo nosso servidor."""
+    if not token:
         return False
-    esperado = hmac.new(dsn.encode(), b"coleta-pm", hashlib.sha256).hexdigest()
-    return hmac.compare_digest(token, esperado)
+    try:
+        row = conn.execute("SELECT valor FROM app_config WHERE chave = ?",
+                           ("coleta_token",)).fetchone()
+    except Exception:  # noqa: BLE001  (tabela ainda não existe)
+        return False
+    esperado = (row["valor"] if row else "") or ""
+    return bool(esperado) and hmac.compare_digest(token, esperado)
 
 
 @app.get("/debug/dsn-fp")
@@ -125,14 +130,14 @@ def cron_pm_batch(x_coleta_token: str | None = Header(None)):
     """Coleta UMA leva (~30 produtos) do Pague Menos a partir deste servidor (IP no Brasil).
     O cursor (posição no catálogo) fica no banco e roda sozinho a cada chamada — cobre o
     catálogo inteiro em várias chamadas e segue reatualizando."""
-    if not _coleta_pm_token_ok(x_coleta_token):
-        raise HTTPException(status_code=401, detail="token inválido")
     from coletores.base import ItemColeta, ItemPerecivel
     from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
 
     LEVA, DELAY = 30, 0.3
     conn = _conn()
     try:
+        if not _coleta_pm_token_ok(conn, x_coleta_token):
+            raise HTTPException(status_code=401, detail="token inválido")
         m = conn.execute("SELECT id, nome, url_base FROM mercados WHERE slug = ?",
                          (_COLETA_PM_SLUG,)).fetchone()
         if not m:
@@ -209,10 +214,10 @@ def cron_pm_batch(x_coleta_token: str | None = Header(None)):
 @app.get("/cron/pm-finalizar")
 def cron_pm_finalizar(x_coleta_token: str | None = Header(None)):
     """Reconstrói o resumo (chamar UMA vez ao fim da rodada diária)."""
-    if not _coleta_pm_token_ok(x_coleta_token):
-        raise HTTPException(status_code=401, detail="token inválido")
     conn = _conn()
     try:
+        if not _coleta_pm_token_ok(conn, x_coleta_token):
+            raise HTTPException(status_code=401, detail="token inválido")
         database.rebuild_resumo(conn)
         return {"ok": True}
     finally:

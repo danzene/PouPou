@@ -175,6 +175,11 @@ def cron_pm_descobrir(x_coleta_token: str | None = Header(None)):
         if not m:
             raise HTTPException(status_code=500, detail="mercado não existe")
         mid = m["id"]
+        # URLs já TENTADAS (deram item OU vieram vazias): marcamos pra NÃO re-tentar todo dia —
+        # muitas URLs do sitemap são variantes de um EAN já conhecido ou páginas fora de estoque
+        # que voltam None. Sem isso o "backlog" nunca drenava. Assim cada URL é tentada 1x.
+        conn.execute("CREATE TABLE IF NOT EXISTS coleta_url_vista ("
+                     "mercado_id integer, url text, vista_em text, PRIMARY KEY (mercado_id, url))")
         col = ColetorConvertiez(slug=_COLETA_PM_SLUG, nome=m["nome"], url_base=m["url_base"],
                                 delay=DELAY, contato="contato@poupou.app")
         base = col.url_base
@@ -183,6 +188,8 @@ def cron_pm_descobrir(x_coleta_token: str | None = Header(None)):
         for r in conn.execute("SELECT url FROM links WHERE mercado_id=? AND url IS NOT NULL", (mid,)):
             known.add(r["url"])
         for r in conn.execute("SELECT url FROM pereciveis WHERE mercado_id=? AND url IS NOT NULL", (mid,)):
+            known.add(r["url"])
+        for r in conn.execute("SELECT url FROM coleta_url_vista WHERE mercado_id=?", (mid,)):
             known.add(r["url"])
         novos_coletados = bloqueado = 0
         with httpx.Client(headers=col._headers(), timeout=col.timeout,
@@ -202,11 +209,14 @@ def cron_pm_descobrir(x_coleta_token: str | None = Header(None)):
                     bloqueado = 1
                     break
                 except Exception:  # noqa: BLE001
-                    continue
-                if item is None:
-                    continue
-                _pm_upsert_item(conn, mid, item, agora)
-                novos_coletados += 1
+                    item = None
+                if item is not None:
+                    _pm_upsert_item(conn, mid, item, agora)
+                    novos_coletados += 1
+                # marca a URL como TENTADA (com item ou vazia) pra não re-tentar amanhã
+                conn.execute("INSERT INTO coleta_url_vista (mercado_id, url, vista_em) "
+                             "VALUES (?, ?, ?) ON CONFLICT (mercado_id, url) DO NOTHING",
+                             (mid, u, agora))
         return {"ok": True, "sitemap_total": len(sitemap), "conhecidos": len(known),
                 "novos_no_sitemap": len(novos), "novos_coletados": novos_coletados,
                 "bloqueado": bool(bloqueado)}

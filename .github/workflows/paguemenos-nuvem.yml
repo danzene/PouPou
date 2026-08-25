@@ -1,13 +1,12 @@
 name: Coleta Pague Menos (nuvem)
 
 # O Pague Menos bloqueia IP de fora do Brasil. Os servidores do GitHub ficam nos EUA, entao
-# NAO coletamos direto daqui. Em vez disso, este robo so serve de "despertador": ele bate no
-# nosso proprio Vercel (que roda em Sao Paulo, IP brasileiro, e PASSA no site) em sequencia,
-# e o Vercel faz a coleta de verdade, uma leva pequena por chamada. Assim o bloqueio
-# geografico nao nos afeta (o GitHub so fala com a gente, nunca com o Pague Menos).
+# NAO coletamos direto daqui. Este robo so serve de "despertador": bate no nosso proprio Vercel
+# (Sao Paulo, IP brasileiro, que PASSA no site) em sequencia, e o Vercel faz a coleta de verdade,
+# uma leva pequena por chamada. Assim o bloqueio geografico nao nos afeta.
 #
-# O token de autenticacao e derivado do proprio DATABASE_URL (HMAC), entao NAO precisa de
-# nenhum segredo novo: o mesmo secret DATABASE_URL que ja esta cadastrado gera o token.
+# Zero segredo novo: o token de autenticacao fica no banco (tabela app_config) e o robo o le
+# usando o secret DATABASE_URL que ja existe.
 
 on:
   schedule:
@@ -27,6 +26,14 @@ jobs:
       BASE_URL: "https://poupou-three.vercel.app"
       BATCHES: "50"        # 50 levas x ~30 produtos = ~1500/dia (cobre o catalogo em ~13 dias)
     steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Conferir o secret DATABASE_URL
         run: |
           if [ -z "$DATABASE_URL" ]; then
@@ -35,36 +42,8 @@ jobs:
           fi
           echo "DATABASE_URL presente. OK."
 
-      - name: Coletar (batendo no Vercel/SP em sequencia)
-        run: |
-          set -u
-          TOKEN=$(printf %s "coleta-pm" | openssl dgst -sha256 -hmac "$DATABASE_URL" | sed 's/^.*= *//')
-          echo "::add-mask::$TOKEN"
-          total=0
-          for i in $(seq 1 "$BATCHES"); do
-            out=$(curl -s -w $'\n%{http_code}' --max-time 90 \
-              -H "X-Coleta-Token: $TOKEN" "$BASE_URL/cron/pm-batch")
-            code=$(printf '%s' "$out" | tail -n1)
-            body=$(printf '%s' "$out" | sed '$d')
-            echo "leva $i (HTTP $code): $body"
-            if [ "$code" != "200" ]; then
-              echo "::warning::leva $i retornou HTTP $code"
-              if [ "$i" = "1" ]; then
-                echo "::error::primeira leva falhou (token errado ou Vercel fora?). Abortando."
-                exit 1
-              fi
-              break
-            fi
-            feitos=$(printf '%s' "$body" | grep -o '"feitos":[0-9]*' | grep -o '[0-9]*' || true)
-            total=$((total + ${feitos:-0}))
-            if printf '%s' "$body" | grep -q '"bloqueado": *true'; then
-              echo "bloqueio detectado no Vercel — parando cedo"; break
-            fi
-            if printf '%s' "$body" | grep -q '"total": *0'; then
-              echo "sem URLs conhecidas — parando"; break
-            fi
-            sleep 2
-          done
-          echo "==> TOTAL de produtos atualizados nesta rodada: $total"
-          echo "Finalizando (reconstruindo resumo)..."
-          curl -s --max-time 60 -H "X-Coleta-Token: $TOKEN" "$BASE_URL/cron/pm-finalizar"; echo ""
+      - name: Instalar dependencias (leves)
+        run: pip install "psycopg[binary]" "httpx>=0.27"
+
+      - name: Coletar (despertando o Vercel/SP em sequencia)
+        run: python .github/scripts/pingar_coleta.py

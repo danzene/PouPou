@@ -91,6 +91,123 @@ def _debug_coletar_pm():
             "nome": getattr(item, "nome", None), "preco": getattr(item, "preco", None),
             "ean": getattr(item, "ean", None), "unidade": getattr(item, "unidade", None)}
 
+
+# ===================== COLETA NA NUVEM (Pague Menos, IP no Brasil) =====================
+# O Pague Menos bloqueia IP de fora do BR. Este servidor (Vercel gru1/SP) tem IP brasileiro
+# e PASSA, então a coleta roda AQUI, uma leva pequena por chamada (cabe nos 60s do Vercel).
+# Um disparador externo (GitHub Actions) bate nestes endpoints em sequência — ele nunca fala
+# com o Pague Menos, só com a gente, então não sofre o bloqueio geográfico.
+_COLETA_PM_SLUG = "superpaguemenos"
+
+
+def _coleta_pm_token_ok(token: str | None) -> bool:
+    """Token = HMAC-SHA256(chave=DATABASE_URL, msg='coleta-pm'). Só quem tem o DATABASE_URL
+    (o disparador) consegue gerar. Evita que qualquer um dispare coleta pelo nosso servidor."""
+    dsn = os.getenv("DATABASE_URL", "").strip()
+    if not dsn or not token:
+        return False
+    esperado = hmac.new(dsn.encode(), b"coleta-pm", hashlib.sha256).hexdigest()
+    return hmac.compare_digest(token, esperado)
+
+
+@app.get("/cron/pm-batch")
+def cron_pm_batch(x_coleta_token: str | None = Header(None)):
+    """Coleta UMA leva (~30 produtos) do Pague Menos a partir deste servidor (IP no Brasil).
+    O cursor (posição no catálogo) fica no banco e roda sozinho a cada chamada — cobre o
+    catálogo inteiro em várias chamadas e segue reatualizando."""
+    if not _coleta_pm_token_ok(x_coleta_token):
+        raise HTTPException(status_code=401, detail="token inválido")
+    from coletores.base import ItemColeta, ItemPerecivel
+    from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
+
+    LEVA, DELAY = 30, 0.3
+    conn = _conn()
+    try:
+        m = conn.execute("SELECT id, nome, url_base FROM mercados WHERE slug = ?",
+                         (_COLETA_PM_SLUG,)).fetchone()
+        if not m:
+            raise HTTPException(status_code=500, detail="mercado não existe")
+        mid = m["id"]
+        conn.execute("CREATE TABLE IF NOT EXISTS coleta_cursor ("
+                     "mercado_id integer PRIMARY KEY, pos integer NOT NULL DEFAULT 0, "
+                     "atualizado_em text)")
+        total = conn.execute(
+            "SELECT (SELECT count(*) FROM links WHERE mercado_id=? AND url IS NOT NULL) + "
+            "(SELECT count(*) FROM pereciveis WHERE mercado_id=? AND url IS NOT NULL) AS t",
+            (mid, mid)).fetchone()["t"]
+        if not total:
+            return {"ok": True, "feitos": 0, "total": 0, "obs": "sem URLs conhecidas"}
+        crow = conn.execute("SELECT pos FROM coleta_cursor WHERE mercado_id = ?", (mid,)).fetchone()
+        pos = (crow["pos"] if crow else 0) % total
+        rows = conn.execute(
+            "SELECT url FROM ("
+            "  SELECT url FROM links WHERE mercado_id=? AND url IS NOT NULL "
+            "  UNION SELECT url FROM pereciveis WHERE mercado_id=? AND url IS NOT NULL"
+            ") q ORDER BY url LIMIT ? OFFSET ?", (mid, mid, LEVA, pos)).fetchall()
+        urls = [r["url"] for r in rows]
+
+        col = ColetorConvertiez(slug=_COLETA_PM_SLUG, nome=m["nome"], url_base=m["url_base"],
+                                delay=DELAY, contato="contato@poupou.app")
+        base = col.url_base
+        agora = datetime.now(timezone.utc).isoformat()
+        feitos = bloqueado = 0
+        with httpx.Client(headers=col._headers(), timeout=col.timeout,
+                          follow_redirects=True) as client:
+            for u in urls:
+                href = u[len(base):] if u.startswith(base) else u
+                try:
+                    item = col._produto(client, href, None)
+                except BloqueioDetectado:
+                    bloqueado = 1
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+                if item is None:
+                    continue
+                if isinstance(item, ItemPerecivel):
+                    database.upsert_perecivel(
+                        conn, mercado_id=mid, cod_interno=item.cod_interno, nome=item.nome,
+                        preco=item.preco, unidade=item.unidade, imagem_url=item.imagem_url,
+                        url=item.url, coletado_em=agora, so_no_site=item.so_no_site,
+                        preco_de=item.preco_de, desconto_pct=item.desconto_pct)
+                elif isinstance(item, ItemColeta):
+                    medida = normalizar.extrair_medida(item.nome)
+                    ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
+                    database.upsert_produto(
+                        conn, ean=item.ean, nome=item.nome, marca=item.marca,
+                        categoria=item.categoria,
+                        unidade=(medida.unidade if medida else item.unidade),
+                        qtd_embalagem=(medida.qtd_base if medida else None),
+                        imagem_url=item.imagem_url)
+                    database.inserir_preco(
+                        conn, ean=item.ean, mercado_id=mid, preco=item.preco,
+                        preco_por_unidade=ppu, coletado_em=agora, so_no_site=item.so_no_site,
+                        preco_de=item.preco_de, desconto_pct=item.desconto_pct)
+                feitos += 1
+        # só avança o cursor se NÃO bloqueou (bloqueou -> repete a mesma fatia na próxima)
+        novo = pos if bloqueado else (pos + LEVA) % total
+        conn.execute(
+            "INSERT INTO coleta_cursor (mercado_id, pos, atualizado_em) VALUES (?, ?, ?) "
+            "ON CONFLICT (mercado_id) DO UPDATE SET pos = excluded.pos, "
+            "atualizado_em = excluded.atualizado_em", (mid, novo, agora))
+        return {"ok": True, "feitos": feitos, "de": pos, "para": novo,
+                "total": total, "bloqueado": bool(bloqueado)}
+    finally:
+        conn.close()
+
+
+@app.get("/cron/pm-finalizar")
+def cron_pm_finalizar(x_coleta_token: str | None = Header(None)):
+    """Reconstrói o resumo (chamar UMA vez ao fim da rodada diária)."""
+    if not _coleta_pm_token_ok(x_coleta_token):
+        raise HTTPException(status_code=401, detail="token inválido")
+    conn = _conn()
+    try:
+        database.rebuild_resumo(conn)
+        return {"ok": True}
+    finally:
+        conn.close()
+
 # ---- Auth (Supabase): valida o Bearer token e diz QUEM é o usuário + se é premium ----
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ijtnozcomqzxfaidurso.supabase.co").rstrip("/")
 SUPABASE_ANON = os.getenv(

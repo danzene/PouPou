@@ -68,6 +68,29 @@ def _debug_reach_pm():
                 out[nome] = {"erro": f"{type(exc).__name__}: {exc}"}
     return out
 
+
+@app.get("/debug/coletar-pm")
+def _debug_coletar_pm():
+    """TEMPORARIO: roda o CODIGO REAL do coletor num produto, a partir deste servidor.
+    Prova se o coletor consegue extrair preco+EAN do Pague Menos daqui. REMOVER depois."""
+    from coletores.convertiez import BloqueioDetectado, ColetorConvertiez
+    col = ColetorConvertiez(slug="superpaguemenos", nome="Supermercados Pague Menos",
+                            url_base="https://www.superpaguemenos.com.br",
+                            delay=0.0, contato="contato@poupou.app")
+    href = "/suco-em-po-clight-laranja-8g/p"
+    with httpx.Client(headers=col._headers(), timeout=col.timeout, follow_redirects=True) as client:
+        try:
+            item = col._produto(client, href, None)
+        except BloqueioDetectado as e:
+            return {"resultado": "BLOQUEADO", "msg": str(e)}
+        except Exception as e:  # noqa: BLE001
+            return {"resultado": "ERRO", "tipo": type(e).__name__, "msg": str(e)}
+    if item is None:
+        return {"resultado": "None (nao parseou / sem preco / bloqueado)"}
+    return {"resultado": "OK", "tipo": type(item).__name__,
+            "nome": getattr(item, "nome", None), "preco": getattr(item, "preco", None),
+            "ean": getattr(item, "ean", None), "unidade": getattr(item, "unidade", None)}
+
 # ---- Auth (Supabase): valida o Bearer token e diz QUEM é o usuário + se é premium ----
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://ijtnozcomqzxfaidurso.supabase.co").rstrip("/")
 SUPABASE_ANON = os.getenv(

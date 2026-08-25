@@ -20,11 +20,12 @@ concurrency:
 jobs:
   disparar:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       BASE_URL: "https://poupou-three.vercel.app"
-      BATCHES: "50"        # 50 levas x ~30 produtos = ~1500/dia (cobre o catalogo em ~13 dias)
+      BATCHES: "100"       # 100 levas x ~30 produtos = ~3000/dia (cobre o catalogo em ~6-7 dias,
+                           # ~16-18% em 24h). ~50 min/rodada, cabe folgado nos 2000 min/mes gratis.
     steps:
       - name: Baixar o codigo
         uses: actions/checkout@v4

@@ -54,12 +54,26 @@ with httpx.Client(timeout=95.0) as cli:
 
 print(f"==> TOTAL de produtos re-checados nesta rodada: {total}")
 
-# descobrir produtos NOVOS (1 chamada: le o sitemap e coleta uma leva dos que faltam)
-try:
-    r = httpx.get(f"{base}/cron/pm-descobrir", headers=H, timeout=90.0)
-    print(f"descobrir novos: HTTP {r.status_code} {r.text[:200]}")
-except Exception as e:  # noqa: BLE001
-    print(f"descobrir erro: {type(e).__name__}: {e}")
+# descobrir produtos NOVOS (ate 3 levas: le o sitemap e coleta os que faltam; para cedo)
+novos_total = 0
+for j in range(1, 4):
+    try:
+        r = httpx.get(f"{base}/cron/pm-descobrir", headers=H, timeout=95.0)
+    except Exception as e:  # noqa: BLE001
+        print(f"descobrir {j}: erro {type(e).__name__}: {e}")
+        break
+    if r.status_code != 200:
+        print(f"descobrir {j}: HTTP {r.status_code} {r.text[:150]}")
+        break
+    d = r.json()
+    nc = int(d.get("novos_coletados", 0) or 0)
+    novos_total += nc
+    print(f"descobrir {j}: novos_coletados={nc} novos_no_sitemap={d.get('novos_no_sitemap')} "
+          f"sitemap={d.get('sitemap_total')}")
+    if nc == 0 or d.get("bloqueado"):
+        break
+    time.sleep(2)
+print(f"==> TOTAL de produtos NOVOS descobertos nesta rodada: {novos_total}")
 
 try:
     r = httpx.get(f"{base}/cron/pm-finalizar", headers=H, timeout=90.0)

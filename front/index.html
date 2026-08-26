@@ -198,6 +198,8 @@
     padding:26px 24px; text-align:center; margin-bottom:16px; }
   .eco-lbl{ font-size:12.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); }
   .eco-num{ font-size:46px; font-weight:700; color:var(--green); line-height:1.05; letter-spacing:-.02em; margin:8px 0 6px; }
+  .eco-pct{ display:inline-block; vertical-align:middle; margin-left:12px; font-size:16px; font-weight:700;
+    color:#fff; background:var(--green); padding:5px 13px; border-radius:999px; letter-spacing:0; }
   .eco-sub{ font-size:14.5px; color:var(--mut); margin:0 auto; max-width:420px; }
   .eco-det{ margin-top:16px; }
   .eco-det>summary{ list-style:none; cursor:pointer; font-size:13px; color:var(--focus); display:inline-flex; align-items:center; gap:5px; }
@@ -1448,7 +1450,7 @@ function rankingMercados(d){
       : `<div class="d num">R$ ${diff.toFixed(2).replace(".",",")} a mais</div>`;
     const sub=m.completo
       ? `tem todos os ${d.n_itens} itens`
-      : `tem ${m.cobertura}, + ${m.faltam} ${m.faltam===1?"item pego":"itens pegos"} no mais barato fora`;
+      : `tem ${m.cobertura}, + ${m.faltam} ${m.faltam===1?"item estimado":"itens estimados"} pela média`;
     return `<div class="mrank-row">
       <span class="mrank-medal">${medal[i]||"·"}</span>
       <div class="mrank-info"><div class="mrank-nm">${badgeMini(m)} ${esc(m.nome)}${seloFav(m)} <span class="mrank-cover ${m.completo?"full":""}">${m.cobertura}/${d.n_itens}</span></div>
@@ -1456,7 +1458,7 @@ function rankingMercados(d){
       <div class="mrank-val"><div class="t num">${brl(m.completo_total)}</div>${extra}</div>
     </div>`;
   }).join("");
-  const nota=`<p class="mrank-nota">Quanto sua <b>feira inteira</b> (${d.n_itens} itens) sai em cada loja: o que ela tem + os que faltam pelo <b>menor preço em outra</b>. Assim a comparação é justa. O valor em <b class="tred">vermelho</b> é quanto sai <b>mais caro</b> que a mais barata.</p>`;
+  const nota=`<p class="mrank-nota">Quanto sua <b>feira inteira</b> (${d.n_itens} itens) sai em cada loja: o que ela tem + os que faltam <b>estimados pelo preço médio</b> (a loja não vende o item). Assim a comparação é justa. O valor em <b class="tred">vermelho</b> é quanto sai <b>mais caro</b> que a mais barata.</p>`;
   return `<div class="sec-title">Sua feira inteira, comparada de forma justa</div>${nota}<div class="mrank">${linhas}</div>`;
 }
 function cardItemCesta(it){
@@ -1515,12 +1517,15 @@ async function loadCesta(){
     ctx.textContent="";
     const banner=d.n_alertas>0?`<div class="alerta-banner">${ic("bell")} ${d.n_alertas} item(ns) no preço-alvo ou abaixo</div>`:"";
     const eMerc=d.economia_mercados||0, eDias=d.economia_dias||0, heroVal=eMerc>0?eMerc:eDias;
+    // % de economia = quanto o "comprar esperto" poupa vs. pagar o MAIS CARO de cada item (real).
+    const naiveTot=((d.mix&&d.mix.total)||0)+eMerc;
+    const pctEco=(eMerc>0&&naiveTot>0)?Math.round(100*eMerc/naiveTot):0;
     const prem=(d.premium!==undefined)?d.premium:acessoPremium();  // verdade do servidor
     const trialBanner=trialAtivo()?`<div class="trial-banner">${ic("crown")} Acesso completo liberado — faltam <b>${diasRestantesTrial()} dia(s)</b> do seu período grátis</div>`:"";
     const ecoBox=(eMerc>0||eDias>0)?`<div class="eco">
         <div class="eco-lbl">Você pode economizar</div>
-        <div class="eco-num num">${brl(heroVal)}</div>
-        <div class="eco-sub">Comprando cada produto pelo menor preço encontrado${(eMerc>0&&eDias>0)?`, e aproveitando ${brl(eDias)} em quedas recentes`:""}.</div>
+        <div class="eco-num num">${brl(heroVal)}${pctEco>0?`<span class="eco-pct">até ${pctEco}%</span>`:""}</div>
+        <div class="eco-sub">Comprando cada produto pelo menor preço em vez do mais caro${(eMerc>0&&eDias>0)?`, e aproveitando ${brl(eDias)} em quedas recentes`:""}.</div>
         ${prem?ecoDetalhe(d):`<div class="pw-inline">${ic("lock")} No PouPou+ você vê item a item de onde vem essa economia</div>`}
       </div>`:"";
     // 1 loja vs otimizada — os TOTAIS agregados ficam LIVRES (grátis entende o valor)
@@ -1528,7 +1533,7 @@ async function loadCesta(){
     let vs="";
     if(mm){
       const mmNome=prem?`${badgeMini(mm)} ${esc(mm.nome)}`:`<span class="mkt-oculto">${ic("lock")} a loja mais barata</span>`;
-      const umaLoja=`<div class="vs-card"><div class="vs-tag">${mm.completo?"Compra em 1 mercado":"Feira quase toda numa loja"}</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.completo_total!=null?mm.completo_total:mm.total)}</div><div class="vs-sub">${mm.completo?`os ${d.n_itens} itens numa loja só`:`tem ${mm.cobertura}/${d.n_itens} · +${mm.faltam} pego no mais barato`}</div></div>`;
+      const umaLoja=`<div class="vs-card"><div class="vs-tag">${mm.completo?"Compra em 1 mercado":"Feira quase toda numa loja"}</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.completo_total!=null?mm.completo_total:mm.total)}</div><div class="vs-sub">${mm.completo?`os ${d.n_itens} itens numa loja só`:`tem ${mm.cobertura}/${d.n_itens} · +${mm.faltam} estimado pela média`}</div></div>`;
       const otim=`<div class="vs-card best"><div class="vs-tag">Compra otimizada</div><div class="vs-mkt">${d.mix.n_mercados} mercados</div><div class="vs-val num">${brl(d.mix.total)}</div><div class="vs-sub">${(poupa!=null&&poupa>0)?`economia de <b style="color:var(--green-dark)">${brl(poupa)}</b>`:"pegando cada item no menor preço"}</div></div>`;
       vs=`<div class="vs">${umaLoja}<div class="vs-mid">vs</div>${otim}</div>`;
     }

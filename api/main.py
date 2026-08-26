@@ -1432,12 +1432,17 @@ def cesta(authorization: str | None = Header(None), mercados: str | None = None)
                                     "preco": melhor["preco"], "subtotal": round(melhor["preco"] * qtd, 2),
                                     "url": melhor["url"]})
                 dv["subtotal"] += melhor["preco"] * qtd
-                # COMPARAÇÃO JUSTA: quem NÃO tem esse item "completa" pelo menor preço em outra
-                # loja — assim cada loja tem o total da FEIRA INTEIRA (mesma cesta, comparável).
-                custo_i = melhor["preco"] * qtd
+                # COMPARAÇÃO JUSTA: quem NÃO tem esse item "completa" pela ESTIMATIVA do preço
+                # MÉDIO entre as lojas que o vendem (a loja não tem o item — é estimativa, não
+                # preço real). Usar a MÉDIA (e não o menor) evita que lojas incompletas pareçam
+                # baratas demais só por "emprestar" o preço de fundo de poço, deixa a comparação
+                # da feira inteira mais fiel e as diferenças entre lojas mais visíveis/reais.
+                precos_item = [r["preco"] for r in ranking]
+                media_item = sum(precos_item) / len(precos_item)
+                custo_falta_i = media_item * qtd
                 for m in mercados:
                     if m["slug"] not in slugs_com:
-                        acc[m["id"]]["completar_custo"] += custo_i
+                        acc[m["id"]]["completar_custo"] += custo_falta_i
             # ---- ECONOMIA (sensação de economia) ----
             eco_merc_item = eco_dias_item = 0.0
             ref_hist = None

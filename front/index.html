@@ -543,7 +543,7 @@
   /* meus mercados */
   .mkt-pick{ display:grid; gap:8px; }
   .mkt-row{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-btn); padding:9px 11px; }
-  .mkt-row.on{ border-color:var(--green); background:var(--green-light); }
+  .mkt-row.on{ border-color:color-mix(in srgb,var(--green) 42%, var(--line)); background:color-mix(in srgb,var(--green-light) 55%, var(--surface)); }
   .mkt-row .grip{ color:var(--faint); cursor:grab; display:flex; } .mkt-row .grip svg{ width:18px; height:18px; }
   .mkt-row .badge{ width:26px; height:26px; }
   .mkt-row .nm{ flex:1; font-size:14px; font-weight:600; color:var(--ink); }
@@ -551,6 +551,74 @@
   .mkt-row .fav svg{ width:17px; height:17px; }
   .mkt-row.on .fav{ background:var(--yellow); border-color:var(--yellow); color:#5c3d00; }
   .mkt-row .ord{ font-size:11px; font-weight:700; color:var(--green-dark); min-width:20px; text-align:center; }
+
+  /* ===== perfil redesenhado (pf2) — compacto, seccionado, 2 colunas ===== */
+  .pf2{ max-width:1080px; margin:0 auto; }
+  .pf2-head{ display:flex; align-items:center; gap:14px; padding:4px 2px 20px; }
+  .pf2-avatar{ width:60px; height:60px; border-radius:var(--r-pill); flex:0 0 auto; font-size:26px; font-weight:800;
+    background:linear-gradient(150deg,var(--green),var(--green-dark)); color:var(--on-green);
+    display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px color-mix(in srgb,var(--green) 32%, transparent); }
+  .pf2-avatar svg{ width:30px; height:30px; }
+  .pf2-id{ flex:1; min-width:0; }
+  .pf2-name{ font-size:22px; font-weight:800; color:var(--ink); letter-spacing:-.01em; line-height:1.15; }
+  .pf2-mail{ font-size:13px; color:var(--mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pf2-grid{ display:flex; gap:20px; align-items:flex-start; }
+  .pf2-main{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:18px; }
+  .pf2-side{ flex:0 0 300px; }
+  @media (min-width:900px){ .pf2-side{ position:sticky; top:84px; } }
+
+  .pf2-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:18px; }
+  .pf2-card-t{ font-size:12px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--mut); margin-bottom:14px; }
+  .pf2-stats{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pf2-stat{ display:flex; flex-direction:column; gap:2px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-btn); padding:12px; }
+  .pf2-stat .ps-ic{ color:var(--green); } .pf2-stat .ps-ic svg{ width:18px; height:18px; }
+  .pf2-stat .ps-n{ font-size:22px; font-weight:800; color:var(--ink); line-height:1.05; letter-spacing:-.02em; margin-top:2px; }
+  .pf2-stat .ps-l{ font-size:11.5px; color:var(--mut); line-height:1.25; }
+
+  .pf2-plus{ background:linear-gradient(155deg,var(--green-light),var(--surface)); border:1px solid var(--green); border-radius:var(--r-card); padding:20px; }
+  .pf2-plus.on{ background:linear-gradient(155deg,var(--yellow-soft),var(--surface)); border-color:var(--yellow); }
+  .pf2-plus-h{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pf2-plus-t{ display:inline-flex; align-items:center; gap:7px; font-size:18px; font-weight:800; color:var(--green-dark); }
+  .pf2-plus-t svg{ width:20px; height:20px; }
+  .pf2-plus.on .pf2-plus-t{ color:#7a4e00; } :root[data-theme="dark"] .pf2-plus.on .pf2-plus-t{ color:var(--yellow); }
+  .pf2-plus-badge{ font-size:10.5px; font-weight:800; letter-spacing:.08em; padding:3px 9px; border-radius:var(--r-pill); background:var(--yellow); color:#5c3d00; }
+  .pf2-plus-badge:empty{ display:none; }
+  .pf2-plus-sub{ font-size:13.5px; color:var(--mut); margin:6px 0 0; } .pf2-plus-sub b{ color:var(--ink); }
+  .pf2-plus .benef{ margin:14px 0 16px; }
+  .pf2-plus-actions{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
+  .pf2-cta{ width:100%; height:46px; }
+  .pf2-manage{ background:none; border:none; color:var(--green-dark); font-weight:700; font-size:13.5px; cursor:pointer;
+    padding:2px 0; text-decoration:underline; text-underline-offset:3px; }
+  .pf2-plus.on .pf2-manage{ color:var(--ink); }
+  .pf2-planos{ margin-top:15px; padding-top:15px; border-top:1px solid color-mix(in srgb,var(--green) 30%, transparent); }
+  .pf2-planos[hidden]{ display:none; }
+  .pf2-planos .btn-pay{ width:100%; }
+  .pf2-renew-lbl{ font-size:12.5px; font-weight:700; color:var(--mut); margin-bottom:8px; }
+
+  .pf2-sec{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:4px 18px 12px; }
+  .pf2-sec-h{ padding:14px 0 6px; } .pf2-sec-h h4{ margin:0; font-size:16px; color:var(--ink); }
+  .pf2-sec-h p{ margin:3px 0 0; font-size:12.5px; color:var(--mut); }
+  .pf2-rows{ display:flex; flex-direction:column; }
+  .pf2-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:none; border:none;
+    border-top:1px solid var(--line); padding:13px 2px; cursor:pointer; color:inherit; font:inherit; }
+  .pf2-row:first-child{ border-top:none; }
+  .pf2-row-ic{ color:var(--green); flex:0 0 auto; display:flex; } .pf2-row-ic svg{ width:19px; height:19px; }
+  .pf2-row-tx{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .pf2-row-tx b{ font-size:14px; font-weight:600; color:var(--ink); } .pf2-row-tx small{ font-size:12px; color:var(--mut); }
+  .pf2-row-ch{ color:var(--faint); display:flex; } .pf2-row-ch svg{ width:18px; height:18px; }
+  .pf2-row:hover .pf2-row-ch{ color:var(--green); }
+  .pf2-rows .modo-teste{ margin-top:0; border:none; border-top:1px solid var(--line); border-radius:0; background:none; padding:12px 2px; }
+  .pf2-foot{ text-align:center; margin-top:20px; }
+  .pf2-logout{ display:inline-flex; align-items:center; gap:8px; background:none; border:1px solid var(--line);
+    color:var(--mut); font-size:13.5px; font-weight:600; padding:9px 18px; border-radius:var(--r-btn); cursor:pointer; }
+  .pf2-logout svg{ width:16px; height:16px; }
+  .pf2-logout:hover{ border-color:#e2574c; color:#e2574c; }
+  @media (max-width:760px){
+    .pf2-grid{ flex-direction:column; }
+    .pf2-side{ flex:1 1 auto; width:100%; order:-1; }
+    .pf2-head{ flex-wrap:wrap; padding-bottom:16px; } .pf2-name{ font-size:20px; }
+  }
+
   /* onboarding de personalização (pós-cadastro) */
   .onb-box{ max-width:460px; }
   .onb-tit{ font-size:20px; font-weight:800; color:var(--ink); text-align:center; margin:8px 0 4px; }
@@ -1585,7 +1653,7 @@ async function atualizarBadge(){
 let MERCADOS=[];                       // lista completa vinda de /mercados
 const FAV_KEY="mb_mercados_fav";       // favoritos ainda em localStorage (sync p/ conta vem depois)
 const TRIAL_DIAS=3;
-const PRECO_MENSAL="R$ 1,00", PRECO_DE="R$ 29,90", PRECO_ANUAL="R$ 99,90";  /* TESTE: mensal R$1 — REVERTER p/ "R$ 9,90" */
+const PRECO_MENSAL="R$ 9,90", PRECO_DE="R$ 29,90", PRECO_ANUAL="R$ 99,90";
 
 // ---- Supabase (cadastro real). URL + anon são PÚBLICOS; a service_role NUNCA vem pro front. ----
 const SUPABASE_URL="https://ijtnozcomqzxfaidurso.supabase.co";
@@ -1596,7 +1664,8 @@ const sb=(window.supabase&&SUPABASE_URL)?window.supabase.createClient(SUPABASE_U
 let SESSAO=null;
 let PERFIL={plano:"gratis", trial_ini:null, trial_usado:false, nome:null, plano_expira_em:null, mp_preapproval_id:null, mp_status:null};
 let PLANO_SEL="mensal";   // plano escolhido no card de assinatura (mensal|anual)
-function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(); }
+let PF_PLANOS_ABERTO=false;   // revelação progressiva: preços/pagamento só aparecem ao "Gerenciar"
+function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(undefined,true); }
 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
@@ -1876,31 +1945,35 @@ function bloqueado(inner,titulo,sub){
 }
 
 /* ---------------- tela de conta / assinatura / meus mercados ---------------- */
-function loadPerfil(secao){
+function loadPerfil(secao, manterPlanos){
   catAtiva=null; marcarNav(); $("#btnCesta").setAttribute("aria-pressed","false"); $("#q").value="";
   const u=usuario(), prem=acessoPremium(), emTrial=trialAtivo(), assinante=assinanteAtivo();
-  const status = assinante?"Assinante PouPou+":(emTrial?`Acesso grátis — ${diasRestantesTrial()} dia(s) restantes`:"Conta grátis");
-  const hero=`<div class="pf-hero">
-      <div class="row">
-        <div class="who"><span class="pf-avatar">${ic("user")}</span>
-          <div><div class="nm">${u?esc(u.nome):"Visitante"}</div><div class="sub">${u?esc(u.email)+" · ":""}${status}</div></div></div>
-        <span class="plano-badge ${prem?"pro":"free"}">${assinante?ic("crown")+" PouPou+":(emTrial?"Trial":"Grátis")}</span>
-      </div>
-      ${u?`<button class="pf-sair" type="button" onclick="sair()">Sair da conta</button>`
-         :`<button class="pf-sair entrar" type="button" onclick="abrirLogin(()=>loadPerfil())">Entrar / criar conta</button>`}
-    </div>`;
+  ctx.textContent="";
+  if(secao==="assinar") PF_PLANOS_ABERTO=true; else if(!manterPlanos) PF_PLANOS_ABERTO=false;
 
   const benef=`<ul class="benef">
-      <li><span class="ok">${ic("check")}</span> Ver <b>em qual mercado</b> pegar cada item da sua lista pra pagar menos</li>
+      <li><span class="ok">${ic("check")}</span> Ver <b>em qual mercado</b> pegar cada item da sua lista</li>
       <li><span class="ok">${ic("check")}</span> A <b>rota otimizada</b>: o que comprar em cada mercado</li>
-      <li><span class="ok">${ic("check")}</span> Ranking de <b>qual supermercado</b> sai mais barato pra sua feira inteira</li>
+      <li><span class="ok">${ic("check")}</span> Ranking de <b>qual supermercado</b> sai mais barato pra sua feira</li>
       <li><span class="ok">${ic("check")}</span> <b>Alertas</b> quando um item da sua feira baixa de preço</li>
-      <li><span class="ok">${ic("check")}</span> Seus <b>mercados favoritos</b> em destaque na comparação</li>
+      <li><span class="ok">${ic("check")}</span> Seus <b>mercados favoritos</b> em destaque</li>
     </ul>`;
 
-  // seletor de plano (mensal/anual) + botões de pagamento (cartão recorrente / Pix avulso)
-  const selMensal = PLANO_SEL!=="anual";
-  const diasSel = selMensal ? "30 dias" : "365 dias";
+  // ---------- visitante (não logado): entrada enxuta ----------
+  if(!u){
+    saida.innerHTML=`<div class="pf2">
+      <div class="pf2-head"><span class="pf2-avatar">${ic("user")}</span>
+        <div class="pf2-id"><div class="pf2-name">Visitante</div><div class="pf2-mail">Entre pra ver onde economizar na sua feira</div></div></div>
+      <div class="pf2-plus"><div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span></div>
+        <p class="pf2-plus-sub">Crie sua conta e comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão.</p>
+        ${benef}
+        <div class="pf2-plus-actions"><button class="btn-primary pf2-cta" type="button" onclick="abrirLogin(()=>loadPerfil())">Entrar / criar conta</button></div>
+      </div></div>`;
+    return;
+  }
+
+  // seletor de plano (mensal/anual) + botões de pagamento — revelados só ao "Gerenciar"
+  const selMensal = PLANO_SEL!=="anual", diasSel = selMensal ? "30 dias" : "365 dias";
   const seletor = `<div class="plano-sel">
       <button type="button" class="ps ${selMensal?'on':''}" onclick="setPlanoSel('mensal')"><span>Mensal</span><b>${PRECO_MENSAL}<i>/mês</i></b></button>
       <button type="button" class="ps ${selMensal?'':'on'}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">2 meses grátis</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
@@ -1910,45 +1983,112 @@ function loadPerfil(secao){
       <button class="btn-ghost btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','pix')">Pagar no Pix — libera ${diasSel}</button>
       <p class="fine">Cartão: renova automático, cancele quando quiser. Pix: cada pagamento libera ${diasSel} (avulso). Via Mercado Pago.</p>`;
 
-  let assine;
+  // ---------- cabeçalho compacto ----------
+  const inicial=((u.nome||u.email||"?").trim().charAt(0)||"?").toUpperCase();
+  const badge = assinante?`<span class="plano-badge pro">${ic("crown")} PouPou+</span>`
+              : emTrial ?`<span class="plano-badge pro">Trial</span>`
+              : `<span class="plano-badge free">Grátis</span>`;
+  const head=`<div class="pf2-head">
+      <span class="pf2-avatar">${esc(inicial)}</span>
+      <div class="pf2-id"><div class="pf2-name">${esc(u.nome)}</div><div class="pf2-mail">${esc(u.email)}</div></div>
+      ${badge}</div>`;
+
+  // ---------- PouPou+ compacto (revelação progressiva do preço/pagamento) ----------
+  let plusBody, plusReveal, plusActions;
+  const plusBadge = assinante?"ATIVO":(emTrial?"TRIAL":"");
   if(assinante){
     const recorrente = PERFIL.mp_preapproval_id && PERFIL.mp_status!=="cancelled";
     const exp = PERFIL.plano_expira_em ? new Date(PERFIL.plano_expira_em) : null;
     const dias = exp ? Math.max(0, Math.ceil((exp.getTime()-Date.now())/864e5)) : null;
-    const linha = recorrente
-      ? `<p class="sub2">✓ Renova automático${dias!=null?` — próxima cobrança em ~${dias} dia(s)`:""}. Obrigado por apoiar!</p>`
-      : (dias!=null ? `<p class="sub2">✓ Acesso ativo — vence em <b>${dias} dia(s)</b>.</p>` : `<p class="sub2">Tudo liberado. Obrigado por apoiar!</p>`);
-    const acao = recorrente
-      ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação</button>`
-      : `<div class="pf-sub-sec"><div class="renew-lbl">Renovar / mudar plano</div>${seletor}${payBtns}</div>`;
-    assine=`<div class="assine-card pro"><h3>${ic("crown")} Você é PouPou+</h3>${linha}${benef}${acao}</div>`;
+    plusBody = recorrente
+      ? `<p class="pf2-plus-sub">Renova automático${dias!=null?` — próxima cobrança em ~<b>${dias} dia(s)</b>`:""}. Obrigado por apoiar 💚</p>`
+      : (dias!=null ? `<p class="pf2-plus-sub">Acesso ativo — vence em <b>${dias} dia(s)</b>.</p>` : `<p class="pf2-plus-sub">Tudo liberado. Obrigado por apoiar 💚</p>`);
+    plusReveal = recorrente
+      ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação automática</button>`
+      : `<div class="pf2-renew-lbl">Renovar / mudar plano</div>${seletor}${payBtns}`;
+    plusActions = `<button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Gerenciar assinatura</button>`;
+  } else if(emTrial){
+    plusBody = `<p class="pf2-plus-sub">Acesso completo — termina em <b>${diasRestantesTrial()} dia(s)</b>.</p>`;
+    plusReveal = `${seletor}${payBtns}`;
+    plusActions = `<button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Ver planos e preços</button>`;
   } else {
-    const chip = emTrial
-      ? `<div class="trial-chip on">⏳ Seu acesso completo termina em <b>${diasRestantesTrial()} dia(s)</b></div>`
-      : (trialJaUsado()? "" : `<div class="trial-chip">✨ Comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão</div>`);
-    const trialBtn = (!trialJaUsado() && !emTrial)
-      ? `<button class="btn-primary btn-pay" type="button" onclick="desbloquear()">Começar — ${TRIAL_DIAS} dias grátis</button>
-         <div class="ou">ou assine agora</div>` : "";
-    assine=`<div class="assine-card">${chip}
-        <h3>${ic("crown")} PouPou+</h3>
-        ${seletor}
-        ${benef}
-        <div class="roi">${ic("check")} Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+. Ele se paga na primeira compra.</div>
-        ${trialBtn}
-        ${payBtns}</div>`;
+    plusBody = trialJaUsado()
+      ? `<p class="pf2-plus-sub">Assine pra desbloquear onde economizar em cada feira.</p>`
+      : `<p class="pf2-plus-sub">Comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão.</p>`;
+    plusReveal = `${seletor}${payBtns}`;
+    plusActions = (!trialJaUsado())
+      ? `<button class="btn-primary pf2-cta" type="button" onclick="desbloquear()">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>
+         <button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Ver planos e preços</button>`
+      : `<button class="btn-primary pf2-cta" type="button" onclick="pfPlanos(this)">${ic("crown")} Ver planos</button>`;
   }
+  const plus=`<div class="pf2-plus ${prem?'on':''}">
+      <div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span><span class="pf2-plus-badge">${plusBadge}</span></div>
+      ${plusBody}
+      ${benef}
+      <div class="pf2-plus-actions">${plusActions}</div>
+      <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${plusReveal}</div>
+    </div>`;
 
-  const meus=`<div class="pf-sec"><h4>Meus mercados</h4>
-      <p class="hint">Marque os supermercados que você usa. Eles aparecem em destaque na comparação.</p>
+  // ---------- Meus mercados (preferência de compra) ----------
+  const meus=`<div class="pf2-sec">
+      <div class="pf2-sec-h"><h4>Meus mercados</h4><p>Escolha seus mercados favoritos pra priorizar nas comparações.</p></div>
       <div class="mkt-pick" id="mktPick">${renderMeusMercados()}</div></div>`;
 
-  const cfg=`<div class="pf-sec"><h4>Preferências</h4>
-      <label class="modo-teste"><span class="lbl">Tema escuro<small>conforto pra vista à noite</small></span>
-        <span class="switch"><input type="checkbox" id="tgTema" ${document.documentElement.dataset.theme==="dark"?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label></div>`;
+  // ---------- Preferências (só o que existe de verdade) ----------
+  const dark = document.documentElement.dataset.theme==="dark";
+  const prefs=`<div class="pf2-sec">
+      <div class="pf2-sec-h"><h4>Preferências de compra</h4></div>
+      <div class="pf2-rows">
+        <button class="pf2-row" type="button" onclick="loadCesta()">
+          <span class="pf2-row-ic">${ic("cart")}</span>
+          <span class="pf2-row-tx"><b>Minha lista</b><small data-k2="itens">…</small></span>
+          <span class="pf2-row-ch">${ic("chevron")}</span></button>
+        <button class="pf2-row" type="button" onclick="loadCesta()">
+          <span class="pf2-row-ic">${ic("bell")}</span>
+          <span class="pf2-row-tx"><b>Alertas de preço</b><small data-k2="alertas">…</small></span>
+          <span class="pf2-row-ch">${ic("chevron")}</span></button>
+        <label class="modo-teste"><span class="lbl">Tema escuro<small>conforto pra vista à noite</small></span>
+          <span class="switch"><input type="checkbox" id="tgTema" ${dark?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label>
+      </div></div>`;
 
-  ctx.textContent="";
-  saida.innerHTML=hero+assine+meus+cfg;
-  if(secao==="assinar"){ const c=saida.querySelector(".assine-card"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
+  // ---------- Resumo da conta (dados reais; números preenchidos async) ----------
+  const nFav=favMercados().length;
+  const resumo=`<aside class="pf2-side"><div class="pf2-card">
+      <div class="pf2-card-t">Minha conta</div>
+      <div class="pf2-stats">
+        <div class="pf2-stat"><span class="ps-ic">${ic("cart")}</span><b class="ps-n" data-k="itens">—</b><span class="ps-l">itens na lista</span></div>
+        <div class="pf2-stat"><span class="ps-ic">${ic("star")}</span><b class="ps-n">${nFav}</b><span class="ps-l">mercados favoritos</span></div>
+        <div class="pf2-stat"><span class="ps-ic">${ic("chart")}</span><b class="ps-n" data-k="eco">—</b><span class="ps-l">economia na feira</span></div>
+        <div class="pf2-stat"><span class="ps-ic">${ic("bell")}</span><b class="ps-n" data-k="alertas">—</b><span class="ps-l">alertas de preço</span></div>
+      </div></div></aside>`;
+
+  const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button></div>`;
+
+  saida.innerHTML=`<div class="pf2">${head}
+      <div class="pf2-grid"><div class="pf2-main">${plus}${meus}${prefs}</div>${resumo}</div>
+      ${sair}</div>`;
+  carregarResumoPerfil();
+  if(secao==="assinar"){ const c=saida.querySelector(".pf2-plus"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
+}
+/* revelação progressiva dos preços/pagamento no card PouPou+ */
+function pfPlanos(btn){
+  const box=document.getElementById("pf2Planos"); if(!box) return;
+  PF_PLANOS_ABERTO=box.hasAttribute("hidden");
+  if(PF_PLANOS_ABERTO){ box.removeAttribute("hidden"); if(btn)btn.setAttribute("aria-expanded","true"); box.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+  else{ box.setAttribute("hidden",""); if(btn)btn.setAttribute("aria-expanded","false"); }
+}
+/* preenche os números do resumo + preferências com dados REAIS (uma chamada ao /cesta) */
+async function carregarResumoPerfil(){
+  if(!estaLogado()) return;
+  try{
+    const d=await fetchAuth(`${API}/cesta`).then(r=>r.json());
+    const nItens=d.n_itens||0, eco=d.economia_mercados||0;
+    const nAl=(d.itens||[]).filter(i=>i.preco_alvo!=null).length;
+    const sN=(k,v)=>{ const el=document.querySelector(`.pf2-stats [data-k="${k}"]`); if(el) el.textContent=v; };
+    sN("itens", nItens); sN("eco", brl(eco)); sN("alertas", nAl);
+    const p1=document.querySelector('[data-k2="itens"]'); if(p1) p1.textContent=`${nItens} ${nItens===1?"produto":"produtos"}`;
+    const p2=document.querySelector('[data-k2="alertas"]'); if(p2) p2.textContent=`${nAl} ${nAl===1?"ativo":"ativos"}`;
+  }catch(e){}
 }
 
 /* ---------------- painel admin (só is_admin) ---------------- */

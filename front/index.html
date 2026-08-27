@@ -613,6 +613,48 @@
     color:var(--mut); font-size:13.5px; font-weight:600; padding:9px 18px; border-radius:var(--r-btn); cursor:pointer; }
   .pf2-logout svg{ width:16px; height:16px; }
   .pf2-logout:hover{ border-color:#e2574c; color:#e2574c; }
+
+  /* PouPou+ como PROMOÇÃO (não-assinante) — chamativo */
+  .pf2-plus.promo{ position:relative; overflow:hidden;
+    background:linear-gradient(160deg, color-mix(in srgb,var(--yellow-soft) 88%, var(--surface)), var(--surface) 72%);
+    border:1.5px solid var(--yellow); box-shadow:0 12px 34px color-mix(in srgb,var(--yellow) 24%, transparent); }
+  .pf2-promo-glow{ position:absolute; top:-45%; right:-18%; width:62%; height:130%; pointer-events:none;
+    background:radial-gradient(circle, color-mix(in srgb,var(--yellow) 30%, transparent), transparent 68%); }
+  .pf2-promo-top{ position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pf2-plus.promo .pf2-plus-t{ color:#7a4e00; }
+  :root[data-theme="dark"] .pf2-plus.promo .pf2-plus-t{ color:var(--yellow); }
+  .pf2-promo-free{ font-size:11px; font-weight:800; letter-spacing:.02em; color:#5c3d00; background:var(--yellow);
+    border-radius:var(--r-pill); padding:4px 11px; white-space:nowrap; }
+  .pf2-promo-free.urg{ background:#e2574c; color:#fff; }
+  .pf2-promo-hook{ position:relative; font-size:15px; line-height:1.42; color:var(--ink); margin:14px 0 12px; max-width:40ch; }
+  .pf2-promo-hook b{ color:var(--green-dark); }
+  :root[data-theme="dark"] .pf2-promo-hook b{ color:var(--green); }
+  .pf2-promo-price{ position:relative; display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin:2px 0 6px; }
+  .pf2-promo-price .old{ font-size:16px; color:var(--faint); text-decoration:line-through; }
+  .pf2-promo-price .now{ font-size:40px; font-weight:800; color:var(--ink); letter-spacing:-.02em; line-height:1; }
+  .pf2-promo-price .per{ font-size:14px; color:var(--mut); font-weight:600; }
+  .pf2-promo-price .off{ font-size:12px; font-weight:800; color:#fff; background:#e2574c; border-radius:var(--r-pill); padding:3px 9px; align-self:center; }
+  .pf2-plus.promo .benef{ position:relative; }
+  .pf2-promo-roi{ position:relative; display:flex; gap:8px; align-items:flex-start; font-size:12.5px; color:var(--green-dark);
+    background:color-mix(in srgb,var(--green-light) 72%, transparent); border-radius:var(--r-btn); padding:10px 12px; margin:2px 0 14px; }
+  .pf2-promo-roi svg{ width:15px; height:15px; flex:0 0 auto; margin-top:1px; }
+  .pf2-plus.promo .pf2-plus-actions{ position:relative; }
+  .pf2-cta.big{ height:50px; font-size:15px; }
+  .pf2-plus.promo .pf2-manage{ align-self:center; }
+  /* seletor de plano + pagamento dentro do pf2-plus (estavam escopados só em .assine-card) */
+  .pf2-plus .plano-sel{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 0 12px; }
+  .pf2-plus .ps{ display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left; padding:10px 12px;
+    border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r-btn); cursor:pointer; color:var(--mut); font:inherit; }
+  .pf2-plus .ps span{ font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px; }
+  .pf2-plus .ps b{ font-size:18px; font-weight:800; color:var(--ink); line-height:1; }
+  .pf2-plus .ps b i{ font-size:12px; font-weight:600; color:var(--mut); font-style:normal; }
+  .pf2-plus .ps em.badge-off{ font-size:10px; font-weight:700; color:var(--green-dark); background:var(--green-light); border-radius:var(--r-pill); padding:1px 6px; font-style:normal; }
+  .pf2-plus .ps.on{ border-color:var(--green); background:var(--green-light); color:var(--green-dark); }
+  .pf2-plus .btn-pay{ width:100%; margin-top:8px; }
+  .pf2-plus .btn-ghost{ width:100%; height:46px; margin-top:8px; border:1.5px solid var(--green); background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:14.5px; cursor:pointer; }
+  .pf2-plus .btn-ghost:hover{ background:var(--green-light); }
+  .pf2-plus .fine{ font-size:11.5px; color:var(--mut); text-align:center; margin:10px 0 0; }
+
   @media (max-width:760px){
     .pf2-grid{ flex-direction:column; }
     .pf2-side{ flex:1 1 auto; width:100%; order:-1; }
@@ -1993,41 +2035,51 @@ function loadPerfil(secao, manterPlanos){
       <div class="pf2-id"><div class="pf2-name">${esc(u.nome)}</div><div class="pf2-mail">${esc(u.email)}</div></div>
       ${badge}</div>`;
 
-  // ---------- PouPou+ compacto (revelação progressiva do preço/pagamento) ----------
-  let plusBody, plusReveal, plusActions;
-  const plusBadge = assinante?"ATIVO":(emTrial?"TRIAL":"");
+  // ---------- PouPou+ ----------
+  let plus;
   if(assinante){
+    // ASSINANTE: card sóbrio de gestão (revelação progressiva do pagamento)
     const recorrente = PERFIL.mp_preapproval_id && PERFIL.mp_status!=="cancelled";
     const exp = PERFIL.plano_expira_em ? new Date(PERFIL.plano_expira_em) : null;
     const dias = exp ? Math.max(0, Math.ceil((exp.getTime()-Date.now())/864e5)) : null;
-    plusBody = recorrente
+    const plusBody = recorrente
       ? `<p class="pf2-plus-sub">Renova automático${dias!=null?` — próxima cobrança em ~<b>${dias} dia(s)</b>`:""}. Obrigado por apoiar 💚</p>`
       : (dias!=null ? `<p class="pf2-plus-sub">Acesso ativo — vence em <b>${dias} dia(s)</b>.</p>` : `<p class="pf2-plus-sub">Tudo liberado. Obrigado por apoiar 💚</p>`);
-    plusReveal = recorrente
+    const plusReveal = recorrente
       ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação automática</button>`
       : `<div class="pf2-renew-lbl">Renovar / mudar plano</div>${seletor}${payBtns}`;
-    plusActions = `<button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Gerenciar assinatura</button>`;
-  } else if(emTrial){
-    plusBody = `<p class="pf2-plus-sub">Acesso completo — termina em <b>${diasRestantesTrial()} dia(s)</b>.</p>`;
-    plusReveal = `${seletor}${payBtns}`;
-    plusActions = `<button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Ver planos e preços</button>`;
+    plus=`<div class="pf2-plus on">
+        <div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span><span class="pf2-plus-badge">ATIVO</span></div>
+        ${plusBody}${benef}
+        <div class="pf2-plus-actions"><button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Gerenciar assinatura</button></div>
+        <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${plusReveal}</div>
+      </div>`;
   } else {
-    plusBody = trialJaUsado()
-      ? `<p class="pf2-plus-sub">Assine pra desbloquear onde economizar em cada feira.</p>`
-      : `<p class="pf2-plus-sub">Comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão.</p>`;
-    plusReveal = `${seletor}${payBtns}`;
-    plusActions = (!trialJaUsado())
-      ? `<button class="btn-primary pf2-cta" type="button" onclick="desbloquear()">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>
-         <button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Ver planos e preços</button>`
-      : `<button class="btn-primary pf2-cta" type="button" onclick="pfPlanos(this)">${ic("crown")} Ver planos</button>`;
+    // NÃO-ASSINANTE: promoção CHAMATIVA (é a hora de converter)
+    const trialAvail = !trialJaUsado() && !emTrial;
+    const _num=s=>parseFloat(String(s).replace(/[^\d,]/g,"").replace(",","."))||0;
+    const off=Math.round((1-_num(PRECO_MENSAL)/_num(PRECO_DE))*100);
+    const pill = emTrial
+      ? `<span class="pf2-promo-free urg">⏳ grátis termina em ${diasRestantesTrial()} dia(s)</span>`
+      : (trialAvail ? `<span class="pf2-promo-free">✨ ${TRIAL_DIAS} dias grátis · sem cartão</span>` : `<span class="pf2-promo-free">Oferta de lançamento</span>`);
+    const hook = emTrial
+      ? `Seu acesso completo termina logo — <b>garanta o PouPou+</b> e siga economizando em toda feira.`
+      : `Desbloqueie <b>onde comprar cada item mais barato</b> e economize em toda feira.`;
+    const cta = trialAvail
+      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear()">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>`
+      : `<button class="btn-primary pf2-cta big" type="button" onclick="pfPlanos(this)">${ic("crown")} Assinar por ${PRECO_MENSAL}/mês</button>`;
+    plus=`<div class="pf2-plus promo">
+        <div class="pf2-promo-glow" aria-hidden="true"></div>
+        <div class="pf2-promo-top"><span class="pf2-plus-t">${ic("crown")} PouPou+</span>${pill}</div>
+        <div class="pf2-promo-hook" data-k="ecohook">${hook}</div>
+        <div class="pf2-promo-price"><span class="old">${PRECO_DE}</span><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
+        ${benef}
+        <div class="pf2-promo-roi">${ic("check")} Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+ — se paga na 1ª compra.</div>
+        <div class="pf2-plus-actions">${cta}
+          <button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">${trialAvail?"ou ver planos e pagar agora":"escolher plano e forma de pagamento"}</button></div>
+        <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${seletor}${payBtns}</div>
+      </div>`;
   }
-  const plus=`<div class="pf2-plus ${prem?'on':''}">
-      <div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span><span class="pf2-plus-badge">${plusBadge}</span></div>
-      ${plusBody}
-      ${benef}
-      <div class="pf2-plus-actions">${plusActions}</div>
-      <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${plusReveal}</div>
-    </div>`;
 
   // ---------- Meus mercados (preferência de compra) ----------
   const meus=`<div class="pf2-sec">
@@ -2088,6 +2140,9 @@ async function carregarResumoPerfil(){
     sN("itens", nItens); sN("eco", brl(eco)); sN("alertas", nAl);
     const p1=document.querySelector('[data-k2="itens"]'); if(p1) p1.textContent=`${nItens} ${nItens===1?"produto":"produtos"}`;
     const p2=document.querySelector('[data-k2="alertas"]'); if(p2) p2.textContent=`${nAl} ${nAl===1?"ativo":"ativos"}`;
+    // gancho personalizado da promoção: mostra a economia REAL da feira atual
+    const hk=document.querySelector('[data-k="ecohook"]');
+    if(hk && eco>0){ hk.innerHTML=`Na sua feira de agora dá pra economizar <b>${brl(eco)}</b> — o PouPou+ te mostra <b>onde</b> comprar cada item. 👀`; }
   }catch(e){}
 }
 

@@ -1752,19 +1752,22 @@ async function iniciarTrial(){
 
 /* CLÍMAX: clique em "ver onde comprar". Sem conta -> login. Com conta e trial disponível ->
    começa o trial de 3 dias (server-side). Trial já usado/expirado -> tela de assinatura. */
-async function desbloquear(){
-  if(!estaLogado()){ abrirLogin(desbloquear); return; }
+async function desbloquear(btn){
+  if(!estaLogado()){ abrirLogin(()=>desbloquear()); return; }
   if(acessoPremium()){ reabrir(); return; }
   if(!trialJaUsado()){
+    if(btn){ btn.disabled=true; btn.dataset.txt=btn.innerHTML; btn.innerHTML="Aguarde…"; }
     const ok=await iniciarTrial();
     if(ok){ toast(`Acesso completo liberado por ${TRIAL_DIAS} dias 🎉`); reabrir(); return; }
+    if(btn){ btn.disabled=false; btn.innerHTML=btn.dataset.txt||btn.innerHTML; }  // falhou: restaura o botão
   }
   loadPerfil("assinar");
 }
-/* re-renderiza a vista aberta (drawer/lista/listagem) já com os mercados liberados */
+/* re-renderiza a vista aberta (drawer/lista/listagem/perfil) já com os mercados liberados */
 function reabrir(){
   if($("#drawerOv") && DRAWER && DRAWER.prod){ fecharProduto(); renderDrawer(DRAWER.prod); return; }
   if($("#btnCesta").getAttribute("aria-pressed")==="true"){ loadCesta(); return; }
+  if(document.querySelector(".pf2")){ loadPerfil(); return; }   // tela de conta: re-renderiza com o novo status
   if(catAtiva && catAtiva.indexOf("fresco")!==0){ const c=categorias.find(x=>x.slug===catAtiva); if(c) loadCategoria(c.slug,c.nome); }
 }
 // Cobrança REAL: cria o pagamento no Mercado Pago e redireciona pro checkout (init_point).
@@ -1980,7 +1983,7 @@ function bloqueado(inner,titulo,sub){
       <div class="pw-lock">${ic("lock")}</div>
       <div class="pw-tit">${titulo}</div>
       ${sub?`<div class="pw-sub">${sub}</div>`:""}
-      <button class="pw-cta" type="button" onclick="desbloquear()">${ic("crown")} ${cta}</button>
+      <button class="pw-cta" type="button" onclick="desbloquear(this)">${ic("crown")} ${cta}</button>
       ${virgem?`<div class="pw-fine">${TRIAL_DIAS} dias grátis · sem cartão · cancele quando quiser</div>`:`<div class="pw-fine">a partir de ${PRECO_MENSAL}/mês</div>`}
     </div>
   </div>`;
@@ -2066,7 +2069,7 @@ function loadPerfil(secao, manterPlanos){
       ? `Seu acesso completo termina logo — <b>garanta o PouPou+</b> e siga economizando em toda feira.`
       : `Desbloqueie <b>onde comprar cada item mais barato</b> e economize em toda feira.`;
     const cta = trialAvail
-      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear()">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>`
+      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear(this)">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>`
       : `<button class="btn-primary pf2-cta big" type="button" onclick="pfPlanos(this)">${ic("crown")} Assinar por ${PRECO_MENSAL}/mês</button>`;
     plus=`<div class="pf2-plus promo">
         <div class="pf2-promo-glow" aria-hidden="true"></div>

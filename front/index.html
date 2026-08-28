@@ -1818,7 +1818,7 @@ let _authCb=null, _authModo="entrar";
 function abrirLogin(cb){ _authCb=(typeof cb==="function")?cb:null; _authModo="entrar"; renderLogin(); $("#loginModal").classList.add("show"); }
 function fecharLogin(){ $("#loginModal").classList.remove("show"); _authCb=null; }
 function authTab(m){ _authModo=m; renderLogin(); }
-function loginGoogle(){ if(!sb){ return; } sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:location.origin}}); }
+function loginGoogle(){ if(!sb){ return; } lsSet("mb_oauth_pending","1"); sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:location.origin}}); }
 function renderLogin(){
   const criar=_authModo==="criar";
   $("#loginBox").innerHTML=`
@@ -1940,10 +1940,11 @@ async function onbBuscarCep(){
 function onbConcluir(){
   const favs=[...MERCADOS].map(m=>m.slug).filter(s=>_onbSel.has(s));   // ordem estável = ordem da lista
   setFavMercados(favs); salvarFavoritos(); const n=favs.length;
+  marcarOnbFeito();
   fecharOnboarding();
   if(n) toast(`${n} mercado${n>1?"s":""} marcado${n>1?"s":""} como seu${n>1?"s":""} ⭐`);
 }
-function onbPular(){ fecharOnboarding(); }
+function onbPular(){ marcarOnbFeito(); fecharOnboarding(); }
 function fecharOnboarding(){ $("#onbModal").classList.remove("show"); const cb=_onbCb; _onbCb=null; if(typeof cb==="function") cb(); }
 
 function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
@@ -1951,6 +1952,10 @@ function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div");
 
 function favMercados(){ try{ return JSON.parse(localStorage.getItem(FAV_KEY)||"[]"); }catch(e){ return []; } }
 function setFavMercados(a){ try{ localStorage.setItem(FAV_KEY,JSON.stringify(a)); }catch(e){} }
+// onboarding: marca por uid quem já passou (localStorage) pra não repetir; e decide se precisa mostrar
+function onbFeito(uid){ return !!uid && lsGet("mb_onb_"+uid,"")==="1"; }
+function marcarOnbFeito(){ const uid=SESSAO&&SESSAO.user&&SESSAO.user.id; if(uid) lsSet("mb_onb_"+uid,"1"); }
+function precisaOnboarding(){ const uid=SESSAO&&SESSAO.user&&SESSAO.user.id; return !!uid && !onbFeito(uid) && favMercados().length===0; }
 // Sync dos mercados favoritos com a conta (tabela favoritos no Supabase, RLS dono-só).
 // Carrega no login (a conta é a fonte da verdade entre dispositivos); grava com debounce.
 async function carregarFavoritos(){
@@ -2273,8 +2278,10 @@ $("#btnCesta").addEventListener("click",loadCesta);
 (async function init(){
   setTemaBtn();
   // restaura a sessão salva (login persiste entre visitas) e carrega o perfil/plano da conta
+  let oauthRetorno=false;
   if(sb){
     try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
+    oauthRetorno = lsGet("mb_oauth_pending","")==="1"; if(oauthRetorno) lsSet("mb_oauth_pending","");
     sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); });
   }
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
@@ -2284,6 +2291,9 @@ $("#btnCesta").addEventListener("click",loadCesta);
     MERCADOS=mk.mercados||[];
     MERCADOS.forEach(m=>{ if(m.logo_url){ MKT_LOGO[m.slug]=m.logo_url; MKT_LOGO[m.nome]=m.logo_url; } });
   }catch(e){}
+  // usuário NOVO que entrou com Google -> mostra o onboarding (CEP + mercados da região),
+  // igual ao cadastro por e-mail (que já dispara em authSubmit). Só na volta do login Google.
+  if(oauthRetorno && SESSAO && precisaOnboarding()){ abrirOnboarding(); }
   try{ const d=await fetch(`${API}/categorias`).then(r=>r.json());
     categorias=d.categorias; renderCats();
     const p=categorias.find(c=>c.disponivel); if(p) loadCategoria(p.slug,p.nome);

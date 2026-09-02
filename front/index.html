@@ -6,6 +6,14 @@
 <meta name="color-scheme" content="light dark" />
 <script>(function(){try{var t=localStorage.getItem("mb-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 <title>PouPou — Compare, escolha e economize nas compras</title>
+<!-- PWA: instalável (tela inicial, tela cheia como app) -->
+<meta name="theme-color" content="#0fa968">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PouPou">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -654,6 +662,18 @@
   .pf2-plus .btn-ghost{ width:100%; height:46px; margin-top:8px; border:1.5px solid var(--green); background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:14.5px; cursor:pointer; }
   .pf2-plus .btn-ghost:hover{ background:var(--green-light); }
   .pf2-plus .fine{ font-size:11.5px; color:var(--mut); text-align:center; margin:10px 0 0; }
+
+  /* banner PWA "instalar na tela inicial" */
+  .pwa-bar{ position:fixed; left:12px; right:12px; bottom:12px; z-index:300; margin:0 auto; max-width:520px;
+    display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:10px 12px; box-shadow:0 10px 30px rgba(0,0,0,.22); animation:pwaUp .25s ease; }
+  @keyframes pwaUp{ from{ transform:translateY(16px); opacity:0; } to{ transform:none; opacity:1; } }
+  .pwa-bar .pwa-ic{ color:var(--green); flex:0 0 auto; display:flex; } .pwa-bar .pwa-ic svg{ width:22px; height:22px; }
+  .pwa-bar .pwa-tx{ flex:1; font-size:13.5px; color:var(--ink); line-height:1.25; } .pwa-bar .pwa-tx b{ font-weight:800; }
+  .pwa-bar .pwa-inst{ flex:0 0 auto; background:var(--green); color:var(--on-green); border:none; border-radius:10px;
+    padding:9px 16px; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .pwa-bar .pwa-inst:hover{ background:var(--green-press); }
+  .pwa-bar .pwa-x{ flex:0 0 auto; background:none; border:none; color:var(--faint); font-size:16px; cursor:pointer; padding:4px 6px; line-height:1; }
 
   @media (max-width:760px){
     .pf2-grid{ flex-direction:column; }
@@ -2302,6 +2322,34 @@ $("#btnCesta").addEventListener("click",loadCesta);
     renderFrescos(f.categorias);
   }catch(e){}
 })();
+
+/* ===== PWA: registra o service worker + banner "Instalar na tela inicial" ===== */
+if("serviceWorker" in navigator){
+  addEventListener("load",()=>{ navigator.serviceWorker.register("/sw.js").catch(()=>{}); });
+}
+let _pwaPrompt=null;
+addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); _pwaPrompt=e;
+  if(matchMedia("(display-mode: standalone)").matches) return;   // já instalado
+  if(lsGet("mb_pwa_dismiss","")==="1") return;                    // usuário já dispensou
+  mostrarInstalarPWA();
+});
+function mostrarInstalarPWA(){
+  if(document.getElementById("pwaBar")) return;
+  const bar=document.createElement("div"); bar.id="pwaBar"; bar.className="pwa-bar";
+  bar.innerHTML=`<span class="pwa-ic">${ic("cart")}</span>`+
+    `<span class="pwa-tx">Instale o <b>PouPou</b> na sua tela inicial</span>`+
+    `<button class="pwa-inst" type="button">Instalar</button>`+
+    `<button class="pwa-x" type="button" aria-label="Dispensar">✕</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector(".pwa-inst").onclick=async()=>{
+    if(!_pwaPrompt) return; _pwaPrompt.prompt();
+    try{ await _pwaPrompt.userChoice; }catch(e){}
+    _pwaPrompt=null; bar.remove();
+  };
+  bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_pwa_dismiss","1"); bar.remove(); };
+}
+addEventListener("appinstalled",()=>{ const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉"); }catch(e){} });
 </script>
 </body>
 </html>

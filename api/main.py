@@ -1991,6 +1991,28 @@ def gestao():
     return FileResponse(RAIZ / "front" / "admin.html")
 
 
+@app.get("/manifest.webmanifest")
+def pwa_manifest():
+    return FileResponse(RAIZ / "front" / "manifest.webmanifest",
+                        media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def pwa_sw():
+    # servido da raiz => escopo "/" (controla o app todo); no-cache pra atualizações pegarem
+    return FileResponse(RAIZ / "front" / "sw.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+@app.get("/icons/{fname}")
+def pwa_icon(fname: str):
+    base = (RAIZ / "front" / "icons").resolve()
+    p = (base / fname).resolve()
+    if p.parent != base or not p.is_file():
+        raise HTTPException(status_code=404, detail="ícone não encontrado")
+    return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
+
+
 @app.get("/")
 def home():
     return FileResponse(FRONT)

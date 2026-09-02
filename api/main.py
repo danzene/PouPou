@@ -1994,7 +1994,8 @@ def gestao():
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
     return FileResponse(RAIZ / "front" / "manifest.webmanifest",
-                        media_type="application/manifest+json")
+                        media_type="application/manifest+json",
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/sw.js")

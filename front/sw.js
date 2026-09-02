@@ -3,8 +3,8 @@
    - estáticos do app (ícones/logos/manifest): cache primeiro (rápido, atualiza em 2º plano);
    - resto (API dinâmica: /cesta, /buscar, /mercados…): NÃO intercepta — vai direto pela rede
      (preços sempre frescos, sem quebrar auth). Também nunca mexe em origens externas (Supabase/CDN). */
-const CACHE = "poupou-v2";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const CACHE = "poupou-v3";
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-v2-192.png", "/icons/icon-v2-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -2016,4 +2016,5 @@ def pwa_icon(fname: str):
 
 @app.get("/")
 def home():
-    return FileResponse(FRONT)
+    # no-cache no HTML: garante que atualizações (manifest/ícones/SW) sempre cheguem ao navegador
+    return FileResponse(FRONT, headers={"Cache-Control": "no-cache"})

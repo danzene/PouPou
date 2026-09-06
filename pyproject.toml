@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "psycopg[binary]>=3.1",
     "mercadopago>=2.2",
+    "pywebpush>=1.14",
 ]
 
 [tool.uv]

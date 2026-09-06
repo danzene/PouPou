@@ -2130,6 +2130,9 @@ function loadPerfil(secao, manterPlanos){
           <span class="pf2-row-ch">${ic("chevron")}</span></button>
         <label class="modo-teste"><span class="lbl">Tema escuro<small>conforto pra vista à noite</small></span>
           <span class="switch"><input type="checkbox" id="tgTema" ${dark?"checked":""} onchange="toggleTema()"><span class="track"></span><span class="knob"></span></span></label>
+        ${pushSuportado()?`<label class="modo-teste"><span class="lbl">Notificações no celular<small>avisos de queda de preço, mesmo com o app fechado</small></span>
+          <span class="switch"><input type="checkbox" id="tgPush" onchange="togglePush(this)"><span class="track"></span><span class="knob"></span></span></label>
+        <button id="pushTestBtn" class="btn-sm" type="button" hidden onclick="enviarPushTeste()" style="align-self:flex-start;margin-top:6px">Enviar notificação de teste</button>`:""}
       </div></div>`;
 
   // ---------- Resumo da conta (dados reais; números preenchidos async) ----------
@@ -2149,6 +2152,7 @@ function loadPerfil(secao, manterPlanos){
       <div class="pf2-grid"><div class="pf2-main">${plus}${meus}${prefs}</div>${resumo}</div>
       ${sair}</div>`;
   carregarResumoPerfil();
+  sincronizarPushUI();
   if(secao==="assinar"){ const c=saida.querySelector(".pf2-plus"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
 /* revelação progressiva dos preços/pagamento no card PouPou+ */
@@ -2351,6 +2355,59 @@ function mostrarInstalarPWA(){
   bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_pwa_dismiss","1"); bar.remove(); };
 }
 addEventListener("appinstalled",()=>{ const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉"); }catch(e){} });
+
+/* ===== Notificações push (avisa no celular, mesmo com o app fechado) ===== */
+function pushSuportado(){ return ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window); }
+function _b64ToUint8(b64){
+  const pad="=".repeat((4-b64.length%4)%4);
+  const s=(b64+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s);
+  const arr=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i); return arr;
+}
+async function pushInscrito(){
+  try{ const reg=await navigator.serviceWorker.getRegistration(); return !!(reg && await reg.pushManager.getSubscription()); }
+  catch(e){ return false; }
+}
+async function ativarPush(){
+  if(!pushSuportado()){ toast("Seu navegador não suporta notificações."); return false; }
+  if(!estaLogado()){ toast("Entre pra ativar notificações."); abrirLogin(()=>loadPerfil()); return false; }
+  let perm=Notification.permission;
+  if(perm!=="granted"){ perm=await Notification.requestPermission(); }
+  if(perm!=="granted"){ toast("Permissão de notificação negada — libere nas configurações do navegador."); return false; }
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const cfg=await fetch(`${API}/push/config`).then(r=>r.json());
+    if(!cfg.publicKey){ toast("Notificações ainda não configuradas no servidor."); return false; }
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_b64ToUint8(cfg.publicKey)}); }
+    const r=await fetchAuth(`${API}/push/subscribe`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)});
+    if(!r.ok){ toast("Não consegui salvar a inscrição."); return false; }
+    toast("Notificações ativadas ✓");
+    return true;
+  }catch(e){ toast("Erro ao ativar notificações."); return false; }
+}
+async function desativarPush(){
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    const sub=reg && await reg.pushManager.getSubscription();
+    if(sub){ await fetchAuth(`${API}/push/unsubscribe`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)}).catch(()=>{}); await sub.unsubscribe().catch(()=>{}); }
+    toast("Notificações desativadas.");
+  }catch(e){}
+}
+async function togglePush(el){
+  el.disabled=true;
+  if(el.checked){ el.checked=await ativarPush(); } else { await desativarPush(); el.checked=false; }
+  el.disabled=false;
+  const tb=document.getElementById("pushTestBtn"); if(tb) tb.hidden=!el.checked;
+}
+async function enviarPushTeste(){
+  const r=await fetchAuth(`${API}/push/test`,{method:"POST"}).then(x=>x.json()).catch(()=>null);
+  toast(r&&r.enviados>0 ? "Teste enviado 📲 — trave o celular e veja a notificação!" : "Nada enviado (ative primeiro).");
+}
+async function sincronizarPushUI(){
+  const t=document.getElementById("tgPush"); if(!t) return;
+  const on=await pushInscrito(); t.checked=on;
+  const tb=document.getElementById("pushTestBtn"); if(tb) tb.hidden=!on;
+}
 </script>
 </body>
 </html>

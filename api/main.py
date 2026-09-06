@@ -1991,6 +1991,100 @@ def gestao():
     return FileResponse(RAIZ / "front" / "admin.html")
 
 
+# ===================== PUSH (notificações no celular, mesmo com o app fechado) =====================
+def _vapid_cfg(conn):
+    rows = {r["chave"]: r["valor"] for r in conn.execute(
+        "SELECT chave, valor FROM app_config WHERE chave IN "
+        "('vapid_public','vapid_private','vapid_subject')")}
+    return (rows.get("vapid_public"), rows.get("vapid_private"),
+            rows.get("vapid_subject") or "mailto:contato@poupou.app")
+
+
+def _enviar_push(conn, uid, titulo, corpo, url="/"):
+    """Envia push a TODAS as assinaturas do usuário. Remove as mortas (404/410)."""
+    from pywebpush import WebPushException, webpush
+    _pub, priv, subject = _vapid_cfg(conn)
+    if not priv:
+        return 0
+    subs = conn.execute("SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?",
+                        (uid,)).fetchall()
+    payload = json.dumps({"title": titulo, "body": corpo, "url": url})
+    enviados = 0
+    for s in subs:
+        try:
+            webpush(subscription_info={"endpoint": s["endpoint"],
+                                       "keys": {"p256dh": s["p256dh"], "auth": s["auth"]}},
+                    data=payload, vapid_private_key=priv, vapid_claims={"sub": subject})
+            enviados += 1
+        except WebPushException as e:
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if code in (404, 410):
+                conn.execute("DELETE FROM push_subs WHERE endpoint = ?", (s["endpoint"],))
+        except Exception:  # noqa: BLE001
+            pass
+    return enviados
+
+
+@app.get("/push/config")
+def push_config():
+    conn = _conn()
+    try:
+        pub, _priv, _sub = _vapid_cfg(conn)
+        return {"publicKey": pub or ""}
+    finally:
+        conn.close()
+
+
+@app.post("/push/subscribe")
+def push_subscribe(sub: dict = Body(...), authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        uid = _uid_do_header(authorization)
+        if not uid:
+            raise HTTPException(status_code=401, detail="entre pra ativar notificações")
+        endpoint = (sub.get("endpoint") or "").strip()
+        keys = sub.get("keys") or {}
+        p256dh, auth = keys.get("p256dh"), keys.get("auth")
+        if not (endpoint and p256dh and auth):
+            raise HTTPException(status_code=400, detail="assinatura inválida")
+        conn.execute(
+            "INSERT INTO push_subs (user_id, endpoint, p256dh, auth, criado_em) VALUES (?,?,?,?,?) "
+            "ON CONFLICT (endpoint) DO UPDATE SET user_id=excluded.user_id, "
+            "p256dh=excluded.p256dh, auth=excluded.auth",
+            (uid, endpoint, p256dh, auth, datetime.now(timezone.utc).isoformat()))
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/push/unsubscribe")
+def push_unsubscribe(sub: dict = Body(None), authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        uid = _uid_do_header(authorization)
+        endpoint = ((sub or {}).get("endpoint") or "").strip()
+        if uid and endpoint:
+            conn.execute("DELETE FROM push_subs WHERE user_id=? AND endpoint=?", (uid, endpoint))
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/push/test")
+def push_test(authorization: str | None = Header(None)):
+    conn = _conn()
+    try:
+        uid = _uid_do_header(authorization)
+        if not uid:
+            raise HTTPException(status_code=401, detail="entre primeiro")
+        n = _enviar_push(conn, uid, "PouPou 🛒",
+                         "Notificações ativadas! É assim que a gente vai te avisar de queda de preço.",
+                         "/")
+        return {"ok": True, "enviados": n}
+    finally:
+        conn.close()
+
+
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
     return FileResponse(RAIZ / "front" / "manifest.webmanifest",

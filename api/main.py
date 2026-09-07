@@ -2008,7 +2008,10 @@ def _enviar_push(conn, uid, titulo, corpo, url="/"):
         return 0
     subs = conn.execute("SELECT endpoint, p256dh, auth FROM push_subs WHERE user_id = ?",
                         (uid,)).fetchall()
-    payload = json.dumps({"title": titulo, "body": corpo, "url": url})
+    base_url = PUBLIC_BASE_URL or ""
+    payload = json.dumps({"title": titulo, "body": corpo, "url": url,
+                          "icon": base_url + "/icons/icon-v2-192.png",
+                          "badge": base_url + "/icons/badge.png"})
     enviados = 0
     for s in subs:
         try:
@@ -2105,6 +2108,17 @@ def pwa_icon(fname: str):
     p = (base / fname).resolve()
     if p.parent != base or not p.is_file():
         raise HTTPException(status_code=404, detail="ícone não encontrado")
+    return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
+
+
+@app.get("/vendor/{fname}")
+def vendor(fname: str):
+    """Libs de terceiros hospedadas no próprio app (ex.: supabase-js) — mesma origem, o SW
+    cacheia, o PWA abre rápido e o login não quebra quando um CDN externo falha."""
+    base = (RAIZ / "front" / "vendor").resolve()
+    p = (base / fname).resolve()
+    if p.parent != base or not p.is_file():
+        raise HTTPException(status_code=404, detail="arquivo não encontrado")
     return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
 
 

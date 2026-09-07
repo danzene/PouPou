@@ -3,8 +3,9 @@
    - estáticos do app (ícones/logos/manifest): cache primeiro (rápido, atualiza em 2º plano);
    - resto (API dinâmica: /cesta, /buscar, /mercados…): NÃO intercepta — vai direto pela rede
      (preços sempre frescos, sem quebrar auth). Também nunca mexe em origens externas (Supabase/CDN). */
-const CACHE = "poupou-v4";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-v2-192.png", "/icons/icon-v2-512.png"];
+const CACHE = "poupou-v5";
+const SHELL = ["/", "/manifest.webmanifest", "/vendor/supabase.js",
+               "/icons/icon-v2-192.png", "/icons/icon-v2-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -25,10 +26,16 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== self.location.origin) return; // não mexe em Supabase/CDN/externos
 
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).catch(() => caches.match("/")));
+    // abre INSTANTÂNEO: serve o shell do cache e atualiza em 2º plano (stale-while-revalidate)
+    e.respondWith(caches.match("/").then((cached) => {
+      const net = fetch(req).then((res) => {
+        const copy = res.clone(); caches.open(CACHE).then((c) => c.put("/", copy)); return res;
+      }).catch(() => cached);
+      return cached || net;
+    }));
     return;
   }
-  if (/^\/(icons|logos)\//.test(url.pathname) || url.pathname === "/manifest.webmanifest") {
+  if (/^\/(icons|logos|vendor)\//.test(url.pathname) || url.pathname === "/manifest.webmanifest") {
     e.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
         const copy = res.clone();
@@ -48,8 +55,8 @@ self.addEventListener("push", (e) => {
   const titulo = d.title || "PouPou";
   e.waitUntil(self.registration.showNotification(titulo, {
     body: d.body || "",
-    icon: "/icons/icon-v2-192.png",
-    badge: "/icons/icon-v2-192.png",
+    icon: d.icon || "/icons/icon-v2-192.png",
+    badge: d.badge || "/icons/badge.png",
     data: { url: d.url || "/" },
     vibrate: [80, 40, 80],
     tag: d.tag || "poupou",

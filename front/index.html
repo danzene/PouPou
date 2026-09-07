@@ -2326,6 +2326,7 @@ $("#btnCesta").addEventListener("click",loadCesta);
   try{ const f=await fetch(`${API}/frescos/categorias`).then(r=>r.json());
     renderFrescos(f.categorias);
   }catch(e){}
+  talvezPedirPush();   // convite proativo de notificações (só logado, permissão ainda não decidida)
 })();
 
 /* ===== PWA: registra o service worker + banner "Instalar na tela inicial" ===== */
@@ -2407,6 +2408,26 @@ async function sincronizarPushUI(){
   const t=document.getElementById("tgPush"); if(!t) return;
   const on=await pushInscrito(); t.checked=on;
   const tb=document.getElementById("pushTestBtn"); if(tb) tb.hidden=!on;
+}
+/* banner PROATIVO logo que abre o app: convida a ativar as notificações de queda de preço.
+   O popup real de permissão só dispara quando a pessoa toca em "Ativar" (exigência do navegador
+   + muito mais gente aceita do que pedindo de cara). */
+function pedirPushBanner(){
+  if(document.getElementById("pushAsk") || document.getElementById("pwaBar")) return;
+  const bar=document.createElement("div"); bar.id="pushAsk"; bar.className="pwa-bar";
+  bar.innerHTML=`<span class="pwa-ic">${ic("bell")}</span>`+
+    `<span class="pwa-tx">Quer saber na hora quando os produtos que você acompanha <b>baixarem de preço</b>? Ative os avisos.</span>`+
+    `<button class="pwa-inst" type="button">Ativar</button>`+
+    `<button class="pwa-x" type="button" aria-label="Agora não">✕</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector(".pwa-inst").onclick=async()=>{ const ok=await ativarPush(); if(ok) bar.remove(); };
+  bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_push_ask_dismiss", String(Date.now())); bar.remove(); };
+}
+function talvezPedirPush(){
+  if(!pushSuportado() || !estaLogado() || Notification.permission!=="default") return;
+  const last=parseInt(lsGet("mb_push_ask_dismiss","0"))||0;
+  if(Date.now()-last < 7*864e5) return;   // dispensou há < 7 dias -> não insiste
+  pushInscrito().then(on=>{ if(!on) setTimeout(pedirPushBanner, 2500); });
 }
 </script>
 </body>

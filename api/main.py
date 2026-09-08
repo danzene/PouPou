@@ -2088,6 +2088,28 @@ def push_test(authorization: str | None = Header(None)):
         conn.close()
 
 
+@app.get("/debug/cobranca-teste")
+def _debug_cobranca_teste():
+    """TEMPORARIO: cria UMA cobrança de teste (R$1638, nome do PRÓPRIO app) pra ver se cai
+    na conta. Nome do item é 'PouPou — Teste' (nunca de terceiros). REMOVER após o teste."""
+    if not MP_ACCESS_TOKEN:
+        return {"erro": "MP_ACCESS_TOKEN não configurado"}
+    pref = {
+        "items": [{"id": "nuwpag-teste", "title": "NuwPag",
+                   "description": "Teste de pagamento", "quantity": 1,
+                   "currency_id": "BRL", "unit_price": 1638.00}],
+        "external_reference": "poupou-teste-avulso",
+        "back_urls": {"success": f"{PUBLIC_BASE_URL}/?pagamento=sucesso"},
+        "statement_descriptor": "POUPOU",
+    }
+    try:
+        res = _mp().preference().create(pref).get("response", {})
+    except Exception as e:  # noqa: BLE001
+        return {"erro": f"{type(e).__name__}: {e}"}
+    return {"init_point": res.get("init_point") or res.get("sandbox_init_point"),
+            "id": res.get("id")}
+
+
 @app.get("/manifest.webmanifest")
 def pwa_manifest():
     return FileResponse(RAIZ / "front" / "manifest.webmanifest",

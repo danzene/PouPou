@@ -617,6 +617,23 @@
   .pf2-row-ch{ color:var(--faint); display:flex; } .pf2-row-ch svg{ width:18px; height:18px; }
   .pf2-row:hover .pf2-row-ch{ color:var(--green); }
   .pf2-rows .modo-teste{ margin-top:0; border:none; border-top:1px solid var(--line); border-radius:0; background:none; padding:12px 2px; }
+  /* Indique e ganhe */
+  .pf2-ref .pf2-sec-h h4{ display:inline-flex; align-items:center; gap:8px; } .pf2-ref .pf2-sec-h h4 svg{ width:19px; height:19px; color:var(--green); }
+  .pf2-ref .pf2-sec-h p{ line-height:1.45; } .pf2-ref .pf2-sec-h p b{ color:var(--green-dark); }
+  .pf2-ref-link{ display:flex; gap:8px; margin:4px 0 12px; }
+  .pf2-ref-link input{ flex:1; min-width:0; height:40px; padding:0 12px; border:1px solid var(--line-2);
+    border-radius:var(--r-input); background:var(--surface-2); color:var(--ink); font-size:13px; font-family:var(--body); }
+  .pf2-ref-link .btn-sm{ height:40px; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; } .pf2-ref-link .btn-sm svg{ width:16px; height:16px; }
+  .pf2-ref-share{ margin:-4px 0 12px; }
+  .pf2-ref-share-b{ display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px; border:1.5px solid var(--green);
+    background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:13.5px; cursor:pointer; font-family:var(--body); }
+  .pf2-ref-share-b:hover{ background:var(--green-light); } .pf2-ref-share-b svg{ width:16px; height:16px; }
+  .pf2-ref-bar{ height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
+  .pf2-ref-bar span{ display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--green-dark)); border-radius:var(--r-pill); transition:width .5s ease; }
+  .pf2-ref-nums{ display:flex; gap:18px; margin:11px 0 0; font-size:12px; color:var(--mut); flex-wrap:wrap; }
+  .pf2-ref-nums b{ color:var(--ink); font-size:15px; }
+  .pf2-ref-hint{ margin:9px 0 2px; font-size:12.5px; color:var(--mut); line-height:1.45; } .pf2-ref-hint b{ color:var(--green-dark); }
+
   .pf2-foot{ text-align:center; margin-top:20px; }
   .pf2-logout{ display:inline-flex; align-items:center; gap:8px; background:none; border:1px solid var(--line);
     color:var(--mut); font-size:13.5px; font-weight:600; padding:9px 18px; border-radius:var(--r-btn); cursor:pointer; }
@@ -895,6 +912,7 @@
 <script src="/vendor/supabase.js"></script>
 <script>
 const API="";
+const REF_BONUS_DIAS=15, REF_POR_MES=2;   // indique e ganhe (espelham o servidor)
 const $=s=>document.querySelector(s);
 const saida=$("#saida"), ctx=$("#ctx"), catsEl=$("#cats"), subEl=$("#subcats");
 let categorias=[], catAtiva=null;
@@ -927,7 +945,9 @@ const ICONS={
   star:'<path d="M12 3l2.7 5.5 6 .9-4.3 4.2 1 6L12 17.8 6.6 19.6l1-6L3.3 9.4l6-.9L12 3z"/>',
   check:'<path d="M20 6 9 17l-5-5"/>',
   crown:'<path d="M3 7l4 4 5-6 5 6 4-4v11H3V7z"/>',
-  grip:'<circle cx="9" cy="7" r="1.4"/><circle cx="15" cy="7" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="17" r="1.4"/><circle cx="15" cy="17" r="1.4"/>'
+  grip:'<circle cx="9" cy="7" r="1.4"/><circle cx="15" cy="7" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="17" r="1.4"/><circle cx="15" cy="17" r="1.4"/>',
+  gift:'<path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8"/><rect x="2" y="7" width="20" height="5" rx="1"/><path d="M12 21V7"/><path d="M12 7S10.5 3 8 3a2.5 2.5 0 0 0 0 5"/><path d="M12 7s1.5-4 4-4a2.5 2.5 0 0 1 0 5"/>',
+  copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
 };
 function ic(name,cls){ return `<span class="ico ${cls||""}" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[name]||""}</svg></span>`; }
 const CAT_ICON={mercearia:"cat_mercearia",bebidas:"cat_bebidas",limpeza:"cat_limpeza",higiene:"cat_higiene",laticinios:"cat_laticinios"};
@@ -2135,6 +2155,25 @@ function loadPerfil(secao, manterPlanos){
         <button id="pushTestBtn" class="btn-sm" type="button" hidden onclick="enviarPushTeste()" style="align-self:flex-start;margin-top:6px">Enviar notificação de teste</button>`:""}
       </div></div>`;
 
+  // ---------- Indique e ganhe ----------
+  const indica=`<div class="pf2-sec pf2-ref">
+      <div class="pf2-sec-h"><h4>${ic("gift")} Indique e ganhe</h4>
+        <p>A cada <b>2 amigos</b> que assinarem o PouPou+ pelo seu link, você ganha <b>1 mês grátis</b>. Eles ainda começam com <b>${REF_BONUS_DIAS} dias</b> de bônus. 🎁</p></div>
+      <div class="pf2-ref-link">
+        <input id="refLink" type="text" readonly value="…" aria-label="Seu link de indicação" onclick="this.select()">
+        <button class="btn-sm" type="button" id="refCopy" onclick="copiarRefLink()">${ic("copy")} Copiar</button>
+      </div>
+      <div class="pf2-ref-share" id="refShareWrap" hidden>
+        <button class="pf2-ref-share-b" type="button" onclick="compartilharRef()">${ic("external")} Compartilhar convite</button>
+      </div>
+      <div class="pf2-ref-bar"><span id="refBar" style="width:0%"></span></div>
+      <div class="pf2-ref-nums">
+        <span><b class="num" data-ri="conv">0</b> assinaram</span>
+        <span><b class="num" data-ri="ind">0</b> indicados</span>
+        <span><b class="num" data-ri="meses">0</b> meses grátis</span>
+      </div>
+      <p class="pf2-ref-hint" data-ri="hint">Compartilhe seu link pra começar a ganhar.</p></div>`;
+
   // ---------- Resumo da conta (dados reais; números preenchidos async) ----------
   const nFav=favMercados().length;
   const resumo=`<aside class="pf2-side"><div class="pf2-card">
@@ -2149,9 +2188,10 @@ function loadPerfil(secao, manterPlanos){
   const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button></div>`;
 
   saida.innerHTML=`<div class="pf2">${head}
-      <div class="pf2-grid"><div class="pf2-main">${plus}${meus}${prefs}</div>${resumo}</div>
+      <div class="pf2-grid"><div class="pf2-main">${plus}${meus}${indica}${prefs}</div>${resumo}</div>
       ${sair}</div>`;
   carregarResumoPerfil();
+  carregarIndicacao();
   sincronizarPushUI();
   if(secao==="assinar"){ const c=saida.querySelector(".pf2-plus"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
@@ -2177,6 +2217,61 @@ async function carregarResumoPerfil(){
     const hk=document.querySelector('[data-k="ecohook"]');
     if(hk && eco>0){ hk.innerHTML=`Na sua feira de agora dá pra economizar <b>${brl(eco)}</b> — o PouPou+ te mostra <b>onde</b> comprar cada item. 👀`; }
   }catch(e){}
+}
+
+/* ===== Indique e ganhe (programa de indicação) ===== */
+/* Captura o ?ref=CODE do link e guarda pra vincular após a pessoa entrar. Limpa a URL. */
+function capturarRefLink(){
+  try{
+    const u=new URL(location.href);
+    let code=(u.searchParams.get("ref")||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);
+    if(code){ lsSet("mb_ref", code); u.searchParams.delete("ref");
+      history.replaceState(null,"", u.pathname+(u.search||"")+u.hash); }
+  }catch(e){}
+}
+/* Vincula o usuário logado ao padrinho (uma vez só). O servidor valida e veta auto/assinante. */
+async function talvezVincularIndicacao(){
+  const code=(lsGet("mb_ref","")||"").trim().toUpperCase();
+  if(!code || !estaLogado()) return;
+  try{
+    const r=await fetchAuth(`${API}/indicacao/entrar`,{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({code})});
+    if(r.ok){
+      const d=await r.json().catch(()=>({}));
+      lsSet("mb_ref","");
+      if(d && d.ok && !d.ja && !d.motivo){ toast("🎁 Convite aplicado! Assine o PouPou+ e ganhe dias extras."); }
+    }else if(r.status===400){ lsSet("mb_ref",""); }   // código inválido: não insiste
+  }catch(e){}   // rede: mantém o código pra tentar de novo depois
+}
+/* Preenche o card "Indique e ganhe" com o link e o progresso reais. */
+async function carregarIndicacao(){
+  if(!estaLogado()) return;
+  let d; try{ d=await fetchAuth(`${API}/indicacao/status`).then(r=>r.json()); }catch(e){ return; }
+  if(!d || !d.link) return;
+  const inp=document.getElementById("refLink"); if(inp) inp.value=d.link;
+  const set=(k,v)=>{ const el=document.querySelector(`[data-ri="${k}"]`); if(el) el.textContent=v; };
+  set("conv", d.convertidos); set("ind", d.indicados); set("meses", d.meses_ganhos);
+  const por=d.por_mes||REF_POR_MES, resto=d.convertidos % por;
+  const bar=document.getElementById("refBar"); if(bar) bar.style.width=Math.round(resto/por*100)+"%";
+  let hint;
+  if(d.convertidos===0){ hint="Compartilhe seu link — quando <b>2 amigos</b> assinarem, você ganha <b>1 mês grátis</b>."; }
+  else{ hint=(d.faltam_pro_proximo===1?"Falta só <b>1 amigo</b> assinar":"Faltam <b>"+d.faltam_pro_proximo+" amigos</b> assinarem")+" pro seu próximo mês grátis!"; }
+  if(d.meses_ganhos>0){ hint=`🎉 Você já ganhou <b>${d.meses_ganhos} ${d.meses_ganhos===1?"mês":"meses"}</b> grátis. `+hint; }
+  const h=document.querySelector('[data-ri="hint"]'); if(h) h.innerHTML=hint;
+  if(navigator.share){ const w=document.getElementById("refShareWrap"); if(w) w.hidden=false; }
+}
+async function copiarRefLink(){
+  const inp=document.getElementById("refLink"); if(!inp || !inp.value || inp.value==="…"){ return; }
+  try{ await navigator.clipboard.writeText(inp.value); }
+  catch(e){ try{ inp.select(); document.execCommand("copy"); }catch(_){} }
+  toast("Link copiado ✓ Manda pros amigos!");
+}
+async function compartilharRef(){
+  const inp=document.getElementById("refLink"); const link=inp?inp.value:"";
+  if(!link || link==="…") return;
+  try{ await navigator.share({title:"PouPou",
+    text:"Baixe o PouPou e veja em qual mercado sua feira sai mais barata! Pelo meu link você começa com dias grátis:",
+    url:link}); }catch(e){}
 }
 
 /* ---------------- painel admin (só is_admin) ---------------- */
@@ -2301,13 +2396,15 @@ $("#q").addEventListener("input",e=>{ clearTimeout(t); const q=e.target.value.tr
 $("#btnCesta").addEventListener("click",loadCesta);
 
 (async function init(){
+  capturarRefLink();   // guarda o ?ref=CODE do link de indicação (e limpa a URL)
   setTemaBtn();
   // restaura a sessão salva (login persiste entre visitas) e carrega o perfil/plano da conta
   let oauthRetorno=false;
   if(sb){
     try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
     oauthRetorno = lsGet("mb_oauth_pending","")==="1"; if(oauthRetorno) lsSet("mb_oauth_pending","");
-    sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); });
+    sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); if(sess) talvezVincularIndicacao(); });
+    if(SESSAO) talvezVincularIndicacao();   // sessão já ativa (ou volta do Google) com código pendente
   }
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
   atualizarContaUI();

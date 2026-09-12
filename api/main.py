@@ -19,6 +19,7 @@ import hmac
 import json
 import logging
 import os
+import secrets
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
@@ -445,6 +446,118 @@ def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapprova
             "mp_status=?, atualizado_em=? WHERE id=?",
             (nova, agora.isoformat(), mp_status, agora.isoformat(), uid))
     return nova
+
+
+# ===== INDIQUE E GANHE (programa de indicação) =============================================
+# Regra: quem indica ganha 1 mês grátis a cada 2 indicados que ASSINAREM (viram pagantes).
+# Quem foi indicado ganha um bônus de boas-vindas ao assinar pela 1ª vez (mão-dupla).
+# Anti-fraude: só conta indicado que PAGOU (não basta cadastrar); veta auto-indicação;
+# tudo idempotente (o webhook pode reenviar o mesmo pagamento e a recorrência dispara todo mês).
+REF_BONUS_INDICADO = 15        # dias de bônus pro INDICADO na 1ª assinatura paga
+REF_INDICADOS_POR_MES = 2      # a cada N indicados convertidos, o PADRINHO ganha 1 mês
+REF_DIAS_MES = 30              # "1 mês grátis" = 30 dias
+_REF_ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"   # sem 0/O/1/I/L (evita confusão ao digitar)
+
+
+def _dar_dias(conn, uid, dias) -> None:
+    """Concede `dias` de acesso PouPou+ a `uid`, estendendo a partir do MAIOR entre agora e a
+    validade atual (não descarta dias já pagos). Vira 'assinante'. Usado nos bônus de indicação
+    — NÃO mexe em mp_status/preapproval (não é pagamento, é cortesia)."""
+    if not uid or dias <= 0:
+        return
+    agora = datetime.now(timezone.utc)
+    base = agora
+    r = conn.execute("SELECT plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
+    if r and r["plano_expira_em"]:
+        atual = r["plano_expira_em"]
+        if isinstance(atual, str):
+            try:
+                atual = datetime.fromisoformat(atual)
+            except ValueError:
+                atual = agora
+        if atual.tzinfo is None:
+            atual = atual.replace(tzinfo=timezone.utc)
+        if atual > agora:
+            base = atual
+    nova = (base + timedelta(days=int(dias))).isoformat()
+    conn.execute(
+        "UPDATE profiles SET plano='assinante', plano_expira_em=?, atualizado_em=? WHERE id=?",
+        (nova, agora.isoformat(), uid))
+
+
+def _gerar_ref_code(conn, uid) -> str | None:
+    """Devolve o ref_code do usuário; cria um curto e único (6 chars) se ainda não tiver.
+    Idempotente: a claim é o UPDATE ... WHERE ref_code IS NULL (rowcount==1 ganhou)."""
+    if not uid:
+        return None
+    r = conn.execute("SELECT ref_code FROM profiles WHERE id = ?", (uid,)).fetchone()
+    if r and r["ref_code"]:
+        return r["ref_code"]
+    for _ in range(8):
+        code = "".join(secrets.choice(_REF_ALFABETO) for _ in range(6))
+        try:
+            cur = conn.execute(
+                "UPDATE profiles SET ref_code = ? WHERE id = ? AND ref_code IS NULL", (code, uid))
+            if getattr(cur, "rowcount", 0) == 1:
+                return code
+        except Exception:   # noqa: BLE001 — colisão no índice único: tenta outro código
+            pass
+        r = conn.execute("SELECT ref_code FROM profiles WHERE id = ?", (uid,)).fetchone()
+        if r and r["ref_code"]:
+            return r["ref_code"]
+    return None
+
+
+def _processar_indicacao(conn, uid) -> None:
+    """Fecha a indicação quando `uid` vira pagante (chamado do webhook). Roda UMA vez só por
+    indicado (claim atômica em ref_creditado) e credita o padrinho a cada REF_INDICADOS_POR_MES
+    convertidos (idempotente por ref_meses_dados). Best-effort: qualquer falha aqui NUNCA
+    pode derrubar a confirmação do pagamento — por isso todo o corpo vai num try/except amplo."""
+    if not uid:
+        return
+    try:
+        r = conn.execute(
+            "SELECT indicado_por, ref_creditado FROM profiles WHERE id = ?", (uid,)).fetchone()
+        if not r:
+            return
+        codigo_padrinho = (r["indicado_por"] or "").strip()
+        if r["ref_creditado"] or not codigo_padrinho:
+            return
+        # claim atômica: só quem transformar false->true segue (evita crédito dobrado em
+        # reenvio de webhook ou concorrência). No Postgres o WHERE é reavaliado após o lock.
+        cur = conn.execute(
+            "UPDATE profiles SET ref_creditado = true WHERE id = ? AND ref_creditado = false",
+            (uid,))
+        if getattr(cur, "rowcount", 0) != 1:
+            return
+        # padrinho existe? (e não é auto-indicação)
+        pad = conn.execute(
+            "SELECT id FROM profiles WHERE ref_code = ?", (codigo_padrinho,)).fetchone()
+        if not pad or pad["id"] == uid:
+            return   # código inválido/próprio: claim gasta, mas não credita ninguém
+        padrinho_id = pad["id"]
+        # bônus de boas-vindas pro INDICADO (mão-dupla)
+        _dar_dias(conn, uid, REF_BONUS_INDICADO)
+        # credita o PADRINHO: conta convertidos e dá 1 mês a cada REF_INDICADOS_POR_MES
+        convertidos = conn.execute(
+            "SELECT COUNT(*) AS n FROM profiles WHERE indicado_por = ? AND ref_creditado = true",
+            (codigo_padrinho,)).fetchone()["n"]
+        meses_merecidos = convertidos // REF_INDICADOS_POR_MES
+        row = conn.execute(
+            "SELECT ref_meses_dados FROM profiles WHERE id = ?", (padrinho_id,)).fetchone()
+        ja_dados = (row["ref_meses_dados"] or 0) if row else 0
+        if meses_merecidos > ja_dados:
+            novos = meses_merecidos - ja_dados
+            _dar_dias(conn, padrinho_id, REF_DIAS_MES * novos)
+            conn.execute("UPDATE profiles SET ref_meses_dados = ? WHERE id = ?",
+                         (meses_merecidos, padrinho_id))
+            try:
+                _enviar_push(conn, padrinho_id, "🎉 Você ganhou um mês grátis!",
+                             "Suas indicações renderam — aproveite o PouPou+ por nossa conta.", "/")
+            except Exception:   # noqa: BLE001
+                pass
+    except Exception as e:   # noqa: BLE001
+        logging.getLogger("api").warning("indicacao: falha ao processar uid=%s: %s", uid, e)
 
 
 # Garante schema/migrações (tabelas links, lista) ao subir a API. RESILIENTE: se o banco
@@ -1714,6 +1827,7 @@ def _proc_payment(payment_id) -> None:
             if _registra_evento(conn, payment_id, "payment", status, uid, plano_id,
                                  pay.get("transaction_amount"), pay):
                 _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+                _processar_indicacao(conn, uid)
         finally:
             conn.close()
 
@@ -1738,6 +1852,7 @@ def _proc_authorized_payment(ap_id) -> None:
             if _registra_evento(conn, ap_id, "subscription_authorized_payment", "approved",
                                  uid, plano_id, ap.get("transaction_amount"), ap):
                 _estende_assinatura(conn, uid, plano_id, mp_status="authorized", preapproval_id=pre_id)
+                _processar_indicacao(conn, uid)
         finally:
             conn.close()
 
@@ -2084,6 +2199,76 @@ def push_test(authorization: str | None = Header(None)):
                          "Notificações ativadas! É assim que a gente vai te avisar de queda de preço.",
                          "/")
         return {"ok": True, "enviados": n}
+    finally:
+        conn.close()
+
+
+@app.get("/indicacao/status")
+def indicacao_status(authorization: str | None = Header(None)):
+    """Painel de indicação do usuário: o código/link pra compartilhar e o progresso
+    (quantos indicou, quantos assinaram, quantos meses já ganhou e quanto falta pro próximo)."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    conn = _conn()
+    try:
+        code = _gerar_ref_code(conn, uid)
+        indicados = convertidos = 0
+        if code:
+            indicados = conn.execute(
+                "SELECT COUNT(*) AS n FROM profiles WHERE indicado_por = ?", (code,)).fetchone()["n"]
+            convertidos = conn.execute(
+                "SELECT COUNT(*) AS n FROM profiles WHERE indicado_por = ? AND ref_creditado = true",
+                (code,)).fetchone()["n"]
+        meses_ganhos = convertidos // REF_INDICADOS_POR_MES
+        faltam = REF_INDICADOS_POR_MES - (convertidos % REF_INDICADOS_POR_MES)
+        return {
+            "code": code,
+            "link": f"{PUBLIC_BASE_URL}/?ref={code}" if code else None,
+            "indicados": indicados,
+            "convertidos": convertidos,
+            "meses_ganhos": meses_ganhos,
+            "faltam_pro_proximo": faltam,
+            "por_mes": REF_INDICADOS_POR_MES,
+            "bonus_indicado_dias": REF_BONUS_INDICADO,
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/indicacao/entrar")
+def indicacao_entrar(body: dict = Body(...), authorization: str | None = Header(None)):
+    """Vincula quem se cadastrou a um padrinho (uma vez só). O front chama isso logo após o
+    cadastro, com o código capturado do link ?ref=CODE. Valida existência e veta auto-indicação;
+    o crédito de verdade só acontece quando o indicado ASSINA (ver _processar_indicacao)."""
+    uid = _uid_do_header(authorization)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    code = (body.get("code") or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Código vazio")
+    conn = _conn()
+    try:
+        r = conn.execute(
+            "SELECT indicado_por, ref_code, plano FROM profiles WHERE id = ?", (uid,)).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+        if r["indicado_por"]:
+            return {"ok": True, "ja": True}          # já tem padrinho: não troca
+        # quem JÁ É assinante não pode entrar como "indicado" (fecharia a brecha de um pagante
+        # se atribuir a um amigo e os dois ganharem crédito na próxima renovação).
+        if r["plano"] == "assinante":
+            return {"ok": False, "motivo": "ja_assinante"}
+        if r["ref_code"] and r["ref_code"] == code:
+            raise HTTPException(status_code=400, detail="Você não pode usar o próprio código")
+        pad = conn.execute("SELECT id FROM profiles WHERE ref_code = ?", (code,)).fetchone()
+        if not pad or pad["id"] == uid:
+            raise HTTPException(status_code=400, detail="Código de indicação inválido")
+        # grava só se ainda estiver vazio (idempotente sob corrida)
+        conn.execute(
+            "UPDATE profiles SET indicado_por = ? WHERE id = ? AND indicado_por IS NULL",
+            (code, uid))
+        return {"ok": True}
     finally:
         conn.close()
 

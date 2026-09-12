@@ -617,22 +617,41 @@
   .pf2-row-ch{ color:var(--faint); display:flex; } .pf2-row-ch svg{ width:18px; height:18px; }
   .pf2-row:hover .pf2-row-ch{ color:var(--green); }
   .pf2-rows .modo-teste{ margin-top:0; border:none; border-top:1px solid var(--line); border-radius:0; background:none; padding:12px 2px; }
-  /* Indique e ganhe */
-  .pf2-ref .pf2-sec-h h4{ display:inline-flex; align-items:center; gap:8px; } .pf2-ref .pf2-sec-h h4 svg{ width:19px; height:19px; color:var(--green); }
-  .pf2-ref .pf2-sec-h p{ line-height:1.45; } .pf2-ref .pf2-sec-h p b{ color:var(--green-dark); }
-  .pf2-ref-link{ display:flex; gap:8px; margin:4px 0 12px; }
-  .pf2-ref-link input{ flex:1; min-width:0; height:40px; padding:0 12px; border:1px solid var(--line-2);
-    border-radius:var(--r-input); background:var(--surface-2); color:var(--ink); font-size:13px; font-family:var(--body); }
-  .pf2-ref-link .btn-sm{ height:40px; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; } .pf2-ref-link .btn-sm svg{ width:16px; height:16px; }
-  .pf2-ref-share{ margin:-4px 0 12px; }
-  .pf2-ref-share-b{ display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px; border:1.5px solid var(--green);
-    background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:13.5px; cursor:pointer; font-family:var(--body); }
-  .pf2-ref-share-b:hover{ background:var(--green-light); } .pf2-ref-share-b svg{ width:16px; height:16px; }
-  .pf2-ref-bar{ height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
-  .pf2-ref-bar span{ display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--green-dark)); border-radius:var(--r-pill); transition:width .5s ease; }
-  .pf2-ref-nums{ display:flex; gap:18px; margin:11px 0 0; font-size:12px; color:var(--mut); flex-wrap:wrap; }
-  .pf2-ref-nums b{ color:var(--ink); font-size:15px; }
-  .pf2-ref-hint{ margin:9px 0 2px; font-size:12.5px; color:var(--mut); line-height:1.45; } .pf2-ref-hint b{ color:var(--green-dark); }
+  /* Indique e ganhe — card HERO chamativo (gradiente verde fixo, texto branco, pop nos 2 temas) */
+  .pf2-ref-hero{ position:relative; overflow:hidden; border-radius:var(--r-card); padding:20px; color:#fff;
+    background:linear-gradient(135deg,#0a7247 0%,#0fa968 55%,#16b974 100%);
+    box-shadow:0 12px 34px -14px rgba(15,169,104,.6); }
+  .pf2-ref-glow{ position:absolute; top:-70px; right:-50px; width:230px; height:230px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,255,255,.30), transparent 70%); pointer-events:none; }
+  .pf2-ref-gift{ position:absolute; top:-18px; right:-8px; opacity:.15; transform:rotate(12deg); pointer-events:none; }
+  .pf2-ref-gift svg{ width:128px; height:128px; color:#fff; stroke-width:1.4; }
+  .pf2-ref-body{ position:relative; }
+  .pf2-ref-eyebrow{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:.1em;
+    text-transform:uppercase; background:rgba(255,255,255,.20); padding:5px 11px; border-radius:var(--r-pill); }
+  .pf2-ref-eyebrow svg{ width:14px; height:14px; }
+  .pf2-ref-title{ margin:12px 0 5px; font-size:22px; line-height:1.18; font-weight:800; color:#fff;
+    font-family:var(--disp); text-wrap:balance; } .pf2-ref-title b{ font-weight:800; }
+  .pf2-ref-pitch{ margin:0 0 14px; font-size:13.5px; line-height:1.5; color:rgba(255,255,255,.93); }
+  .pf2-ref-pitch b{ color:#fff; font-weight:700; }
+  .pf2-ref-perks{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 15px; }
+  .pf2-ref-perk{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.28); padding:6px 11px; border-radius:var(--r-pill); }
+  .pf2-ref-perk b{ font-weight:800; } .pf2-ref-perk svg{ width:15px; height:15px; }
+  .pf2-ref-link{ display:flex; gap:8px; margin:0 0 10px; }
+  .pf2-ref-link input{ flex:1; min-width:0; height:44px; padding:0 13px; border:none; border-radius:var(--r-input);
+    background:rgba(255,255,255,.96); color:#0a3a28; font-size:13px; font-weight:600; font-family:var(--body); }
+  .pf2-ref-copy{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; height:44px; padding:0 16px; border:none;
+    border-radius:var(--r-input); background:#fff; color:var(--green-dark); font-weight:800; font-size:13.5px; cursor:pointer; font-family:var(--body); }
+  .pf2-ref-copy:hover{ background:#e9fff4; } .pf2-ref-copy svg{ width:16px; height:16px; }
+  .pf2-ref-share-b{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:46px; margin:0 0 15px;
+    border:1.5px solid rgba(255,255,255,.55); background:rgba(255,255,255,.12); color:#fff; border-radius:var(--r-btn);
+    font-weight:700; font-size:14px; cursor:pointer; font-family:var(--body); }
+  .pf2-ref-share-b:hover{ background:rgba(255,255,255,.22); } .pf2-ref-share-b svg{ width:17px; height:17px; }
+  .pf2-ref-bar{ height:9px; border-radius:var(--r-pill); background:rgba(255,255,255,.25); overflow:hidden; }
+  .pf2-ref-bar span{ display:block; height:100%; background:#fff; border-radius:var(--r-pill); transition:width .6s ease; }
+  .pf2-ref-nums{ display:flex; gap:16px; margin:11px 0 0; font-size:12px; color:rgba(255,255,255,.85); flex-wrap:wrap; }
+  .pf2-ref-nums b{ color:#fff; font-size:15px; }
+  .pf2-ref-hint{ margin:9px 0 0; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.93); } .pf2-ref-hint b{ color:#fff; font-weight:800; }
 
   .pf2-foot{ text-align:center; margin-top:20px; }
   .pf2-logout{ display:inline-flex; align-items:center; gap:8px; background:none; border:1px solid var(--line);
@@ -912,7 +931,7 @@
 <script src="/vendor/supabase.js"></script>
 <script>
 const API="";
-const REF_BONUS_DIAS=15, REF_POR_MES=2;   // indique e ganhe (espelham o servidor)
+const REF_POR_MES=2;   // indique e ganhe: nº de indicados por mês grátis (espelha o servidor)
 const $=s=>document.querySelector(s);
 const saida=$("#saida"), ctx=$("#ctx"), catsEl=$("#cats"), subEl=$("#subcats");
 let categorias=[], catAtiva=null;
@@ -1199,8 +1218,8 @@ function renderDrawer(prod){
             <div class="cmp-over">
               <div class="pw-lock">${ic("lock")}</div>
               <div class="cmp-tit">Veja o preço em cada mercado</div>
-              <button class="pw-cta" type="button" onclick="desbloquear()">${ic("crown")} ${trialJaUsado()?"Assine e desbloqueie":`Cadastre-se — ${TRIAL_DIAS} dias grátis`}</button>
-              <div class="pw-fine">${trialJaUsado()?`a partir de ${PRECO_MENSAL}/mês`:`${TRIAL_DIAS} dias grátis · sem cartão`}</div>
+              <button class="pw-cta" type="button" onclick="desbloquear()">${ic("crown")} ${trialJaUsado()?"Assine e desbloqueie":`Cadastre-se — ${trialDiasOferta()} dias grátis`}</button>
+              <div class="pw-fine">${trialJaUsado()?`a partir de ${PRECO_MENSAL}/mês`:`${trialDiasOferta()} dias grátis · sem cartão`}</div>
             </div>
           </div>`}
     </div>
@@ -1735,7 +1754,7 @@ async function atualizarBadge(){
    o Mercado Pago entram na Fase 2. */
 let MERCADOS=[];                       // lista completa vinda de /mercados
 const FAV_KEY="mb_mercados_fav";       // favoritos ainda em localStorage (sync p/ conta vem depois)
-const TRIAL_DIAS=3;
+const TRIAL_DIAS=3, TRIAL_DIAS_INDICADO=7;   // trial normal x trial de quem chegou por indicação
 const PRECO_MENSAL="R$ 9,90", PRECO_DE="R$ 29,90", PRECO_ANUAL="R$ 99,90";
 
 // ---- Supabase (cadastro real). URL + anon são PÚBLICOS; a service_role NUNCA vem pro front. ----
@@ -1756,8 +1775,14 @@ function usuario(){ return SESSAO?{email:SESSAO.user.email, nome:PERFIL.nome||(S
 function estaLogado(){ return !!SESSAO; }
 function plano(){ return PERFIL.plano||"gratis"; }
 function trialIni(){ return PERFIL.trial_ini?new Date(PERFIL.trial_ini):null; }
+// tamanho REAL do trial em curso (7 pra indicado, 3 pro resto) — vem do servidor no PERFIL.
+function trialLen(){ return (PERFIL && PERFIL.trial_dias) ? PERFIL.trial_dias : TRIAL_DIAS; }
+// quem chegou por indicação? (código pendente no link OU já vinculado no perfil)
+function fuiIndicado(){ try{ return !!lsGet("mb_ref","") || !!(PERFIL && PERFIL.indicado_por); }catch(e){ return false; } }
+// dias a ANUNCIAR antes de começar o trial (pra convidado ver "7 dias grátis").
+function trialDiasOferta(){ return fuiIndicado() ? TRIAL_DIAS_INDICADO : TRIAL_DIAS; }
 function diasRestantesTrial(){ const ini=trialIni(); if(!ini) return 0;
-  return Math.max(0, Math.ceil((ini.getTime()+TRIAL_DIAS*864e5-Date.now())/864e5)); }
+  return Math.max(0, Math.ceil((ini.getTime()+trialLen()*864e5-Date.now())/864e5)); }
 function trialAtivo(){ return plano()==="trial" && diasRestantesTrial()>0; }
 // assinante agora EXPIRA: só é premium enquanto plano_expira_em > agora (o servidor é a
 // fonte da verdade; isto mantém a UI do cliente alinhada e não mostra "PouPou+" vencido).
@@ -1772,9 +1797,9 @@ function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("p
 
 // Perfil (plano/trial) na conta do Supabase. O cache atualiza na hora; o banco em seguida.
 async function carregarPerfil(){
-  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null,is_admin:false,plano_expira_em:null,mp_preapproval_id:null,mp_status:null}; return; }
-  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome,is_admin,plano_expira_em,mp_preapproval_id,mp_status").eq("id",SESSAO.user.id).maybeSingle();
-    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome, is_admin:!!data.is_admin, plano_expira_em:data.plano_expira_em, mp_preapproval_id:data.mp_preapproval_id, mp_status:data.mp_status};
+  if(!sb||!SESSAO){ PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null,is_admin:false,plano_expira_em:null,mp_preapproval_id:null,mp_status:null,trial_dias:null,indicado_por:null}; return; }
+  try{ const {data}=await sb.from("profiles").select("plano,trial_ini,trial_usado,nome,is_admin,plano_expira_em,mp_preapproval_id,mp_status,trial_dias,indicado_por").eq("id",SESSAO.user.id).maybeSingle();
+    if(data) PERFIL={plano:data.plano||"gratis", trial_ini:data.trial_ini, trial_usado:!!data.trial_usado, nome:data.nome, is_admin:!!data.is_admin, plano_expira_em:data.plano_expira_em, mp_preapproval_id:data.mp_preapproval_id, mp_status:data.mp_status, trial_dias:data.trial_dias, indicado_por:data.indicado_por};
   }catch(e){}
   await carregarFavoritos();   // hidrata "meus mercados" da conta (sync entre dispositivos)
 }
@@ -1799,7 +1824,7 @@ async function desbloquear(btn){
   if(!trialJaUsado()){
     if(btn){ btn.disabled=true; btn.dataset.txt=btn.innerHTML; btn.innerHTML="Aguarde…"; }
     const ok=await iniciarTrial();
-    if(ok){ toast(`Acesso completo liberado por ${TRIAL_DIAS} dias 🎉`); reabrir(); return; }
+    if(ok){ toast(`Acesso completo liberado por ${trialLen()} dias 🎉`); reabrir(); return; }
     if(btn){ btn.disabled=false; btn.innerHTML=btn.dataset.txt||btn.innerHTML; }  // falhou: restaura o botão
   }
   loadPerfil("assinar");
@@ -1874,7 +1899,7 @@ function renderLogin(){
       <div class="auth-field"><label for="aEmail">E-mail</label><input id="aEmail" type="email" autocomplete="email" placeholder="voce@email.com" required></div>
       <div class="auth-field"><label for="aSenha">Senha</label><input id="aSenha" type="password" autocomplete="${criar?"new-password":"current-password"}" placeholder="sua senha (mín. 6 caracteres)" required minlength="6"></div>
       <p class="auth-err" id="authErr" aria-live="polite"></p>
-      <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${TRIAL_DIAS} dias`:"Entrar"}</button>
+      <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${trialDiasOferta()} dias`:"Entrar"}</button>
     </form>
     <p class="auth-note">Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
 }
@@ -2022,7 +2047,7 @@ function seloFav(m){ return ehFav(m)?` <span class="fav-star" title="Seu mercado
 /* embrulha o conteúdo real (borrado) com o cadeado + CTA de desbloquear */
 function bloqueado(inner,titulo,sub){
   const virgem=!trialJaUsado();
-  const cta=virgem?`Liberar grátis por ${TRIAL_DIAS} dias`:"Assine e desbloqueie";
+  const cta=virgem?`Liberar grátis por ${trialDiasOferta()} dias`:"Assine e desbloqueie";
   return `<div class="paywall">
     <div class="pw-blur">${inner||""}</div>
     <div class="pw-over">
@@ -2030,7 +2055,7 @@ function bloqueado(inner,titulo,sub){
       <div class="pw-tit">${titulo}</div>
       ${sub?`<div class="pw-sub">${sub}</div>`:""}
       <button class="pw-cta" type="button" onclick="desbloquear(this)">${ic("crown")} ${cta}</button>
-      ${virgem?`<div class="pw-fine">${TRIAL_DIAS} dias grátis · sem cartão · cancele quando quiser</div>`:`<div class="pw-fine">a partir de ${PRECO_MENSAL}/mês</div>`}
+      ${virgem?`<div class="pw-fine">${trialDiasOferta()} dias grátis · sem cartão · cancele quando quiser</div>`:`<div class="pw-fine">a partir de ${PRECO_MENSAL}/mês</div>`}
     </div>
   </div>`;
 }
@@ -2056,7 +2081,7 @@ function loadPerfil(secao, manterPlanos){
       <div class="pf2-head"><span class="pf2-avatar">${ic("user")}</span>
         <div class="pf2-id"><div class="pf2-name">Visitante</div><div class="pf2-mail">Entre pra ver onde economizar na sua feira</div></div></div>
       <div class="pf2-plus"><div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span></div>
-        <p class="pf2-plus-sub">Crie sua conta e comece com <b>${TRIAL_DIAS} dias grátis</b> — sem cartão.</p>
+        <p class="pf2-plus-sub">Crie sua conta e comece com <b>${trialDiasOferta()} dias grátis</b> — sem cartão.</p>
         ${benef}
         <div class="pf2-plus-actions"><button class="btn-primary pf2-cta" type="button" onclick="abrirLogin(()=>loadPerfil())">Entrar / criar conta</button></div>
       </div></div>`;
@@ -2110,12 +2135,12 @@ function loadPerfil(secao, manterPlanos){
     const off=Math.round((1-_num(PRECO_MENSAL)/_num(PRECO_DE))*100);
     const pill = emTrial
       ? `<span class="pf2-promo-free urg">⏳ grátis termina em ${diasRestantesTrial()} dia(s)</span>`
-      : (trialAvail ? `<span class="pf2-promo-free">✨ ${TRIAL_DIAS} dias grátis · sem cartão</span>` : `<span class="pf2-promo-free">Oferta de lançamento</span>`);
+      : (trialAvail ? `<span class="pf2-promo-free">✨ ${trialDiasOferta()} dias grátis · sem cartão</span>` : `<span class="pf2-promo-free">Oferta de lançamento</span>`);
     const hook = emTrial
       ? `Seu acesso completo termina logo — <b>garanta o PouPou+</b> e siga economizando em toda feira.`
       : `Desbloqueie <b>onde comprar cada item mais barato</b> e economize em toda feira.`;
     const cta = trialAvail
-      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear(this)">${ic("crown")} Começar — ${TRIAL_DIAS} dias grátis</button>`
+      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear(this)">${ic("crown")} Começar — ${trialDiasOferta()} dias grátis</button>`
       : `<button class="btn-primary pf2-cta big" type="button" onclick="pfPlanos(this)">${ic("crown")} Assinar por ${PRECO_MENSAL}/mês</button>`;
     plus=`<div class="pf2-plus promo">
         <div class="pf2-promo-glow" aria-hidden="true"></div>
@@ -2155,24 +2180,31 @@ function loadPerfil(secao, manterPlanos){
         <button id="pushTestBtn" class="btn-sm" type="button" hidden onclick="enviarPushTeste()" style="align-self:flex-start;margin-top:6px">Enviar notificação de teste</button>`:""}
       </div></div>`;
 
-  // ---------- Indique e ganhe ----------
-  const indica=`<div class="pf2-sec pf2-ref">
-      <div class="pf2-sec-h"><h4>${ic("gift")} Indique e ganhe</h4>
-        <p>A cada <b>2 amigos</b> que assinarem o PouPou+ pelo seu link, você ganha <b>1 mês grátis</b>. Eles ainda começam com <b>${REF_BONUS_DIAS} dias</b> de bônus. 🎁</p></div>
-      <div class="pf2-ref-link">
-        <input id="refLink" type="text" readonly value="…" aria-label="Seu link de indicação" onclick="this.select()">
-        <button class="btn-sm" type="button" id="refCopy" onclick="copiarRefLink()">${ic("copy")} Copiar</button>
-      </div>
-      <div class="pf2-ref-share" id="refShareWrap" hidden>
-        <button class="pf2-ref-share-b" type="button" onclick="compartilharRef()">${ic("external")} Compartilhar convite</button>
-      </div>
-      <div class="pf2-ref-bar"><span id="refBar" style="width:0%"></span></div>
-      <div class="pf2-ref-nums">
-        <span><b class="num" data-ri="conv">0</b> assinaram</span>
-        <span><b class="num" data-ri="ind">0</b> indicados</span>
-        <span><b class="num" data-ri="meses">0</b> meses grátis</span>
-      </div>
-      <p class="pf2-ref-hint" data-ri="hint">Compartilhe seu link pra começar a ganhar.</p></div>`;
+  // ---------- Indique e ganhe (card hero, chamativo) ----------
+  const indica=`<div class="pf2-ref-hero">
+      <div class="pf2-ref-glow" aria-hidden="true"></div>
+      <div class="pf2-ref-gift" aria-hidden="true">${ic("gift")}</div>
+      <div class="pf2-ref-body">
+        <span class="pf2-ref-eyebrow">${ic("gift")} Indique e ganhe</span>
+        <h3 class="pf2-ref-title">Ganhe <b>meses grátis</b> chamando os amigos 🎉</h3>
+        <p class="pf2-ref-pitch">Seu amigo começa com <b>7 dias grátis</b> — o dobro do normal. E a cada <b>2 amigos</b> que assinarem, <b>você ganha 1 mês</b> por nossa conta.</p>
+        <div class="pf2-ref-perks">
+          <span class="pf2-ref-perk">${ic("gift")} Amigo: <b>7 dias</b></span>
+          <span class="pf2-ref-perk">${ic("crown")} Você: <b>1 mês</b> a cada 2</span>
+        </div>
+        <div class="pf2-ref-link">
+          <input id="refLink" type="text" readonly value="…" aria-label="Seu link de indicação" onclick="this.select()">
+          <button class="pf2-ref-copy" type="button" id="refCopy" onclick="copiarRefLink()">${ic("copy")} Copiar</button>
+        </div>
+        <button class="pf2-ref-share-b" type="button" id="refShareBtn" onclick="compartilharRef()" hidden>${ic("external")} Compartilhar convite com amigos</button>
+        <div class="pf2-ref-bar"><span id="refBar" style="width:0%"></span></div>
+        <div class="pf2-ref-nums">
+          <span><b class="num" data-ri="conv">0</b> assinaram</span>
+          <span><b class="num" data-ri="ind">0</b> indicados</span>
+          <span><b class="num" data-ri="meses">0</b> meses grátis</span>
+        </div>
+        <p class="pf2-ref-hint" data-ri="hint">Compartilhe seu link pra começar a ganhar.</p>
+      </div></div>`;
 
   // ---------- Resumo da conta (dados reais; números preenchidos async) ----------
   const nFav=favMercados().length;
@@ -2188,7 +2220,7 @@ function loadPerfil(secao, manterPlanos){
   const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button></div>`;
 
   saida.innerHTML=`<div class="pf2">${head}
-      <div class="pf2-grid"><div class="pf2-main">${plus}${meus}${indica}${prefs}</div>${resumo}</div>
+      <div class="pf2-grid"><div class="pf2-main">${plus}${indica}${meus}${prefs}</div>${resumo}</div>
       ${sair}</div>`;
   carregarResumoPerfil();
   carregarIndicacao();
@@ -2258,7 +2290,7 @@ async function carregarIndicacao(){
   else{ hint=(d.faltam_pro_proximo===1?"Falta só <b>1 amigo</b> assinar":"Faltam <b>"+d.faltam_pro_proximo+" amigos</b> assinarem")+" pro seu próximo mês grátis!"; }
   if(d.meses_ganhos>0){ hint=`🎉 Você já ganhou <b>${d.meses_ganhos} ${d.meses_ganhos===1?"mês":"meses"}</b> grátis. `+hint; }
   const h=document.querySelector('[data-ri="hint"]'); if(h) h.innerHTML=hint;
-  if(navigator.share){ const w=document.getElementById("refShareWrap"); if(w) w.hidden=false; }
+  if(navigator.share){ const w=document.getElementById("refShareBtn"); if(w) w.hidden=false; }
 }
 async function copiarRefLink(){
   const inp=document.getElementById("refLink"); if(!inp || !inp.value || inp.value==="…"){ return; }

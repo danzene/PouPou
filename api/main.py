@@ -320,7 +320,7 @@ def _premium(conn, uid: str | None) -> bool:
     enquanto plano_expira_em > agora (cada pagamento aprovado estende essa data no webhook)."""
     if not uid:
         return False
-    r = conn.execute("SELECT plano, trial_ini, plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
+    r = conn.execute("SELECT plano, trial_ini, plano_expira_em, trial_dias FROM profiles WHERE id = ?", (uid,)).fetchone()
     if not r:
         return False
     if r["plano"] == "assinante":
@@ -344,7 +344,8 @@ def _premium(conn, uid: str | None) -> bool:
                 return False
         if ini.tzinfo is None:
             ini = ini.replace(tzinfo=timezone.utc)
-        return datetime.now(timezone.utc) - ini < timedelta(days=3)
+        dias = r["trial_dias"] or TRIAL_DIAS_PADRAO   # indicado teve trial dobrado (ver trial_iniciar)
+        return datetime.now(timezone.utc) - ini < timedelta(days=dias)
     return False
 
 
@@ -449,14 +450,17 @@ def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapprova
 
 
 # ===== INDIQUE E GANHE (programa de indicação) =============================================
-# Regra: quem indica ganha 1 mês grátis a cada 2 indicados que ASSINAREM (viram pagantes).
-# Quem foi indicado ganha um bônus de boas-vindas ao assinar pela 1ª vez (mão-dupla).
-# Anti-fraude: só conta indicado que PAGOU (não basta cadastrar); veta auto-indicação;
-# tudo idempotente (o webhook pode reenviar o mesmo pagamento e a recorrência dispara todo mês).
-REF_BONUS_INDICADO = 15        # dias de bônus pro INDICADO na 1ª assinatura paga
+# Regra (mão-dupla):
+#   - INDICADO: quem se cadastra por um link ganha um TRIAL DOBRADO (7 dias em vez de 3),
+#     logo no cadastro, sem precisar pagar (ver TRIAL_DIAS_* e trial_iniciar).
+#   - PADRINHO: a cada 2 indicados que ASSINAREM (viram pagantes) ganha 1 mês grátis.
+# Anti-fraude: o crédito do padrinho só conta indicado que PAGOU (não basta cadastrar);
+# veta auto-indicação; tudo idempotente (a recorrência dispara o webhook todo mês).
 REF_INDICADOS_POR_MES = 2      # a cada N indicados convertidos, o PADRINHO ganha 1 mês
 REF_DIAS_MES = 30              # "1 mês grátis" = 30 dias
 _REF_ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"   # sem 0/O/1/I/L (evita confusão ao digitar)
+TRIAL_DIAS_PADRAO = 3          # reverse trial normal
+TRIAL_DIAS_INDICADO = 7        # trial de quem chegou por indicação (o "dobro" — perk do indicado)
 
 
 def _dar_dias(conn, uid, dias) -> None:
@@ -536,8 +540,8 @@ def _processar_indicacao(conn, uid) -> None:
         if not pad or pad["id"] == uid:
             return   # código inválido/próprio: claim gasta, mas não credita ninguém
         padrinho_id = pad["id"]
-        # bônus de boas-vindas pro INDICADO (mão-dupla)
-        _dar_dias(conn, uid, REF_BONUS_INDICADO)
+        # (o indicado já foi recompensado no cadastro com o trial dobrado — ver trial_iniciar;
+        #  aqui só marcamos a conversão e creditamos o padrinho)
         # credita o PADRINHO: conta convertidos e dá 1 mês a cada REF_INDICADOS_POR_MES
         convertidos = conn.execute(
             "SELECT COUNT(*) AS n FROM profiles WHERE indicado_por = ? AND ref_creditado = true",
@@ -1960,15 +1964,18 @@ def assinatura_cancelar(authorization: str | None = Header(None)):
 
 @app.post("/trial/iniciar")
 def trial_iniciar(authorization: str | None = Header(None)):
-    """Começa o reverse trial de 3 dias — AGORA no servidor (o cliente não escreve mais
-    profiles). Só libera se ainda não usou o trial e está no grátis. Idempotente-ish:
-    se já é assinante/trial, devolve o estado atual sem regredir."""
+    """Começa o reverse trial no servidor (o cliente não escreve mais profiles). Só libera se
+    ainda não usou o trial e está no grátis. Quem chegou por indicação (indicado_por setado)
+    ganha o TRIAL DOBRADO (TRIAL_DIAS_INDICADO). Idempotente-ish: se já é assinante/trial,
+    devolve o estado atual sem regredir."""
     uid = _uid_do_header(authorization)
     if not uid:
         raise HTTPException(status_code=401, detail="Não autenticado")
     conn = _conn()
     try:
-        r = conn.execute("SELECT plano, trial_ini, trial_usado FROM profiles WHERE id = ?", (uid,)).fetchone()
+        r = conn.execute(
+            "SELECT plano, trial_ini, trial_usado, indicado_por FROM profiles WHERE id = ?",
+            (uid,)).fetchone()
         if not r:
             raise HTTPException(status_code=404, detail="Perfil não encontrado")
         if r["plano"] == "assinante":
@@ -1976,11 +1983,12 @@ def trial_iniciar(authorization: str | None = Header(None)):
         if r["trial_usado"] or r["plano"] == "trial":
             return {"ok": False, "plano": r["plano"], "trial_ini": r["trial_ini"],
                     "motivo": "trial_ja_usado"}
+        dias = TRIAL_DIAS_INDICADO if (r["indicado_por"] or "").strip() else TRIAL_DIAS_PADRAO
         agora = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "UPDATE profiles SET plano = 'trial', trial_ini = ?, trial_usado = true, atualizado_em = ? "
-            "WHERE id = ?", (agora, agora, uid))
-        return {"ok": True, "plano": "trial", "trial_ini": agora}
+            "UPDATE profiles SET plano = 'trial', trial_ini = ?, trial_usado = true, "
+            "trial_dias = ?, atualizado_em = ? WHERE id = ?", (agora, dias, agora, uid))
+        return {"ok": True, "plano": "trial", "trial_ini": agora, "trial_dias": dias}
     finally:
         conn.close()
 
@@ -2230,7 +2238,8 @@ def indicacao_status(authorization: str | None = Header(None)):
             "meses_ganhos": meses_ganhos,
             "faltam_pro_proximo": faltam,
             "por_mes": REF_INDICADOS_POR_MES,
-            "bonus_indicado_dias": REF_BONUS_INDICADO,
+            "trial_indicado_dias": TRIAL_DIAS_INDICADO,   # o amigo ganha esse trial ao cadastrar
+            "trial_padrao_dias": TRIAL_DIAS_PADRAO,
         }
     finally:
         conn.close()

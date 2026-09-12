@@ -9,6 +9,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ref_code        text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS indicado_por    text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ref_creditado   boolean DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ref_meses_dados integer DEFAULT 0;
+-- perk do INDICADO: trial dobrado (7 dias em vez de 3) no cadastro. Guardado por usuário
+-- ao iniciar o trial; _premium respeita este valor. Default 3 = trial normal.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS trial_dias      integer DEFAULT 3;
 
 -- ref_code é único (quando preenchido) — é a "chave pública" do link de indicação.
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_ref_code_uidx

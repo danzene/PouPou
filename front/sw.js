@@ -1,9 +1,11 @@
 /* Service worker do PouPou (PWA). Estratégia segura:
-   - navegação (abrir o app): REDE primeiro, cai pro shell em cache quando offline;
+   - navegação (abrir o app): REDE primeiro (HTML sempre fresco quando online), com timeout
+     curto que cai pro shell em cache se a rede demorar/faltar (abre offline/lento sem travar);
    - estáticos do app (ícones/logos/manifest): cache primeiro (rápido, atualiza em 2º plano);
    - resto (API dinâmica: /cesta, /buscar, /mercados…): NÃO intercepta — vai direto pela rede
      (preços sempre frescos, sem quebrar auth). Também nunca mexe em origens externas (Supabase/CDN). */
-const CACHE = "poupou-v5";
+const CACHE = "poupou-v6";
+const NAV_TIMEOUT = 2500;   // ms: tempo máx. esperando a rede antes de cair pro cache
 const SHELL = ["/", "/manifest.webmanifest", "/vendor/supabase.js",
                "/icons/icon-v2-192.png", "/icons/icon-v2-512.png"];
 
@@ -26,13 +28,23 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== self.location.origin) return; // não mexe em Supabase/CDN/externos
 
   if (req.mode === "navigate") {
-    // abre INSTANTÂNEO: serve o shell do cache e atualiza em 2º plano (stale-while-revalidate)
-    e.respondWith(caches.match("/").then((cached) => {
-      const net = fetch(req).then((res) => {
-        const copy = res.clone(); caches.open(CACHE).then((c) => c.put("/", copy)); return res;
-      }).catch(() => cached);
-      return cached || net;
-    }));
+    // REDE PRIMEIRO: tenta buscar o HTML fresco (assim toda atualização aparece na hora).
+    // Se a rede demorar > NAV_TIMEOUT ou falhar, serve o shell do cache (abre instantâneo
+    // offline/lento). Sempre que a rede vence, atualiza o cache pro próximo boot offline.
+    e.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      try {
+        const res = await Promise.race([
+          fetch(req),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("nav-timeout")), NAV_TIMEOUT)),
+        ]);
+        cache.put("/", res.clone());   // guarda o shell fresco (não bloqueia a resposta)
+        return res;
+      } catch (_) {
+        const cached = await cache.match("/");
+        return cached || fetch(req);   // sem cache ainda: última tentativa direto na rede
+      }
+    })());
     return;
   }
   if (/^\/(icons|logos|vendor)\//.test(url.pathname) || url.pathname === "/manifest.webmanifest") {

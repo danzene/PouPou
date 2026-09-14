@@ -21,6 +21,19 @@ logdir = RAIZ / "logs"
 logdir.mkdir(exist_ok=True)
 logf = logdir / (Path(bat).stem + ".log")
 
+# Rotação simples: o log é 'append' entre execuções e podia crescer sem limite (o refresh
+# do Convertiez loga milhares de requests -> chegou a 226 MB, risco de encher o disco e
+# derrubar a coleta). Se passar de LOG_MAX, guarda o ciclo anterior como .1 e recomeça.
+LOG_MAX = 15 * 1024 * 1024
+try:
+    if logf.exists() and logf.stat().st_size > LOG_MAX:
+        bak = logf.with_name(logf.name + ".1")
+        if bak.exists():
+            bak.unlink()
+        logf.rename(bak)
+except OSError:
+    pass
+
 with open(logf, "a", encoding="utf-8", errors="replace") as f:
     f.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M:%S} iniciando {Path(bat).name} =====\n")
     f.flush()

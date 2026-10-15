@@ -22,4 +22,5 @@ jobs:
       comandos: |
         python coletar.py savegnago covabra atacadao oba
         python manutencao.py || echo "::warning::manutencao falhou (segue)"
+        python agrupar_equivalentes.py || echo "::warning::equivalencias falharam (segue com as de ontem)"
         python conferir_precos.py --corrigir || echo "::warning::conferidor achou divergencias (ver log)"

@@ -176,6 +176,70 @@ def upsert_mercado(
     return int(row["id"])
 
 
+# SQL compartilhado entre a gravação item a item e a gravação EM LOTE (gravar_lote_*).
+_SQL_UPSERT_PRODUTO = """
+        INSERT INTO produtos (ean, nome_canonico, marca, categoria, unidade, qtd_embalagem, imagem_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(ean) DO UPDATE SET
+            nome_canonico = CASE
+                WHEN excluded.nome_canonico IS NOT NULL
+                     AND length(COALESCE(excluded.nome_canonico, '')) > length(COALESCE(produtos.nome_canonico, ''))
+                THEN excluded.nome_canonico
+                ELSE produtos.nome_canonico
+            END,
+            marca         = COALESCE(produtos.marca, excluded.marca),
+            categoria     = COALESCE(produtos.categoria, excluded.categoria),
+            unidade       = COALESCE(excluded.unidade, produtos.unidade),
+            qtd_embalagem = COALESCE(produtos.qtd_embalagem, excluded.qtd_embalagem),
+            imagem_url    = COALESCE(produtos.imagem_url, excluded.imagem_url)
+        """
+_SQL_INSERT_PRECO_HIST = """
+            INSERT INTO precos (ean, mercado_id, preco, preco_por_unidade, origem, coletado_em)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """
+_SQL_UPSERT_PRECO_ATUAL = """
+        INSERT INTO precos_atual (ean, mercado_id, preco, preco_por_unidade, origem,
+                                  coletado_em, so_no_site, preco_de, desconto_pct, oferta_tipo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(ean, mercado_id) DO UPDATE SET
+            preco = excluded.preco,
+            preco_por_unidade = excluded.preco_por_unidade,
+            origem = excluded.origem,
+            coletado_em = excluded.coletado_em,
+            so_no_site = excluded.so_no_site,
+            preco_de = excluded.preco_de,
+            desconto_pct = excluded.desconto_pct,
+            oferta_tipo = excluded.oferta_tipo
+        """
+_SQL_UPSERT_PERECIVEL = """
+        INSERT INTO pereciveis (mercado_id, cod_interno, nome, nome_norm, categoria, preco,
+                                unidade, imagem_url, url, coletado_em,
+                                so_no_site, preco_de, desconto_pct, oferta_tipo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(mercado_id, cod_interno) DO UPDATE SET
+            nome = excluded.nome,
+            nome_norm = excluded.nome_norm,
+            categoria = excluded.categoria,
+            preco = excluded.preco,
+            unidade = COALESCE(excluded.unidade, pereciveis.unidade),
+            imagem_url = COALESCE(excluded.imagem_url, pereciveis.imagem_url),
+            url = COALESCE(excluded.url, pereciveis.url),
+            coletado_em = excluded.coletado_em,
+            so_no_site = excluded.so_no_site,
+            preco_de = excluded.preco_de,
+            desconto_pct = excluded.desconto_pct,
+            oferta_tipo = excluded.oferta_tipo
+        """
+_SQL_UPSERT_LINK = """
+        INSERT INTO links (ean, mercado_id, url, atualizado_em)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(ean, mercado_id) DO UPDATE SET
+            url = excluded.url, atualizado_em = excluded.atualizado_em
+        """
+_SQL_INSERT_PERECIVEL_HIST = ("INSERT INTO pereciveis_hist (mercado_id, cod_interno, nome_norm, preco, coletado_em) "
+    "VALUES (?, ?, ?, ?, ?)")
+
+
 def upsert_produto(
     conn: sqlite3.Connection,
     *,
@@ -194,22 +258,7 @@ def upsert_produto(
     primeira observada (vem do termo-semente que achou o produto).
     """
     conn.execute(
-        """
-        INSERT INTO produtos (ean, nome_canonico, marca, categoria, unidade, qtd_embalagem, imagem_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(ean) DO UPDATE SET
-            nome_canonico = CASE
-                WHEN excluded.nome_canonico IS NOT NULL
-                     AND length(COALESCE(excluded.nome_canonico, '')) > length(COALESCE(produtos.nome_canonico, ''))
-                THEN excluded.nome_canonico
-                ELSE produtos.nome_canonico
-            END,
-            marca         = COALESCE(produtos.marca, excluded.marca),
-            categoria     = COALESCE(produtos.categoria, excluded.categoria),
-            unidade       = COALESCE(excluded.unidade, produtos.unidade),
-            qtd_embalagem = COALESCE(produtos.qtd_embalagem, excluded.qtd_embalagem),
-            imagem_url    = COALESCE(produtos.imagem_url, excluded.imagem_url)
-        """,
+        _SQL_UPSERT_PRODUTO,
         (ean, nome, marca, categoria, unidade, qtd_embalagem, imagem_url),
     )
 
@@ -241,27 +290,11 @@ def inserir_preco(
     mudou = ant is None or ant["preco"] is None or abs(float(ant["preco"]) - float(preco)) > 0.005
     if mudou:  # histórico é append-only, mas só de mudanças (dedup)
         conn.execute(
-            """
-            INSERT INTO precos (ean, mercado_id, preco, preco_por_unidade, origem, coletado_em)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
+            _SQL_INSERT_PRECO_HIST,
             (ean, mercado_id, preco, preco_por_unidade, origem, coletado_em),
         )
     conn.execute(
-        """
-        INSERT INTO precos_atual (ean, mercado_id, preco, preco_por_unidade, origem,
-                                  coletado_em, so_no_site, preco_de, desconto_pct, oferta_tipo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(ean, mercado_id) DO UPDATE SET
-            preco = excluded.preco,
-            preco_por_unidade = excluded.preco_por_unidade,
-            origem = excluded.origem,
-            coletado_em = excluded.coletado_em,
-            so_no_site = excluded.so_no_site,
-            preco_de = excluded.preco_de,
-            desconto_pct = excluded.desconto_pct,
-            oferta_tipo = excluded.oferta_tipo
-        """,
+        _SQL_UPSERT_PRECO_ATUAL,
         (ean, mercado_id, preco, preco_por_unidade, origem, coletado_em,
          1 if so_no_site else 0, preco_de, desconto_pct, oferta_tipo),
     )
@@ -505,30 +538,11 @@ def upsert_perecivel(
     ).fetchone()
     if ant is None or ant["preco"] is None or abs(float(ant["preco"]) - float(preco)) > 0.005:
         conn.execute(
-            "INSERT INTO pereciveis_hist (mercado_id, cod_interno, nome_norm, preco, coletado_em) "
-            "VALUES (?, ?, ?, ?, ?)",
+            _SQL_INSERT_PERECIVEL_HIST,
             (mercado_id, cod_interno, nnorm, preco, coletado_em),
         )
     conn.execute(
-        """
-        INSERT INTO pereciveis (mercado_id, cod_interno, nome, nome_norm, categoria, preco,
-                                unidade, imagem_url, url, coletado_em,
-                                so_no_site, preco_de, desconto_pct, oferta_tipo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(mercado_id, cod_interno) DO UPDATE SET
-            nome = excluded.nome,
-            nome_norm = excluded.nome_norm,
-            categoria = excluded.categoria,
-            preco = excluded.preco,
-            unidade = COALESCE(excluded.unidade, pereciveis.unidade),
-            imagem_url = COALESCE(excluded.imagem_url, pereciveis.imagem_url),
-            url = COALESCE(excluded.url, pereciveis.url),
-            coletado_em = excluded.coletado_em,
-            so_no_site = excluded.so_no_site,
-            preco_de = excluded.preco_de,
-            desconto_pct = excluded.desconto_pct,
-            oferta_tipo = excluded.oferta_tipo
-        """,
+        _SQL_UPSERT_PERECIVEL,
         (mercado_id, cod_interno, nome, nnorm, classificar_perecivel(nome), preco,
          unidade, imagem_url, url, coletado_em,
          1 if so_no_site else 0, preco_de, desconto_pct, oferta_tipo),
@@ -540,15 +554,97 @@ def upsert_link(
 ) -> None:
     """Guarda/atualiza a URL da página do produto num mercado (para 'ver no site')."""
     conn.execute(
-        """
-        INSERT INTO links (ean, mercado_id, url, atualizado_em)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(ean, mercado_id) DO UPDATE SET
-            url = excluded.url, atualizado_em = excluded.atualizado_em
-        """,
+        _SQL_UPSERT_LINK,
         (ean, mercado_id, url, atualizado_em),
     )
 
 
 def contar(conn: sqlite3.Connection, tabela: str) -> int:
     return int(conn.execute(f"SELECT COUNT(*) AS n FROM {tabela}").fetchone()["n"])
+
+
+# ---------------------------------------------------------------------------
+# Gravação EM LOTE. Item a item são 3-5 idas ao banco por produto; da nuvem (GitHub,
+# nos EUA) até o Supabase (São Paulo) cada ida custa ~130 ms, então um mercado de 12 mil
+# produtos levava horas. Em lote: 1 SELECT pros preços anteriores + executemany (que o
+# psycopg 3 manda em pipeline) — mesmo SQL e mesmas regras do inserir_preco/upsert_*.
+# ---------------------------------------------------------------------------
+def _em_blocos(seq: list, n: int = 500):
+    for i in range(0, len(seq), n):
+        yield seq[i:i + n]
+
+
+def gravar_lote_ean(conn, mercado_id: int, itens: list[dict], coletado_em: str,
+                    origem: str = "online") -> int:
+    """Grava produtos com EAN de um mercado de uma vez. Cada item: ean, preco,
+    preco_por_unidade, so_no_site, preco_de, desconto_pct, oferta_tipo e, opcionais,
+    produto=(nome, marca, categoria, unidade, qtd_embalagem, imagem_url) e url.
+    Mesma regra do inserir_preco: histórico só quando o preço muda."""
+    if not itens:
+        return 0
+    ant: dict[str, float | None] = {}
+    for bloco in _em_blocos([it["ean"] for it in itens]):
+        marcas = ",".join("?" * len(bloco))
+        for r in conn.execute(
+            f"SELECT ean, preco FROM precos_atual WHERE mercado_id = ? AND ean IN ({marcas})",
+            (mercado_id, *bloco)).fetchall():
+            ant[r["ean"]] = r["preco"]
+
+    produtos, hist, atual, links = [], [], [], []
+    for it in itens:
+        ean, preco = it["ean"], it["preco"]
+        oferta_tipo = it.get("oferta_tipo")
+        if oferta_tipo is None and it.get("desconto_pct"):
+            oferta_tipo = "oferta"   # mesma regra do inserir_preco
+        if it.get("produto"):
+            produtos.append((ean, *it["produto"]))
+        a = ant.get(ean)
+        if a is None or abs(float(a) - float(preco)) > 0.005:
+            hist.append((ean, mercado_id, preco, it.get("preco_por_unidade"), origem, coletado_em))
+        atual.append((ean, mercado_id, preco, it.get("preco_por_unidade"), origem, coletado_em,
+                      1 if it.get("so_no_site") else 0, it.get("preco_de"),
+                      it.get("desconto_pct"), oferta_tipo))
+        if it.get("url"):
+            links.append((ean, mercado_id, it["url"], coletado_em))
+
+    # produto antes do preço (precos/precos_atual referenciam produtos.ean)
+    for sql, linhas in ((_SQL_UPSERT_PRODUTO, produtos), (_SQL_INSERT_PRECO_HIST, hist),
+                        (_SQL_UPSERT_PRECO_ATUAL, atual), (_SQL_UPSERT_LINK, links)):
+        if linhas:
+            conn.executemany(sql, linhas)
+    return len(itens)
+
+
+def gravar_lote_pereciveis(conn, mercado_id: int, itens: list[dict], coletado_em: str) -> int:
+    """Versão em lote do upsert_perecivel (mesmos filtros e mesmo histórico por mudança).
+    Cada item: cod_interno, nome, preco, unidade, imagem_url, url, so_no_site, preco_de,
+    desconto_pct, oferta_tipo."""
+    itens = [it for it in itens if not eh_falso_fresco(it["nome"])]
+    if not itens:
+        return 0
+    ant: dict[str, float | None] = {}
+    for bloco in _em_blocos([it["cod_interno"] for it in itens]):
+        marcas = ",".join("?" * len(bloco))
+        for r in conn.execute(
+            f"SELECT cod_interno, preco FROM pereciveis WHERE mercado_id = ? AND cod_interno IN ({marcas})",
+            (mercado_id, *bloco)).fetchall():
+            ant[r["cod_interno"]] = r["preco"]
+
+    hist, linhas = [], []
+    for it in itens:
+        nome, preco = it["nome"], it["preco"]
+        oferta_tipo = it.get("oferta_tipo")
+        if oferta_tipo is None and it.get("desconto_pct"):
+            oferta_tipo = "oferta"
+        nnorm = normalizar_nome(nome)
+        a = ant.get(it["cod_interno"])
+        if a is None or abs(float(a) - float(preco)) > 0.005:
+            hist.append((mercado_id, it["cod_interno"], nnorm, preco, coletado_em))
+        linhas.append((mercado_id, it["cod_interno"], nome, nnorm, classificar_perecivel(nome), preco,
+                       it.get("unidade"), it.get("imagem_url"), it.get("url"), coletado_em,
+                       1 if it.get("so_no_site") else 0, it.get("preco_de"),
+                       it.get("desconto_pct"), oferta_tipo))
+    if hist:
+        conn.executemany(_SQL_INSERT_PERECIVEL_HIST, hist)
+    conn.executemany(_SQL_UPSERT_PERECIVEL, linhas)
+    return len(itens)

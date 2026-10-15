@@ -67,16 +67,18 @@ def refrescar_vtex(conn, cfg: dict, delay: float, contato: str) -> int:
                     prods = r.json()
                 except ValueError:
                     continue
+                lote = []
                 for prod in prods:
                     item = col._parse_produto(prod)
                     if not isinstance(item, ItemColeta):
                         continue  # refresh é por EAN conhecido; ignora perecível eventual
                     medida = normalizar.extrair_medida(item.nome)
                     ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
-                    database.inserir_preco(conn, ean=item.ean, mercado_id=mid, preco=item.preco,
-                        preco_por_unidade=ppu, coletado_em=agora, so_no_site=item.so_no_site,
-                        preco_de=item.preco_de, desconto_pct=item.desconto_pct)
-                    n += 1
+                    lote.append({"ean": item.ean, "preco": item.preco, "preco_por_unidade": ppu,
+                                 "so_no_site": item.so_no_site, "preco_de": item.preco_de,
+                                 "desconto_pct": item.desconto_pct})
+                # em lote: da nuvem (EUA -> banco em SP) item a item custava ~3 idas por produto
+                n += database.gravar_lote_ean(conn, mid, lote, agora)
                 if (i // LOTE) % 10 == 0:
                     conn.commit()
         conn.commit()

@@ -101,64 +101,54 @@ def coletar_mercado(conn, cfg: dict, sementes: list[str], **opts) -> tuple[int, 
     vistos_per: set[str] = set()
     n_snapshots = 0
     n_pereciveis = 0
-    for item in fonte:
-        # Item fresco/por peso SEM EAN: vai pra tabela `pereciveis` (cruza por nome).
-        if isinstance(item, ItemPerecivel):
-            if item.cod_interno in vistos_per:
-                continue
-            vistos_per.add(item.cod_interno)
-            database.upsert_perecivel(
-                conn,
-                mercado_id=mercado_id,
-                cod_interno=item.cod_interno,
-                nome=item.nome,
-                preco=item.preco,
-                unidade=item.unidade,
-                imagem_url=item.imagem_url,
-                url=item.url,
-                coletado_em=agora,
-                so_no_site=item.so_no_site,
-                preco_de=item.preco_de,
-                desconto_pct=item.desconto_pct,
-                oferta_tipo=item.oferta_tipo,
-            )
-            n_pereciveis += 1
-            continue
-        if item.ean in vistos:
-            continue  # 1 snapshot por EAN por rodada
-        vistos.add(item.ean)
+    # Grava EM LOTE (database.gravar_lote_*): item a item eram 3-5 idas ao banco por produto,
+    # o que da nuvem (EUA -> Supabase em SP) transformava minutos em horas.
+    LOTE = 200
+    buf_ean: list[dict] = []
+    buf_per: list[dict] = []
 
-        # Normalização: extrai gramatura do nome -> R$/kg, R$/L ou R$/un.
-        medida = normalizar.extrair_medida(item.nome)
-        ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
+    def descarregar() -> None:
+        database.gravar_lote_ean(conn, mercado_id, buf_ean, agora)
+        database.gravar_lote_pereciveis(conn, mercado_id, buf_per, agora)
+        buf_ean.clear()
+        buf_per.clear()
 
-        database.upsert_produto(
-            conn,
-            ean=item.ean,
-            nome=item.nome,
-            marca=item.marca,
-            categoria=item.categoria,
-            unidade=(medida.unidade if medida else item.unidade),
-            qtd_embalagem=(medida.qtd_base if medida else None),
-            imagem_url=item.imagem_url,
-        )
-        database.inserir_preco(
-            conn,
-            ean=item.ean,
-            mercado_id=mercado_id,
-            preco=item.preco,
-            preco_por_unidade=ppu,
-            coletado_em=agora,
-            so_no_site=item.so_no_site,
-            preco_de=item.preco_de,
-            desconto_pct=item.desconto_pct,
-            oferta_tipo=item.oferta_tipo,
-        )
-        if item.url:
-            database.upsert_link(
-                conn, ean=item.ean, mercado_id=mercado_id, url=item.url, atualizado_em=agora
-            )
-        n_snapshots += 1
+    try:
+        for item in fonte:
+            # Item fresco/por peso SEM EAN: vai pra tabela `pereciveis` (cruza por nome).
+            if isinstance(item, ItemPerecivel):
+                if item.cod_interno in vistos_per:
+                    continue
+                vistos_per.add(item.cod_interno)
+                buf_per.append({
+                    "cod_interno": item.cod_interno, "nome": item.nome, "preco": item.preco,
+                    "unidade": item.unidade, "imagem_url": item.imagem_url, "url": item.url,
+                    "so_no_site": item.so_no_site, "preco_de": item.preco_de,
+                    "desconto_pct": item.desconto_pct, "oferta_tipo": item.oferta_tipo,
+                })
+                n_pereciveis += 1
+            else:
+                if item.ean in vistos:
+                    continue  # 1 snapshot por EAN por rodada
+                vistos.add(item.ean)
+
+                # Normalização: extrai gramatura do nome -> R$/kg, R$/L ou R$/un.
+                medida = normalizar.extrair_medida(item.nome)
+                ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
+                buf_ean.append({
+                    "ean": item.ean, "preco": item.preco, "preco_por_unidade": ppu,
+                    "so_no_site": item.so_no_site, "preco_de": item.preco_de,
+                    "desconto_pct": item.desconto_pct, "oferta_tipo": item.oferta_tipo,
+                    "url": item.url,
+                    "produto": (item.nome, item.marca, item.categoria,
+                                medida.unidade if medida else item.unidade,
+                                medida.qtd_base if medida else None, item.imagem_url),
+                })
+                n_snapshots += 1
+            if len(buf_ean) + len(buf_per) >= LOTE:
+                descarregar()
+    finally:
+        descarregar()   # nada do lote se perde se o coletor quebrar no meio
 
     conn.commit()
     if n_pereciveis:

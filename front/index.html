@@ -2864,13 +2864,24 @@ $("#btnCesta").addEventListener("click",loadCesta);
 })();
 
 /* ===== PWA: registra o service worker + banner "Instalar na tela inicial" ===== */
-// ---- aviso de nova versão: quem está com o app aberto/guardado no celular vê o botão Atualizar ----
+// ---- versão nova: confere ao abrir/voltar pro app e atualiza ----
+// Se a pessoa ainda não tocou em nada (acabou de abrir ou voltou do 2º plano), recarrega
+// sozinho; se já está usando, mostra a barra "Atualizar" pra não interromper. Antes de
+// recarregar, troca a cópia do app guardada no celular pela nova — assim abre na versão nova
+// mesmo com internet lenta. Trava: no máx. 1 recarga automática a cada 2 min (sem loop).
 const APP_VERSAO=(document.querySelector('meta[name="app-versao"]')||{}).content||"";
-let AVISO_VERSAO=false;
+let AVISO_VERSAO=false, MEXEU=false;
+["pointerdown","keydown","input"].forEach(ev=>addEventListener(ev,()=>{ MEXEU=true; },{capture:true,passive:true}));
 async function checarVersao(){
   if(!APP_VERSAO||AVISO_VERSAO) return;
-  try{ const d=await fetch(`${API}/versao`,{cache:"no-store"}).then(r=>r.json());
-    if(d&&d.versao&&d.versao!==APP_VERSAO) mostrarAvisoVersao(); }catch(e){}
+  let d; try{ d=await fetch(`${API}/versao`,{cache:"no-store"}).then(r=>r.json()); }catch(e){ return; }
+  if(!d||!d.versao||d.versao===APP_VERSAO) return;
+  let ultima=0; try{ ultima=+sessionStorage.getItem("mb_auto_upd")||0; }catch(e){}
+  if(!MEXEU && Date.now()-ultima>120000){
+    try{ sessionStorage.setItem("mb_auto_upd",String(Date.now())); }catch(e){}
+    return atualizarApp();
+  }
+  mostrarAvisoVersao();
 }
 function mostrarAvisoVersao(){ AVISO_VERSAO=true;
   const el=document.createElement("div"); el.className="aviso-versao"; el.setAttribute("role","status");
@@ -2878,10 +2889,17 @@ function mostrarAvisoVersao(){ AVISO_VERSAO=true;
   document.body.appendChild(el); }
 async function atualizarApp(btn){
   if(btn){ btn.disabled=true; btn.textContent="Atualizando…"; }
+  try{ // baixa a página nova e substitui a cópia guardada pelo app (todas as versões de cache)
+    const res=await fetch("/",{cache:"no-store"});
+    if(res.ok && window.caches){ const ks=(await caches.keys()).filter(k=>k.startsWith("poupou-"));
+      await Promise.all(ks.map(async k=>(await caches.open(k)).put("/",res.clone()))); }
+  }catch(e){}
   try{ const r=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
   location.reload(); }
-addEventListener("load",()=>setTimeout(checarVersao,4000));
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checarVersao(); });
+checarVersao();   // na hora que abre (antes esperava 4s)
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden") MEXEU=false;   // voltou do 2º plano = ainda não mexeu
+  else checarVersao(); });
 setInterval(checarVersao,30*60*1000);
 if("serviceWorker" in navigator){
   addEventListener("load",()=>{ navigator.serviceWorker.register("/sw.js").catch(()=>{}); });

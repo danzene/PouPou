@@ -64,7 +64,7 @@
 
   /* ---------- header ---------- */
   header{ position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line);
-    background:color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter:saturate(1.4) blur(12px); }
+    background:color-mix(in srgb, var(--surface) 86%, transparent); }
   .head-in{ max-width:var(--wrap); margin:0 auto; padding:14px 20px; }
   .brand{ display:flex; align-items:center; gap:11px; }
   .brand .logo{ width:38px; height:38px; flex:0 0 auto; display:grid; place-items:center; }
@@ -936,12 +936,10 @@
   header{ background:
       radial-gradient(900px 300px at 85% -40%, color-mix(in srgb, #f4b942 16%, transparent), transparent 70%),
       linear-gradient(180deg, color-mix(in srgb, var(--green) 13%, var(--surface)) 0%, color-mix(in srgb, var(--surface) 92%, transparent) 100%);
-    backdrop-filter:saturate(1.4) blur(12px); }
+    }
   :root[data-theme="dark"] header{ background:
       radial-gradient(900px 300px at 85% -40%, color-mix(in srgb, #f4b942 10%, transparent), transparent 70%),
       linear-gradient(180deg, #123524 0%, color-mix(in srgb, var(--surface) 94%, transparent) 100%); }
-  header::after{ content:""; position:absolute; inset:0; pointer-events:none; opacity:.05; mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
   .head-in{ position:relative; z-index:1; padding:16px 20px 18px; }
   .hero{ margin:22px 0 18px; max-width:760px; }
   .hero-t{ margin:0; font-family:var(--disp); font-weight:800; font-size:clamp(30px, 4.6vw, 50px); line-height:1.02;
@@ -965,8 +963,11 @@
      categorias) fica presa. Nada muda de tamanho ao rolar — o "encolher" antigo mudava a
      altura do topo e o navegador do celular compensava a rolagem, num vai-e-volta. */
   header{ position:relative; top:auto; border-bottom:none; }
-  .barra-fixa{ position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line);
-    background:color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter:saturate(1.4) blur(12px); }
+  /* sólida e sem desfoque: o desfoque (backdrop-filter) e a textura com mix-blend-mode eram
+     recalculados a cada quadro da rolagem e travavam o celular; com fundo translúcido a
+     chamada aparecia "por baixo" da barra enquanto saía */
+  .barra-fixa{ position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line); background:var(--surface);
+    box-shadow:0 6px 16px -14px rgba(0,0,0,.35); }
   .barra-fixa .head-in{ padding-top:10px; padding-bottom:10px; }
   header .head-in{ padding-bottom:6px; }
   .hero{ margin-bottom:8px; }

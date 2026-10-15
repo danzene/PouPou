@@ -1143,10 +1143,11 @@
   .pr-s b{ color:#ffd27a; }
   .pr-oferta{ margin:18px 0 6px; padding:16px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); }
   .pr-preco{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
-  .pr-preco .old{ font-size:15px; color:rgba(238,245,240,.5); text-decoration:line-through; }
+  .pr-de{ display:flex; align-items:center; gap:8px; margin-bottom:4px; font-size:13px; color:rgba(238,245,240,.6); }
+  .pr-de .old{ text-decoration:line-through; }
   .pr-preco .now{ font-family:var(--disp); font-size:44px; font-weight:800; letter-spacing:-.03em; line-height:1; color:#fff; }
   .pr-preco .per{ font-size:14px; font-weight:600; color:rgba(238,245,240,.7); }
-  .pr-preco .off{ align-self:center; font-size:12px; font-weight:800; padding:3px 8px; border-radius:7px; background:#f4b942; color:#3a2600; }
+  .pr-de .off{ font-size:12px; font-weight:800; padding:2px 7px; border-radius:7px; background:#f4b942; color:#3a2600; }
   .pr-anual{ margin-top:6px; font-size:13px; color:rgba(238,245,240,.7); } .pr-anual b{ color:#fff; font-weight:700; }
   .pr-btn{ display:block; width:100%; height:54px; margin-top:16px; border:none; border-radius:14px; cursor:pointer;
     background:linear-gradient(180deg, #45d495, #2fb87e); color:#04140d; font:700 16px var(--body); letter-spacing:-.01em;
@@ -2528,7 +2529,8 @@ function loadPerfil(secao, manterPlanos){
         <h3 class="pr-t">${titulo}</h3>
         <p class="pr-s" data-k="ecohook">${sub}</p>
         <div class="pr-oferta">
-          <div class="pr-preco"><span class="old">${PRECO_DE}</span><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
+          <div class="pr-de">De <span class="old">${PRECO_DE}</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
+          <div class="pr-preco"><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span></div>
           <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · 2 meses grátis</div>
           ${cta}
           <p class="pr-micro">${micro}</p>

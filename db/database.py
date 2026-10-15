@@ -678,3 +678,44 @@ def gravar_lote_pereciveis(conn, mercado_id: int, itens: list[dict], coletado_em
         conn.executemany(_SQL_INSERT_PERECIVEL_HIST, hist)
     conn.executemany(_SQL_UPSERT_PERECIVEL, linhas)
     return len(itens)
+
+
+# ---------------------------------------------------------------------------
+# Mesmo produto com EANs diferentes entre mercados (ver agrupar_equivalentes.py).
+# `produto_equivalente` é só um de/para (ean -> ean_principal); a view
+# `precos_atual_unif` devolve os preços com o EAN já trocado pelo principal (e o
+# original em ean_original, pra achar o link da loja). Nada em precos_atual muda.
+# ---------------------------------------------------------------------------
+_SQL_VIEW_UNIF = """
+    SELECT COALESCE(e.ean_principal, pa.ean) AS ean, pa.ean AS ean_original,
+           pa.mercado_id, pa.preco, pa.preco_por_unidade, pa.origem, pa.coletado_em,
+           pa.so_no_site, pa.preco_de, pa.desconto_pct, pa.oferta_tipo
+    FROM precos_atual pa LEFT JOIN produto_equivalente e ON e.ean = pa.ean
+"""
+
+
+def garantir_equivalentes(conn) -> None:
+    """Cria (idempotente) a tabela de/para e a view unificada."""
+    conn.execute("CREATE TABLE IF NOT EXISTS produto_equivalente ("
+                 "ean TEXT PRIMARY KEY, ean_principal TEXT NOT NULL)")
+    if isinstance(conn, _PgConn):
+        conn.execute("CREATE OR REPLACE VIEW precos_atual_unif AS " + _SQL_VIEW_UNIF)
+        # tabela nova no Supabase: RLS ligado e sem policy = só o backend lê (igual às da coleta)
+        conn.execute("ALTER TABLE produto_equivalente ENABLE ROW LEVEL SECURITY")
+    else:
+        conn.execute("CREATE VIEW IF NOT EXISTS precos_atual_unif AS " + _SQL_VIEW_UNIF)
+    conn.commit()
+
+
+def principais(conn, eans: list[str]) -> dict[str, str]:
+    """{ean: ean_principal} pros EANs pedidos (quem não tem equivalente aponta pra si mesmo)."""
+    out = {e: e for e in eans}
+    if not eans:
+        return out
+    for bloco in _em_blocos(list(eans)):
+        ph = ",".join("?" * len(bloco))
+        for r in conn.execute(
+                f"SELECT ean, ean_principal FROM produto_equivalente WHERE ean IN ({ph})",
+                tuple(bloco)).fetchall():
+            out[r["ean"]] = r["ean_principal"]
+    return out

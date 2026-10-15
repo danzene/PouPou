@@ -106,8 +106,9 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
         rows = conn.execute(
             "SELECT pr.ean, pr.nome_canonico, pr.marca, pr.categoria, "
             "COUNT(DISTINCT pa.mercado_id) AS n_mercados FROM produtos pr "
-            "JOIN precos_atual pa ON pa.ean = pr.ean WHERE pr.ean = ? "
-            "GROUP BY pr.ean, pr.nome_canonico, pr.marca, pr.categoria", (full,)).fetchall()
+            "JOIN precos_atual_unif pa ON pa.ean = pr.ean "
+            "WHERE pr.ean = COALESCE((SELECT ean_principal FROM produto_equivalente WHERE ean = ?), ?) "
+            "GROUP BY pr.ean, pr.nome_canonico, pr.marca, pr.categoria", (full, full)).fetchall()
         return [dict(r) for r in rows], []
 
     nome = "lower(unaccent(pr.nome_canonico))"
@@ -116,8 +117,8 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
     rows = [dict(r) for r in conn.execute(
         f"""SELECT pr.ean, pr.nome_canonico, pr.marca, pr.categoria,
                    COUNT(DISTINCT pa.mercado_id) AS n_mercados
-            FROM produtos pr JOIN precos_atual pa ON pa.ean = pr.ean
-            WHERE {cond}
+            FROM produtos pr JOIN precos_atual_unif pa ON pa.ean = pr.ean   -- mesmo produto c/ EAN
+            WHERE {cond}                                                   -- diferente conta junto
             GROUP BY pr.ean, pr.nome_canonico, pr.marca, pr.categoria
             ORDER BY n_mercados DESC LIMIT 600""", params).fetchall()]
     if not rows:

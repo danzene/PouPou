@@ -652,6 +652,7 @@ def _processar_indicacao(conn, uid) -> None:
 try:
     _boot = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
     database.inicializar(_boot)
+    database.garantir_equivalentes(_boot)   # de/para de EANs do mesmo produto + view unificada
     _boot.close()
 except Exception as _boot_err:  # noqa: BLE001
     logging.getLogger("api").warning("boot: init do banco falhou, seguindo mesmo assim: %s", _boot_err)
@@ -739,20 +740,24 @@ def _linha_ranking(r, spark: list | None = None) -> dict:
 def _ranking_enriquecido(conn: sqlite3.Connection, ean: str, com_sparkline: bool = True) -> list[dict]:
     # Lê da tabela quente precos_atual (1 linha por ean+mercado) — rápido mesmo com
     # milhões de snapshots no histórico. Sparkline (que varre o histórico) só sob demanda.
+    # mesmo produto com EAN diferente em outro mercado entra junto (precos_atual_unif); um
+    # EAN 'antigo' salvo numa lista é traduzido pro principal antes de buscar
+    principal = database.principais(conn, [ean])[ean]
     linhas = conn.execute(
         f"""
-        SELECT {_RANKING_COLS}
-        FROM precos_atual pa
+        SELECT {_RANKING_COLS}, pa.ean_original
+        FROM precos_atual_unif pa
         JOIN mercados m  ON m.id = pa.mercado_id
         JOIN produtos pr ON pr.ean = pa.ean
-        LEFT JOIN links lk ON lk.ean = pa.ean AND lk.mercado_id = pa.mercado_id
+        LEFT JOIN links lk ON lk.ean = pa.ean_original AND lk.mercado_id = pa.mercado_id
         WHERE pa.ean = ? AND m.ativo = 1
         ORDER BY pa.preco ASC
         """,
-        (ean,),
+        (principal,),
     ).fetchall()
+    # sparkline pelo EAN que AQUELE mercado usa (o histórico fica no código original)
     return [
-        _linha_ranking(r, _sparkline(conn, ean, r["mercado_id"]) if com_sparkline else [])
+        _linha_ranking(r, _sparkline(conn, r["ean_original"], r["mercado_id"]) if com_sparkline else [])
         for r in linhas
     ]
 
@@ -763,23 +768,27 @@ def _rankings_lote(conn, eans: list[str]) -> dict[str, list[dict]]:
     é o que derruba /categoria de ~60 idas ao banco pra 1."""
     if not eans:
         return {}
-    ph = ",".join(["?"] * len(eans))
+    # EANs equivalentes (mesmo produto, código diferente) viram o principal; o resultado
+    # volta indexado pelo EAN que foi pedido
+    prin = database.principais(conn, eans)
+    alvo = sorted(set(prin.values()))
+    ph = ",".join(["?"] * len(alvo))
     linhas = conn.execute(
         f"""
         SELECT {_RANKING_COLS}
-        FROM precos_atual pa
+        FROM precos_atual_unif pa
         JOIN mercados m  ON m.id = pa.mercado_id
         JOIN produtos pr ON pr.ean = pa.ean
-        LEFT JOIN links lk ON lk.ean = pa.ean AND lk.mercado_id = pa.mercado_id
+        LEFT JOIN links lk ON lk.ean = pa.ean_original AND lk.mercado_id = pa.mercado_id
         WHERE pa.ean IN ({ph}) AND m.ativo = 1
         ORDER BY pa.ean, pa.preco ASC
         """,
-        tuple(eans),
+        tuple(alvo),
     ).fetchall()
-    out: dict[str, list[dict]] = {}
+    por_principal: dict[str, list[dict]] = {}
     for r in linhas:
-        out.setdefault(r["ean"], []).append(_linha_ranking(r))
-    return out
+        por_principal.setdefault(r["ean"], []).append(_linha_ranking(r))
+    return {e: por_principal[p] for e, p in prin.items() if p in por_principal}
 
 
 def _produto_dict(conn: sqlite3.Connection, prod: sqlite3.Row, com_sparkline: bool = True,
@@ -839,6 +848,7 @@ def cesta_basica_itens():
                           imagem_url, n_mercados
                    FROM produtos
                    WHERE lower(unaccent(nome_canonico)) LIKE ? AND n_mercados > 0
+                     AND ean NOT IN (SELECT ean FROM produto_equivalente)   -- só o principal
                    ORDER BY (lower(unaccent(nome_canonico)) LIKE ?) DESC,
                             n_mercados DESC, menor_preco ASC LIMIT 1""",
                 (padrao, inicio),
@@ -885,6 +895,7 @@ def categoria(slug: str, limite: int = 60):
                    pr.qtd_embalagem, pr.imagem_url, pr.n_mercados
             FROM produtos pr
             WHERE pr.categoria = ? AND pr.n_mercados > 0
+              AND pr.ean NOT IN (SELECT ean FROM produto_equivalente)   -- só o principal
             ORDER BY pr.n_mercados DESC
             LIMIT ?
             """,
@@ -1234,14 +1245,19 @@ def historico(ean: str):
         ).fetchone()
         if not prod:
             raise HTTPException(status_code=404, detail=f"EAN {ean} não encontrado")
+        # o histórico de cada mercado fica no EAN que ELE usa: junta todos os códigos do produto
+        principal = database.principais(conn, [ean])[ean]
+        grupo = [principal] + [r["ean"] for r in conn.execute(
+            "SELECT ean FROM produto_equivalente WHERE ean_principal = ?", (principal,)).fetchall()]
+        ph = ",".join("?" * len(grupo))
         linhas = conn.execute(
-            """
+            f"""
             SELECT m.nome AS mercado, m.cor_badge, p.preco, p.preco_por_unidade, p.coletado_em
             FROM precos p JOIN mercados m ON m.id = p.mercado_id
-            WHERE p.ean = ?
+            WHERE p.ean IN ({ph})
             ORDER BY m.nome, p.coletado_em
             """,
-            (ean,),
+            tuple(grupo),
         ).fetchall()
         series: dict[str, dict] = {}
         for r in linhas:
@@ -1252,8 +1268,8 @@ def historico(ean: str):
         # último ponto — assim um preço estável ainda desenha uma linha até hoje.
         for r in conn.execute(
             """SELECT m.nome AS mercado, m.cor_badge, pa.preco, pa.coletado_em
-               FROM precos_atual pa JOIN mercados m ON m.id = pa.mercado_id WHERE pa.ean = ?""",
-            (ean,),
+               FROM precos_atual_unif pa JOIN mercados m ON m.id = pa.mercado_id WHERE pa.ean = ?""",
+            (principal,),
         ):
             s = series.setdefault(r["mercado"], {"mercado": r["mercado"],
                                                  "cor_badge": r["cor_badge"], "pontos": []})

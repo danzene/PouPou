@@ -1339,8 +1339,12 @@ function iniciais(n){ const p=n.trim().split(/\s+/); return ((p[0]?.[0]||"")+(p[
 function corTexto(hex){ if(!hex) return "#fff"; const h=hex.replace("#","");
   const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
   return (0.299*r+0.587*g+0.114*b)/255>0.6? "#17211c":"#fff"; }
+// Fotos VTEX (Savegnago, Covabra, Atacadão, Oba) vêm no tamanho ORIGINAL (~60-100 KB cada);
+// o próprio VTEX entrega miniatura pelo caminho .../ids/<id>-L-A/ (~5-15 KB). 300px fica
+// nítido até em tela de alta densidade no card. Outros servidores seguem como estão.
+function fotoMini(u,px){ return String(u).replace(/(vteximg\.com\.br\/arquivos\/ids\/\d+)\//,`$1-${px||300}-${px||300}/`); }
 function thumb(url,alt){ const u=hrefSeguro(url); return u
-  ? `<img class="thumb" src="${esc(u)}" alt="" loading="lazy" onerror="this.dataset.noImage='true'">`
+  ? `<img class="thumb" src="${esc(fotoMini(u))}" alt="" width="300" height="300" loading="lazy" decoding="async" onerror="this.dataset.noImage='true'">`
   : `<span class="thumb" data-no-image="true" aria-hidden="true"></span>`; }
 let MKT_LOGO={}; // slug/nome -> URL da logo (carregado de /mercados no init)
 function badgeMini(m){ const c=m.cor_badge||"#8a8a8a";

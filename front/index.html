@@ -7,7 +7,7 @@
 <script>(function(){try{var t=localStorage.getItem("mb-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t;}catch(e){}})();</script>
 <title>PouPou — Compare, escolha e economize nas compras</title>
 <!-- PWA: instalável (tela inicial, tela cheia como app) -->
-<meta name="theme-color" content="#0fa968">
+<meta name="theme-color" content="#f5f8f5" id="metaTema">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-v2-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-v2-180.png">
@@ -106,7 +106,7 @@
   .subcats::-webkit-scrollbar{ display:none; }
   .subcats .lbl{ font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); white-space:nowrap; margin-right:5px; }
   .sub{ flex:0 0 auto; border:1px solid var(--line); background:var(--surface); color:var(--mut); font-size:13px; font-weight:600;
-    cursor:pointer; padding:7px 14px; border-radius:var(--r-pill); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; transition:.15s; }
+    cursor:pointer; padding:7px 14px; border-radius:var(--r-pill); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; }
   .sub:hover{ border-color:var(--line-2); color:var(--ink); }
   .sub[aria-pressed="true"]{ background:var(--green); border-color:var(--green); color:var(--on-green); }
   .sub.oferta{ color:var(--yellow); border-color:color-mix(in srgb,var(--yellow) 40%, var(--line)); }
@@ -144,13 +144,13 @@
   .prod-n{ font-size:12.5px; color:var(--faint); margin-top:4px; }
   .prod-foot{ display:flex; gap:10px; padding:16px 20px 20px; margin-top:16px; }
   .btn-compare{ flex:1; height:44px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink);
-    font-size:14px; font-weight:600; border-radius:var(--r-btn); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:.15s; }
+    font-size:14px; font-weight:600; border-radius:var(--r-btn); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; }
   .btn-compare:hover{ background:var(--green-light); border-color:var(--green); color:var(--green-dark); }
   .btn-compare .chev{ transition:transform .15s; color:var(--faint); }
   .btn-compare:hover .chev{ color:var(--green); }
   .btn-compare[aria-expanded="true"] .chev{ transform:rotate(180deg); }
   .btn-add{ width:44px; height:44px; flex:0 0 auto; border:1px solid var(--line-2); background:var(--surface); color:var(--green-dark);
-    border-radius:var(--r-btn); cursor:pointer; font-size:20px; display:grid; place-items:center; transition:.15s; }
+    border-radius:var(--r-btn); cursor:pointer; font-size:20px; display:grid; place-items:center; transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; }
   .btn-add:hover{ border-color:var(--green); background:var(--green-light); }
   .btn-add.in{ background:var(--green); border-color:var(--green); color:var(--on-green); }
 
@@ -775,8 +775,8 @@
   .adm-sel{ font:inherit; font-size:13px; font-weight:600; color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-pill); padding:6px 10px; cursor:pointer; }
   .adm-sw{ position:relative; width:42px; height:24px; flex:none; cursor:pointer; }
   .adm-sw input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
-  .adm-sw-t{ position:absolute; inset:0; background:var(--line); border-radius:12px; transition:.15s; }
-  .adm-sw-t::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:.15s; }
+  .adm-sw-t{ position:absolute; inset:0; background:var(--line); border-radius:12px; transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; }
+  .adm-sw-t::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; }
   .adm-sw input:checked + .adm-sw-t{ background:var(--green); }
   .adm-sw input:checked + .adm-sw-t::after{ transform:translateX(18px); }
   .fav-star{ display:inline-flex; vertical-align:-2px; } .fav-star svg{ width:14px; height:14px; color:var(--yellow); fill:var(--yellow); }
@@ -871,6 +871,53 @@
   .li-esvaziar:hover{ color:var(--red); border-color:var(--red); }
   .li-esvaziar svg{ width:14px; height:14px; }
   .sub.basica[aria-pressed="true"]{ background:var(--green); border-color:var(--green); color:var(--on-green); }
+
+  /* ===== polimento visual (revisão de design 10/2026) ===== */
+  /* botões e campos herdam a fonte do app (antes caíam na fonte padrão do navegador) */
+  button, input, select, textarea{ font-family:inherit; }
+  html{ -webkit-tap-highlight-color:transparent; }
+  button, a, .sub, .cat, .tab{ touch-action:manipulation; }
+  h1, h2, h3, .sec-title, .prod-nome{ text-wrap:balance; }
+  /* profundidade sutil: brilho verde no topo, em vez de fundo chapado */
+  body{ background-image:radial-gradient(1200px 420px at 50% -160px, color-mix(in srgb, var(--green) 9%, transparent), transparent 70%);
+    background-repeat:no-repeat; }
+  :root[data-theme="dark"] body{ background-image:radial-gradient(1200px 460px at 50% -180px, color-mix(in srgb, var(--green) 13%, transparent), transparent 72%); }
+  /* resposta ao toque: o botão "afunda" ao clicar */
+  .btn-compare, .btn-add, .cesta-btn, .sub, .tab, .sortbtn, .per-add{ transition:background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .12s; }
+  .btn-compare:active, .btn-add:active, .cesta-btn:active, .sub:active, .tab:active, .sortbtn:active, .per-add:active{ transform:scale(.97); }
+  /* card: foto num "azulejo" branco (as fotos dos mercados têm fundo branco) */
+  .prod .thumb{ background:#fff; border:1px solid var(--line); padding:5px; }
+  :root[data-theme="dark"] .prod .thumb{ border-color:transparent; }
+  .prod-top{ align-items:flex-start; }
+  /* selo de economia: a diferença entre o mercado mais caro e o mais barato */
+  .economia{ display:inline-flex; align-items:center; gap:5px; margin-top:9px; padding:4px 9px 4px 7px; border-radius:8px;
+    background:var(--green-light); color:var(--green-dark); font-size:12.5px; font-weight:700; letter-spacing:-.005em; }
+  .economia .ico{ font-size:13px; }
+  .prod-preco{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .prod-preco .ate{ font-family:var(--body); font-size:12.5px; font-weight:500; color:var(--faint); letter-spacing:0; }
+  /* carregando: esqueleto dos cards em vez de texto solto */
+  .skel{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:20px; display:flex; flex-direction:column; gap:12px; }
+  .skel .l{ height:12px; border-radius:6px; background:linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+    background-size:200% 100%; animation:skel 1.3s ease-in-out infinite; }
+  .skel .row1{ display:flex; gap:14px; } .skel .ph{ width:60px; height:60px; border-radius:12px; flex:0 0 auto; }
+  .skel .col{ flex:1; display:flex; flex-direction:column; gap:9px; padding-top:4px; }
+  @keyframes skel{ from{ background-position:100% 0; } to{ background-position:-100% 0; } }
+  /* gavetas e modais não "arrastam" a página de trás */
+  .drawer-scroll, .drawer-ov, .modal-ov, .modal{ overscroll-behavior:contain; }
+  @media (max-width:560px){
+    .prod-top{ padding:14px 14px 0; gap:12px; }
+    .prod .thumb{ width:64px; height:64px; }
+    .prod-price{ margin-top:10px; }
+    .prod-preco{ font-size:27px; }
+    .prod-foot{ padding:12px 14px 14px; margin-top:6px; }
+    .btn-compare{ height:42px; }
+    .btn-add{ width:42px; height:42px; }
+  }
+  /* quem pediu menos movimento no aparelho */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+    .prod:hover{ transform:none; }
+  }
 </style>
 </head>
 <body>
@@ -973,8 +1020,12 @@ const CAT_ICON={mercearia:"cat_mercearia",bebidas:"cat_bebidas",limpeza:"cat_lim
 const FRESCO_ICON={ofertas:"cat_oferta",carnes:"cat_carnes",bandeja:"cat_carnes",hortifruti:"cat_hortifruti",peixes:"cat_peixes",frios:"cat_frios",outros:"cat_outros"};
 
 /* ---------- helpers (formatação / util) ---------- */
-const brl=v=> v==null? "—" : "R$ "+Number(v).toFixed(2).replace(".",",");
-const ppuFmt=(v,rot)=> v==null? "" : "R$ "+Number(v).toFixed(2).replace(".",",")+" "+(rot||"");
+const _BRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
+const brl=v=> v==null? "—" : _BRL.format(Number(v));
+const ppuFmt=(v,rot)=> v==null? "" : _BRL.format(Number(v))+" "+(rot||"");
+// esqueleto dos cards enquanto carrega (em vez de "Carregando…" numa tela vazia)
+function esqueleto(n){ const c=`<div class="skel" aria-hidden="true"><div class="row1"><div class="l ph"></div><div class="col"><div class="l" style="width:85%"></div><div class="l" style="width:55%"></div><div class="l" style="width:40%;height:26px;margin-top:8px"></div></div></div><div class="l" style="height:40px;border-radius:11px;margin-top:6px"></div></div>`;
+  return `<p class="sr-only">Carregando…</p><div class="grid">${c.repeat(n||6)}</div>`; }
 const dataCurta=iso=>{ const d=new Date(iso); return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}); };
 function relTempo(iso){ if(!iso) return "—";
   const s=(Date.now()-new Date(iso).getTime())/1000;
@@ -1067,7 +1118,8 @@ async function toggleHistorico(ean,mercado,btn){
 
 /* ---------- tema claro / escuro ---------- */
 function setTemaBtn(){ const dark=document.documentElement.dataset.theme==="dark";
-  const b=$("#btnTema"); if(b) b.innerHTML=ic(dark?"sun":"moon"); }
+  const b=$("#btnTema"); if(b){ b.innerHTML=ic(dark?"sun":"moon"); b.setAttribute("aria-label",dark?"Usar tema claro":"Usar tema escuro"); }
+  const m=document.getElementById("metaTema"); if(m) m.content=dark?"#0d1411":"#f5f8f5"; }
 function toggleTema(){ const dark=document.documentElement.dataset.theme==="dark";
   const novo=dark?"light":"dark"; document.documentElement.dataset.theme=novo;
   try{ localStorage.setItem("mb-theme",novo); }catch(e){} setTemaBtn(); }
@@ -1337,6 +1389,13 @@ function toggleLojas(rid,btn){
   el.innerHTML=`<ol class="rank">${rk.map((l,i)=>linhaRank(l,i+1,i===0,ean)).join("")}</ol>`;
   el.hidden=false; btn.setAttribute("aria-expanded","true");
 }
+// diferença entre o mercado mais caro e o mais barato: é o "por que comparar" do app
+function economiaChip(rk){
+  if(!rk||rk.length<2) return "";
+  const ps=rk.map(r=>Number(r.preco)).filter(v=>v>0);
+  const d=Math.max(...ps)-Math.min(...ps);
+  return d>=0.10?`<div class="economia">${ic("cat_oferta")} Economize até ${brl(d)}</div>`:"";
+}
 function cardProduto(p){
   const rk=p.ranking||[], emb=embalagem(p.qtd_embalagem,p.unidade);
   const naCesta=CESTA_EANS.has(p.ean);
@@ -1349,6 +1408,7 @@ function cardProduto(p){
       ${best?(acessoPremium()
         ? `<div class="prod-mkt">${badgeMini({nome:best.mercado,cor_badge:best.cor_badge})} ${esc(best.mercado)}</div>`
         : `<div class="prod-mkt oculto">${ic("lock")} <span>ver o mercado</span></div>`):""}
+      ${economiaChip(rk)}
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}</div>
     </div>`;
   const compare=rk.length
@@ -1367,7 +1427,7 @@ function render(lista,contexto){
   saida.innerHTML=`<div class="grid">${lista.map(cardProduto).join("")}</div>`;
 }
 async function loadCategoria(slug,nome){ catAtiva=slug; marcarNav();
-  saida.innerHTML=`<p class="state">Carregando ${esc(nome)}…</p>`; ctx.textContent="";
+  saida.innerHTML=esqueleto(6); ctx.textContent="";
   try{ const d=await fetch(`${API}/categoria/${slug}?limite=60`).then(r=>r.json());
     render(d.produtos,`${d.produtos.length} produtos em ${d.categoria.nome}`);
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar.</p>`; } }
@@ -1380,7 +1440,7 @@ function barraTipos(ativo){ // "Todos · Longa vida · Condensado · Em pó…" 
 }
 async function loadBusca(q,tipo){ catAtiva=null; marcarNav();
   if(q.length<2){ saida.innerHTML=""; ctx.textContent=""; return; }
-  saida.innerHTML=`<p class="state">Buscando…</p>`;
+  saida.innerHTML=esqueleto(6);
   try{ const d=await fetch(`${API}/buscar?q=${encodeURIComponent(q)}${tipo?`&tipo=${encodeURIComponent(tipo)}`:""}`).then(r=>r.json());
     const per=d.pereciveis||[], res=d.resultados||[];
     if(!tipo){ BUSCA_Q=q; BUSCA_TIPOS=d.tipos||[]; } // botões vêm da busca sem filtro
@@ -1450,7 +1510,7 @@ function cardOferta(o){
   </div>`;
 }
 async function loadOfertas(){ catAtiva="fresco:ofertas"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
-  saida.innerHTML=`<p class="state">Carregando ofertas…</p>`; ctx.textContent="";
+  saida.innerHTML=esqueleto(6); ctx.textContent="";
   try{ const d=await fetch(`${API}/ofertas`).then(r=>r.json());
     const its=d.itens||[];
     ctx.textContent=`${its.length} item(ns) em desconto no site`;
@@ -1462,7 +1522,7 @@ async function loadOfertas(){ catAtiva="fresco:ofertas"; marcarNav(); $("#q").va
 /* ---------- Clube / Fidelidade: ofertas que exigem o programa do mercado ---------- */
 let CLUBE_STATE={mercados:[],itens:[],sel:null};
 async function loadClube(){ catAtiva="fresco:clube"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
-  saida.innerHTML=`<p class="state">Carregando ofertas de clube…</p>`; ctx.textContent="";
+  saida.innerHTML=esqueleto(6); ctx.textContent="";
   try{ const d=await fetch(`${API}/clube`).then(r=>r.json());
     const mkts=d.mercados||[];
     CLUBE_STATE={mercados:mkts, itens:d.itens||[], sel:mkts[0]?mkts[0].mercado_slug:null};
@@ -1527,7 +1587,7 @@ function renderFrescosCards(){
     <div class="grid">${its.map(g=>cardPerecivel(g,ord,modo)).join("")}</div>`;
 }
 async function loadFrescos(slug,nome){ catAtiva=`fresco:${slug}`; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
-  saida.innerHTML=`<p class="state">Carregando ${esc(nome)}…</p>`; ctx.textContent="";
+  saida.innerHTML=esqueleto(6); ctx.textContent="";
   try{ const d=await fetch(`${API}/frescos/${slug}`).then(r=>r.json());
     const its=d.itens||[];
     ctx.textContent=`${its.length} item(ns) em ${nome}`;
@@ -1911,7 +1971,7 @@ function renderLogin(){
     <button type="button" class="auth-google" onclick="loginGoogle()"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.5 34.5 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.6 5.6C41.4 36.9 44 31 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg> Continuar com Google</button>
     <div class="auth-ou"><span>ou com e-mail</span></div>
     <form onsubmit="return authSubmit(event)">
-      ${criar?`<div class="auth-field"><label for="aNome">Nome</label><input id="aNome" type="text" autocomplete="name" placeholder="Como te chamamos"></div>`:""}
+      ${criar?`<div class="auth-field"><label for="aNome">Nome</label><input id="aNome" name="nome" type="text" autocomplete="name" placeholder="Como te chamamos…"></div>`:""}
       <div class="auth-field"><label for="aEmail">E-mail</label><input id="aEmail" type="email" autocomplete="email" placeholder="voce@email.com" required></div>
       <div class="auth-field"><label for="aSenha">Senha</label><input id="aSenha" type="password" autocomplete="${criar?"new-password":"current-password"}" placeholder="sua senha (mín. 6 caracteres)" required minlength="6"></div>
       <p class="auth-err" id="authErr" aria-live="polite"></p>
@@ -1982,7 +2042,7 @@ function renderOnboarding(){
     <p class="onb-sub">Quais supermercados você usa? A gente destaca eles na comparação e mostra onde economizar.</p>
     <div class="onb-cep">
       <div class="onb-cep-row">
-        <input id="onbCep" type="text" inputmode="numeric" maxlength="9" placeholder="Seu CEP (opcional)" oninput="onbCepMask(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();onbBuscarCep();}">
+        <input id="onbCep" name="cep" type="text" inputmode="numeric" autocomplete="postal-code" aria-label="Seu CEP (opcional)" maxlength="9" placeholder="13010-000…" oninput="onbCepMask(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();onbBuscarCep();}">
         <button type="button" class="onb-cep-btn" onclick="onbBuscarCep()">Achar meus mercados</button>
       </div>
       <div id="onbCepMsg" class="onb-cep-msg"></div>
@@ -2394,12 +2454,12 @@ function renderMeusMercados(){
   return ordenados.map(m=>{
     const i=favs.indexOf(m.slug), on=i>=0;
     const ord=on?`<span class="ord">${i+1}º</span>`:`<span class="ord"></span>`;
-    const up=on&&i>0?`<button class="fav" type="button" title="Subir" onclick="moverFav('${m.slug}',-1)">${ic("chevron")}</button>`:"";
+    const up=on&&i>0?`<button class="fav" type="button" title="Subir" aria-label="Subir ${esc(m.nome)} na ordem" onclick="moverFav('${m.slug}',-1)">${ic("chevron")}</button>`:"";
     return `<div class="mkt-row ${on?"on":""}">
       <span class="grip">${ic("grip")}</span>
       ${badgeMini(m)}<span class="nm">${esc(m.nome)}</span>
       ${on?ord:""}
-      <button class="fav" type="button" aria-pressed="${on}" title="${on?"Remover dos favoritos":"Marcar como favorito"}" onclick="toggleFav('${m.slug}')">${ic("star")}</button>
+      <button class="fav" type="button" aria-pressed="${on}" title="${on?"Remover dos favoritos":"Marcar como favorito"}" aria-label="${on?"Remover":"Marcar"} ${esc(m.nome)} ${on?"dos":"como"} favorito${on?"s":""}" onclick="toggleFav('${m.slug}')">${ic("star")}</button>
     </div>`;
   }).join("");
 }

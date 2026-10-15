@@ -1,0 +1,22 @@
+name: Vigia da coleta manual (nuvem)
+
+# Atende o botao "coletar agora" do painel /gestao: pega o pedido pendente em coleta_jobs
+# e roda o coletar.py. Sem pedido, sai em segundos. Era a MercadoBarato-Watcher (3/3 min);
+# aqui roda a cada 10 min (o GitHub nao garante cron mais curto que isso).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: coleta-watcher
+  cancel-in-progress: false
+
+jobs:
+  vigia:
+    uses: ./.github/workflows/_coleta.yml
+    secrets: inherit
+    with:
+      timeout: 330
+      comandos: python coleta_watcher.py

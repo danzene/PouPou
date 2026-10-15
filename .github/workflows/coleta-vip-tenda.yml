@@ -1,0 +1,21 @@
+name: Coleta VIP + Tenda (nuvem)
+
+# VIP Commerce (Enxuto, Dalben, Taquaral, Spani) + Tenda. Nao tem refresh leve, entao a
+# unica forma de manter fresco e re-coletar: 3x/dia. Era a MercadoBarato-VipTenda.
+
+on:
+  schedule:
+    - cron: "15 1,9,17 * * *"  # 22:15, 06:15 e 14:15 Brasilia
+  workflow_dispatch: {}
+
+concurrency:
+  group: coleta-vip-tenda
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    uses: ./.github/workflows/_coleta.yml
+    secrets: inherit
+    with:
+      timeout: 180
+      comandos: python coletar.py enxuto dalben taquaral tenda spani

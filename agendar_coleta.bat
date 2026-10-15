@@ -1,5 +1,10 @@
 @echo off
 REM ============================================================================
+REM PLANO B. A coleta hoje roda NA NUVEM (GitHub Actions, .github/workflows/coleta-*.yml
+REM e refresh-vtex.yml), sem depender de PC ligado. Use este script so se quiser voltar
+REM a coletar pelo computador (ex.: GitHub fora do ar) - e desligue os workflows antes,
+REM pra nao coletar em dobro.
+REM
 REM Registra as tarefas do MercadoBarato no Agendador de Tarefas do Windows.
 REM Rode UMA vez (duplo clique) num PC novo, DEPOIS de: iniciar.bat (cria o .venv)
 REM e .env com DATABASE_URL. Para mudar horarios, edite e rode de novo (/f
@@ -35,7 +40,9 @@ schtasks /create /tn "MercadoBarato-Rapidos"       /tr "%PYW% \"%~dp0coleta_rapi
 schtasks /create /tn "MercadoBarato-RefreshRapido" /tr "%PYW% \"%~dp0refrescar_precos.bat\""  /sc hourly /mo 3 /st 11:00 /f
 schtasks /create /tn "MercadoBarato-VipTenda"      /tr "%PYW% \"%~dp0coleta_vip.bat\""        /sc hourly /mo 8 /st 06:00 /f
 schtasks /create /tn "MercadoBarato-GPA"           /tr "%PYW% \"%~dp0coleta_gpa.bat\""        /sc daily  /st 03:00 /f
-schtasks /create /tn "MercadoBarato-Watcher"       /tr "%PYW% \"%~dp0coleta_watcher.bat\""    /sc minute /mo 3 /f
+REM Watcher vai direto no .py: o coleta_watcher.bat redireciona pro mesmo logs\coleta_watcher.log
+REM que o run_bat_hidden abre -> "arquivo ja esta sendo usado" e exit 1 a cada rodada.
+schtasks /create /tn "MercadoBarato-Watcher"       /tr "\"%~dp0.venv\Scripts\pythonw.exe\" \"%~dp0coleta_watcher.py\"" /sc minute /mo 3 /f
 
 echo.
 echo Tarefas registradas:

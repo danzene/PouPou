@@ -1,0 +1,21 @@
+name: Coleta Pao de Acucar (nuvem)
+
+# Pao de Acucar (GPA): busca por termo + 1 detalhe por produto -> lento (~1-2h). 1x/dia,
+# de madrugada. Era a MercadoBarato-GPA.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC = 03:00 Brasilia
+  workflow_dispatch: {}
+
+concurrency:
+  group: coleta-gpa
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    uses: ./.github/workflows/_coleta.yml
+    secrets: inherit
+    with:
+      timeout: 240
+      comandos: python coletar.py paodeacucar

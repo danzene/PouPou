@@ -1,0 +1,48 @@
+name: _coleta (reutilizavel)
+
+# Base comum dos robos de coleta: instala o projeto e roda os comandos recebidos com o
+# DATABASE_URL do secret. Os mercados (exceto o Pague Menos, que bloqueia IP de fora do
+# BR e vai pelo Vercel - ver paguemenos-nuvem.yml) respondem normal aos servidores do
+# GitHub (EUA), entao coletamos direto daqui. Substitui as tarefas do Agendador do Windows.
+
+on:
+  workflow_call:
+    inputs:
+      comandos:
+        description: "linhas de shell a rodar (ex.: python coletar.py enxuto)"
+        type: string
+        required: true
+      timeout:
+        type: number
+        default: 120
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CONTATO: magezene.dl@gmail.com
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Conferir o secret DATABASE_URL
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Configure o secret DATABASE_URL em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Instalar dependencias
+        run: pip install -q -r requirements.txt
+
+      - name: Coletar
+        run: ${{ inputs.comandos }}

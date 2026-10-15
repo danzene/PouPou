@@ -1757,15 +1757,18 @@ def admin_coleta(authorization: str | None = Header(None)):
     try:
         if not _admin_uid(conn, authorization):
             raise HTTPException(status_code=403, detail="Acesso restrito")
-        c24 = _cutoff_horas(24)
+        c24, c7d = _cutoff_horas(24), _cutoff_horas(24 * 7)
+        # % sobre o catálogo VIVO (visto nos últimos 7 dias): produto que a loja tirou do
+        # site nunca mais é revisto e travava a saúde em ~80-90% mesmo com coleta perfeita.
         rows = conn.execute(
             """SELECT m.slug, m.nome, m.plataforma, m.ativo,
                       COUNT(pa.ean) AS n_produtos,
                       SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS frescos_24h,
+                      SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS vistos_7d,
                       MAX(pa.coletado_em) AS ultima
                FROM mercados m LEFT JOIN precos_atual pa ON pa.mercado_id = m.id
                GROUP BY m.id, m.slug, m.nome, m.plataforma, m.ativo""",
-            (c24,),
+            (c24, c7d),
         ).fetchall()
         carnes = {r["slug"]: (r["n"] or 0) for r in conn.execute(
             """SELECT m.slug, SUM(CASE WHEN p.coletado_em >= ? THEN 1 ELSE 0 END) AS n
@@ -1773,10 +1776,10 @@ def admin_coleta(authorization: str | None = Header(None)):
                GROUP BY m.slug""", (c24,))}
         out = []
         for r in rows:
-            n, f = (r["n_produtos"] or 0), (r["frescos_24h"] or 0)
+            n, f, v = (r["n_produtos"] or 0), (r["frescos_24h"] or 0), (r["vistos_7d"] or 0)
             out.append({"slug": r["slug"], "nome": r["nome"], "plataforma": r["plataforma"],
-                        "ativo": bool(r["ativo"]), "n_produtos": n,
-                        "pct_24h": round(100 * f / n) if n else 0, "ultima": r["ultima"],
+                        "ativo": bool(r["ativo"]), "n_produtos": n, "n_no_site": v, "n_fora_site": n - v,
+                        "pct_24h": round(100 * f / v) if v else 0, "ultima": r["ultima"],
                         "carnes_frescas_24h": carnes.get(r["slug"], 0)})
         out.sort(key=lambda x: (not x["ativo"], -x["n_produtos"]))
         return {"mercados": out}

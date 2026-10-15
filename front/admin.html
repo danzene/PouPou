@@ -130,7 +130,8 @@ function render(m,col,usu,mkt,jobs){
       <div id="coletaStatus" style="font-size:12.5px;color:var(--mut)"></div></div>`;
   const colH=(col.mercados||[]).map(x=>{ const c=x.pct_24h>=80?"ok":x.pct_24h>=40?"warn":"bad";
     return `<div class="row ${x.ativo?"":"off"}"><div class="mk"><b>${esc(x.nome)}</b><span class="s">${esc(x.plataforma||"")}${x.ativo?"":" · inativo"}</span></div>
-      <div class="met"><span class="v num">${num(x.n_produtos)}</span><span class="l">produtos</span></div>
+      <div class="met"><span class="v num">${num(x.n_no_site??x.n_produtos)}</span><span class="l">no site</span></div>
+      <div class="met"><span class="v num" style="opacity:.6">${num(x.n_fora_site??0)}</span><span class="l">fora do site</span></div>
       <div class="met"><span class="v num ${c}">${x.pct_24h}%</span><span class="l">em 24h</span></div>
       <div class="met"><span class="v num">${x.carnes_frescas_24h}</span><span class="l">carnes 24h</span></div>
       <div class="when">${x.ultima?relTempo(x.ultima):"nunca"}</div></div>`; }).join("");

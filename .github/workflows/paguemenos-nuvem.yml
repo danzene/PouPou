@@ -10,7 +10,8 @@ name: Coleta Pague Menos (nuvem)
 
 on:
   schedule:
-    - cron: "0 8 * * *"   # todo dia 08:00 UTC = 05:00 no horario de Brasilia (madrugada)
+    - cron: "0 8 * * *"    # 05:00 Brasilia
+    - cron: "0 20 * * *"   # 17:00 Brasilia (2x/dia: o catalogo nunca passa de ~12h sem conferir)
   workflow_dispatch: {}    # botao "Run workflow" pra rodar na hora
 
 concurrency:
@@ -20,12 +21,12 @@ concurrency:
 jobs:
   disparar:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 90
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       BASE_URL: "https://poupou-three.vercel.app"
-      BATCHES: "100"       # 100 levas x ~30 produtos = ~3000/dia (cobre o catalogo em ~6-7 dias,
-                           # ~16-18% em 24h). ~50 min/rodada, cabe folgado nos 2000 min/mes gratis.
+      LISTA_MAX: "90"      # pm-lista: ~360 produtos/chamada, ~60 chamadas fecham o catalogo (~20 min)
+      BATCHES: "30"        # pm-batch (pagina de produto): so complemento - itens por peso e detalhes
     steps:
       - name: Baixar o codigo
         uses: actions/checkout@v4

@@ -159,6 +159,86 @@ def cron_pm_batch(x_coleta_token: str | None = Header(None)):
         conn.close()
 
 
+@app.get("/cron/pm-lista")
+def cron_pm_lista(x_coleta_token: str | None = Header(None)):
+    """Refresh do Pague Menos PELA LISTAGEM: cada página de departamento traz ~40 produtos
+    com preço, então ~450 páginas cobrem o catálogo (vs ~20 mil páginas de produto no
+    pm-batch). Atualiza só produtos já conhecidos (URL -> EAN via `links`); item por peso
+    e descoberta de novos seguem no pm-batch/pm-descobrir. Cursor 'depto:pagina' no
+    app_config; 'volta'=True quando fecha o ciclo de todos os departamentos."""
+    from coletores.convertiez import (DEPARTAMENTOS, BloqueioDetectado, ColetorConvertiez,
+                                      extrair_listagem)
+
+    PAGINAS, ORCAMENTO_S, DELAY = 8, 35.0, 0.3   # cabe folgado no maxDuration=60 do Vercel
+    conn = _conn()
+    try:
+        if not _coleta_pm_token_ok(conn, x_coleta_token):
+            raise HTTPException(status_code=401, detail="token inválido")
+        m = conn.execute("SELECT id, nome, url_base FROM mercados WHERE slug = ?",
+                         (_COLETA_PM_SLUG,)).fetchone()
+        if not m:
+            raise HTTPException(status_code=500, detail="mercado não existe")
+        mid = m["id"]
+        row = conn.execute("SELECT valor FROM app_config WHERE chave = 'pm_lista_cursor'").fetchone()
+        try:
+            i, p = (int(x) for x in (row["valor"] if row else "0:1").split(":"))
+        except ValueError:
+            i, p = 0, 1
+        if not (0 <= i < len(DEPARTAMENTOS)) or p < 1:
+            i, p = 0, 1
+
+        col = ColetorConvertiez(slug=_COLETA_PM_SLUG, nome=m["nome"], url_base=m["url_base"],
+                                delay=DELAY, contato="contato@poupou.app")
+        base = col.url_base
+        agora = datetime.now(timezone.utc).isoformat()
+        t0 = time.monotonic()
+        paginas = lidos = gravados = 0
+        bloqueado = volta = False
+        with httpx.Client(headers=col._headers(), timeout=col.timeout,
+                          follow_redirects=True) as client:
+            while paginas < PAGINAS and time.monotonic() - t0 < ORCAMENTO_S:
+                try:
+                    resp = col._get(client, f"{base}/{DEPARTAMENTOS[i]}/?p={p}")
+                except BloqueioDetectado:
+                    bloqueado = True
+                    break
+                if resp is None or resp.status_code != 200:
+                    break   # falha pontual: não avança o cursor, repete na próxima chamada
+                paginas += 1
+                itens = extrair_listagem(resp.text)
+                if not itens:   # passou da última página do departamento -> próximo
+                    i, p = i + 1, 1
+                    if i >= len(DEPARTAMENTOS):
+                        i, volta = 0, True
+                        break
+                    continue
+                lidos += len(itens)
+                por_url = {base + it["href"]: it for it in itens}
+                marcas = ",".join("?" * len(por_url))
+                conhecidos = conn.execute(
+                    "SELECT l.url, l.ean, pr.nome_canonico AS nome, pa.so_no_site FROM links l "
+                    "JOIN produtos pr ON pr.ean = l.ean "
+                    "LEFT JOIN precos_atual pa ON pa.ean = l.ean AND pa.mercado_id = l.mercado_id "
+                    f"WHERE l.mercado_id = ? AND l.url IN ({marcas})",
+                    (mid, *por_url)).fetchall()
+                for r in conhecidos:
+                    it = por_url[r["url"]]
+                    ppu, _ = normalizar.preco_por_unidade(it["preco"], normalizar.extrair_medida(r["nome"]))
+                    database.inserir_preco(
+                        conn, ean=r["ean"], mercado_id=mid, preco=it["preco"], preco_por_unidade=ppu,
+                        coletado_em=agora, so_no_site=bool(r["so_no_site"]),
+                        preco_de=it["preco_de"], desconto_pct=it["desconto_pct"])
+                    gravados += 1
+                p += 1
+        conn.execute(
+            "INSERT INTO app_config (chave, valor) VALUES ('pm_lista_cursor', ?) "
+            "ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", (f"{i}:{p}",))
+        return {"ok": True, "paginas": paginas, "lidos": lidos, "gravados": gravados,
+                "cursor": f"{DEPARTAMENTOS[i]}:{p}", "volta": volta, "bloqueado": bloqueado}
+    finally:
+        conn.close()
+
+
 @app.get("/cron/pm-descobrir")
 def cron_pm_descobrir(x_coleta_token: str | None = Header(None)):
     """Descobre produtos NOVOS do Pague Menos: lê o sitemap (poucas requisições), acha URLs que

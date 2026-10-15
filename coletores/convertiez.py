@@ -75,6 +75,49 @@ _RE_PRECO = re.compile(r'itemprop="price"[^>]*content="([\d.]+)"', re.I)
 _RE_IMG = re.compile(r'property="og:image"\s+content="([^"]+)"', re.I)
 _RE_MARCA = re.compile(r'itemprop="brand"[^>]*content="([^"]+)"', re.I)
 
+# --- LISTAGEM (página de departamento /{depto}/?p=N, ~40 produtos por página) ---
+# Departamentos que, somados, cobrem o catálogo (~450 páginas). As páginas de MARCA
+# (/nestle/, /omo/…) repetem produtos destes, então ficam de fora.
+DEPARTAMENTOS = (
+    "mercearia", "bebidas", "limpeza", "higiene-e-beleza", "frios-e-laticinios",
+    "congelados", "bazar", "petshop", "mamae-e-bebe", "cafe-da-manha", "acougue",
+    "hortifruti", "9616-utilidades-domesticas", "festivos",
+)
+_RE_LISTA_HREF = re.compile(r'href="(/[a-z0-9][a-z0-9\-/]*?/p)"', re.I)
+_RE_LISTA_PRECO = re.compile(r'value="([\d.]+)"\s+name="price"', re.I)
+_RE_LISTA_DE = re.compile(r'class="unit-price[^"]*"[^>]*>\s*<span>\s*R\$\s*([\d.,]+)', re.I)
+
+
+def extrair_listagem(html: str) -> list[dict]:
+    """Produtos de UMA página de listagem: [{href, preco, preco_de, desconto_pct}].
+    Item vendido por peso (bloco price-weight) fica de fora: na listagem o preço é o
+    total da peça de referência, não o R$/kg — esse continua pela página do produto.
+    O selo 'só no site' não aparece na listagem (quem grava mantém o valor anterior)."""
+    out = []
+    for blk in html.split('class="item-product"')[1:]:
+        blk = blk.split('class="item-product"')[0]
+        if "price-weight" in blk:
+            continue
+        mh, mp = _RE_LISTA_HREF.search(blk), _RE_LISTA_PRECO.search(blk)
+        if not (mh and mp):
+            continue
+        preco = float(mp.group(1))
+        if preco <= 0:
+            continue
+        de = None
+        md = _RE_LISTA_DE.search(blk)
+        if md:
+            try:
+                de = float(md.group(1).replace(".", "").replace(",", "."))
+            except ValueError:
+                de = None
+        mdesc = _RE_DESCONTO.search(blk)
+        pct = int(mdesc.group(1)) if mdesc and int(mdesc.group(1)) > 0 else None
+        out.append({"href": mh.group(1), "preco": preco,
+                    "preco_de": round(de, 2) if (de and de > preco) else None,
+                    "desconto_pct": pct})
+    return out
+
 
 class ColetorConvertiez(Coletor):
     plataforma = "convertiez"

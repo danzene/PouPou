@@ -25,6 +25,39 @@ if not token:
     sys.exit("token de coleta nao encontrado no banco (app_config.coleta_token)")
 
 H = {"X-Coleta-Token": token}
+
+# 1) refresh PELA LISTAGEM (~360 produtos por chamada): fecha o ciclo do catálogo inteiro
+#    em ~60 chamadas. É o que mantém a "saúde" do Pague Menos perto de 100%.
+lista_total = 0
+with httpx.Client(timeout=95.0) as cli:
+    for i in range(1, int(os.environ.get("LISTA_MAX", "90")) + 1):
+        try:
+            r = cli.get(f"{base}/cron/pm-lista", headers=H)
+        except Exception as e:  # noqa: BLE001
+            print(f"lista {i}: erro {type(e).__name__}: {e}")
+            time.sleep(5)
+            continue
+        if r.status_code != 200:
+            print(f"lista {i}: HTTP {r.status_code} {r.text[:200]}")
+            if i == 1 and r.status_code == 401:
+                sys.exit("token recusado pelo Vercel. Abortando.")
+            time.sleep(5)
+            continue
+        d = r.json()
+        lista_total += int(d.get("gravados", 0) or 0)
+        print(f"lista {i}: paginas={d.get('paginas')} lidos={d.get('lidos')} "
+              f"gravados={d.get('gravados')} cursor={d.get('cursor')} bloqueado={d.get('bloqueado')}")
+        if d.get("bloqueado"):
+            print("Vercel sinalizou bloqueio -> parando a listagem")
+            break
+        if d.get("volta"):
+            print("ciclo completo da listagem")
+            break
+        time.sleep(2)
+print(f"==> TOTAL atualizado pela listagem: {lista_total}")
+
+# 2) refresh por PÁGINA DE PRODUTO: agora só um complemento (itens por peso, que a
+#    listagem não cobre, e detalhes como o selo 'só no site').
 total = 0
 with httpx.Client(timeout=95.0) as cli:
     for i in range(1, batches + 1):

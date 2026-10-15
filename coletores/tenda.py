@@ -104,11 +104,7 @@ class ColetorTenda(Coletor):
             log.warning("[%s] não obtive token — pulando mercado.", self.slug)
             return
         with httpx.Client(headers=self._headers(token), timeout=self.timeout, follow_redirects=True) as client:
-            resp = self._get(client, f"{API}/public/store/all-categories")
-            try:
-                arvore = resp.json() if resp is not None else None
-            except ValueError:
-                arvore = None
+            arvore = self._arvore(client)
             if not arvore:
                 log.warning("[%s] não obtive a árvore de categorias (mercado defasado — "
                             "preço antigo mantido e marcado como 'há X dias').", self.slug)
@@ -118,6 +114,33 @@ class ColetorTenda(Coletor):
                 categoria = mapear_categoria(dep.get("name"))
                 for vid in self._vitrines_para_varrer(dep):
                     yield from self._varrer_vitrine(client, vid, categoria, vistos)
+
+    def _arvore(self, client: httpx.Client) -> dict | None:
+        """Árvore de categorias: all-categories; se falhar, monta pelos departamentos.
+
+        Desde ~03/10/2026 o all-categories dá 504 (timeout ~30s no nginx do Tenda) e o
+        catálogo caía pros termos-semente (~2.100 de ~7.400 produtos). O /departments (o
+        mesmo que o menu do site usa) devolve a mesma subárvore — departamentos com as
+        vitrines filhas e countProducts — e responde em <1s. Tenta all-categories 1x só
+        (cada falha custa ~30s) e cai pro /departments."""
+        resp = self._get(client, f"{API}/public/store/all-categories", tentativas=1)
+        if resp is not None and resp.status_code == 200:
+            try:
+                arvore = resp.json()
+            except ValueError:
+                arvore = None
+            if isinstance(arvore, dict) and arvore.get("children"):
+                return arvore
+        log.info("[%s] all-categories falhou (%s) -> usando /departments", self.slug,
+                 resp.status_code if resp is not None else "timeout")
+        resp = self._get(client, f"{API}/public/store/departments")
+        if resp is None or resp.status_code != 200:
+            return None
+        try:
+            deps = resp.json()
+        except ValueError:
+            return None
+        return {"children": deps} if isinstance(deps, list) and deps else None
 
     def _get(self, client: httpx.Client, url: str, tentativas: int = 4) -> httpx.Response | None:
         """GET com pacing e retry+backoff em 429/5xx (auto-cura rate-limit).
@@ -157,7 +180,9 @@ class ColetorTenda(Coletor):
     def _varrer_vitrine(self, client, cid, categoria, vistos) -> Iterator[ItemColeta]:
         page = 1
         while True:
-            url = f"{API}/public/store/category/{cid}/products?page={page}&perPage=50"
+            # Sem `order` a API ignora `page` e devolve sempre a pág. 1 (20 itens) — foi o
+            # que segurou o Tenda em ~2.400 EANs. O front sempre manda order=relevance.
+            url = f"{API}/public/store/category/{cid}/products?page={page}&order=relevance&perPage=50"
             resp = self._get(client, url)
             if resp is None or resp.status_code != 200 or "json" not in (resp.headers.get("content-type") or ""):
                 return

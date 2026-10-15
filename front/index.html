@@ -1779,6 +1779,14 @@ function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(un
 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+// acesso diário pro painel /gestao: id ALEATÓRIO do aparelho (sem nome/e-mail); se logado,
+// o servidor associa ao usuário. Falhar aqui nunca atrapalha o app.
+function idVisitante(){ let v=lsGet("mb_vis","");
+  if(!/^[A-Za-z0-9-]{8,64}$/.test(v)){ v=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12)); lsSet("mb_vis",v); }
+  return v; }
+function registrarAcesso(){ try{ const h={"Content-Type":"application/json"};
+  if(SESSAO&&SESSAO.access_token) h.Authorization="Bearer "+SESSAO.access_token;
+  fetch(`${API}/acesso`,{method:"POST",headers:h,body:JSON.stringify({visitante:idVisitante()}),keepalive:true}).catch(()=>{}); }catch(e){} }
 function usuario(){ return SESSAO?{email:SESSAO.user.email, nome:PERFIL.nome||(SESSAO.user.email||"").split("@")[0]}:null; }
 function estaLogado(){ return !!SESSAO; }
 function plano(){ return PERFIL.plano||"gratis"; }
@@ -2443,9 +2451,11 @@ $("#btnCesta").addEventListener("click",loadCesta);
   if(sb){
     try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
     oauthRetorno = lsGet("mb_oauth_pending","")==="1"; if(oauthRetorno) lsSet("mb_oauth_pending","");
-    sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); if(sess) talvezVincularIndicacao(); });
+    sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); if(sess) talvezVincularIndicacao();
+      if(_ev==="SIGNED_IN") registrarAcesso(); });   // entrou agora: o acesso do dia ganha o "quem"
     if(SESSAO) talvezVincularIndicacao();   // sessão já ativa (ou volta do Google) com código pendente
   }
+  registrarAcesso();   // 1 registro por aparelho por dia (painel /gestao)
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
   atualizarContaUI();
   atualizarBadge();

@@ -719,3 +719,19 @@ def principais(conn, eans: list[str]) -> dict[str, str]:
                 tuple(bloco)).fetchall():
             out[r["ean"]] = r["ean_principal"]
     return out
+
+
+# ---------------------------------------------------------------------------
+# Acessos ao app (painel /gestao): 1 linha por aparelho por dia. 'visitante' é um id
+# aleatório que o próprio app gera e guarda no aparelho (sem nome, IP ou e-mail);
+# user_id só vem quando a pessoa está logada. Dá o fluxo diário sem rastrear além disso.
+# ---------------------------------------------------------------------------
+def garantir_acessos(conn) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS acessos ("
+                 "dia TEXT NOT NULL, visitante TEXT NOT NULL, user_id TEXT, "
+                 "primeiro TEXT NOT NULL, ultimo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, "
+                 "PRIMARY KEY (dia, visitante))")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_acessos_user ON acessos(user_id, dia)")
+    if isinstance(conn, _PgConn):
+        conn.execute("ALTER TABLE acessos ENABLE ROW LEVEL SECURITY")   # só o backend lê/grava
+    conn.commit()

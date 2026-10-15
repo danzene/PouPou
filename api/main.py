@@ -19,6 +19,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -653,6 +654,7 @@ try:
     _boot = database.conectar(os.getenv("DB_PATH", "dados/precos.db"))
     database.inicializar(_boot)
     database.garantir_equivalentes(_boot)   # de/para de EANs do mesmo produto + view unificada
+    database.garantir_acessos(_boot)        # acessos por dia (painel /gestao)
     _boot.close()
 except Exception as _boot_err:  # noqa: BLE001
     logging.getLogger("api").warning("boot: init do banco falhou, seguindo mesmo assim: %s", _boot_err)
@@ -1808,6 +1810,90 @@ def admin_coleta(authorization: str | None = Header(None)):
                         "carnes_frescas_24h": carnes.get(r["slug"], 0)})
         out.sort(key=lambda x: (not x["ativo"], -x["n_produtos"]))
         return {"mercados": out}
+    finally:
+        conn.close()
+
+
+_RE_VISITANTE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+_FUSO_BR = timezone(timedelta(hours=-3))   # dia de Brasília (sem horário de verão desde 2019)
+
+
+@app.post("/acesso", status_code=204)
+def registrar_acesso(body: dict = Body(...), authorization: str | None = Header(None)):
+    """O app chama ao abrir: 1 linha por aparelho por dia (n conta as aberturas). Com login,
+    grava também QUEM é. Sem dado pessoal além do uid: visitante é um id aleatório do aparelho."""
+    vis = str((body or {}).get("visitante") or "")
+    if not _RE_VISITANTE.match(vis):
+        raise HTTPException(status_code=400, detail="visitante inválido")
+    uid = _uid_do_header(authorization) if authorization else None
+    agora = datetime.now(timezone.utc)
+    dia = agora.astimezone(_FUSO_BR).date().isoformat()
+    conn = _conn()
+    try:
+        conn.execute(
+            "INSERT INTO acessos (dia, visitante, user_id, primeiro, ultimo, n) VALUES (?, ?, ?, ?, ?, 1) "
+            "ON CONFLICT (dia, visitante) DO UPDATE SET ultimo = excluded.ultimo, n = acessos.n + 1, "
+            "user_id = COALESCE(excluded.user_id, acessos.user_id)",
+            (dia, vis, uid, agora.isoformat(), agora.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+    return Response(status_code=204)
+
+
+@app.get("/admin/acessos")
+def admin_acessos(dias: int = 30, authorization: str | None = Header(None)):
+    """Fluxo de pessoas no app: por dia (aparelhos, logados, cadastros novos), totais de
+    hoje/7/30 dias e, por usuário cadastrado, último acesso e em quantos dias usou."""
+    dias = max(7, min(int(dias or 30), 120))
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        hoje = datetime.now(_FUSO_BR).date()
+        inicio = (hoje - timedelta(days=dias - 1)).isoformat()
+        por_dia = {r["dia"]: r for r in conn.execute(
+            "SELECT dia, COUNT(*) AS aparelhos, COUNT(DISTINCT user_id) AS logados, SUM(n) AS aberturas "
+            "FROM acessos WHERE dia >= ? GROUP BY dia", (inicio,)).fetchall()}
+        cad: dict = {}
+        for r in conn.execute("SELECT criado_em FROM profiles WHERE criado_em IS NOT NULL").fetchall():
+            ce = r["criado_em"]
+            ce = datetime.fromisoformat(ce) if isinstance(ce, str) else ce
+            if ce.tzinfo is None:
+                ce = ce.replace(tzinfo=timezone.utc)
+            d = ce.astimezone(_FUSO_BR).date().isoformat()
+            if d >= inicio:
+                cad[d] = cad.get(d, 0) + 1
+        serie = []
+        for k in range(dias):
+            d = (hoje - timedelta(days=dias - 1 - k)).isoformat()
+            r = por_dia.get(d)
+            serie.append({"dia": d, "aparelhos": (r["aparelhos"] if r else 0),
+                          "logados": (r["logados"] if r else 0),
+                          "aberturas": (r["aberturas"] if r else 0) or 0, "cadastros": cad.get(d, 0)})
+
+        def unicos(desde: str) -> int:
+            return conn.execute("SELECT COUNT(DISTINCT visitante) AS n FROM acessos WHERE dia >= ?",
+                                (desde,)).fetchone()["n"]
+        totais = {"hoje": unicos(hoje.isoformat()),
+                  "dias_7": unicos((hoje - timedelta(days=6)).isoformat()),
+                  "dias_30": unicos((hoje - timedelta(days=29)).isoformat()),
+                  "desde": conn.execute("SELECT MIN(dia) AS d FROM acessos").fetchone()["d"]}
+
+        ativos = {r["user_id"]: r for r in conn.execute(
+            "SELECT user_id, MAX(ultimo) AS ultimo, COUNT(DISTINCT dia) AS dias_ativos "
+            "FROM acessos WHERE user_id IS NOT NULL AND dia >= ? GROUP BY user_id", (inicio,)).fetchall()}
+        usuarios = []
+        for r in conn.execute(
+                "SELECT p.id, u.email, p.nome, p.plano, p.criado_em, u.last_sign_in_at "
+                "FROM profiles p LEFT JOIN auth.users u ON u.id = p.id").fetchall():
+            a = ativos.get(str(r["id"]))
+            ult = (a["ultimo"] if a else None) or r["last_sign_in_at"]
+            usuarios.append({"id": str(r["id"]), "email": r["email"], "nome": r["nome"],
+                             "plano": r["plano"] or "gratis", "criado_em": r["criado_em"],
+                             "ultimo_acesso": ult, "dias_ativos": (a["dias_ativos"] if a else 0)})
+        usuarios.sort(key=lambda u: str(u["ultimo_acesso"] or ""), reverse=True)
+        return {"serie": serie, "totais": totais, "usuarios": usuarios, "dias": dias}
     finally:
         conn.close()
 

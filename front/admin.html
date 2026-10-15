@@ -55,6 +55,18 @@
   .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0b1a12; border:1px solid var(--green-dark); color:var(--ink); padding:10px 18px; border-radius:var(--r-pill); font-size:13px; opacity:0; transition:.2s; pointer-events:none; z-index:9; }
   .toast.show{ opacity:1; }
   .hidden{ display:none; }
+  /* ---- acessos (gráfico de barras por dia) ---- */
+  .chart{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 12px 8px; margin-top:10px; }
+  .bars{ display:flex; align-items:flex-end; gap:3px; height:130px; }
+  .bars .c{ flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:stretch; position:relative; min-width:0; }
+  .bars .a{ background:rgba(46,204,113,.3); border-radius:4px 4px 0 0; display:flex; flex-direction:column; justify-content:flex-end; overflow:hidden; min-height:0; }
+  .bars .lg{ background:var(--green); }
+  .bars .cad{ position:absolute; left:50%; transform:translateX(-50%); width:7px; height:7px; border-radius:50%; background:#e0b64a; }
+  .bars .c.hoje .a{ outline:1px solid var(--green); }
+  .eixo{ display:flex; gap:3px; margin-top:5px; } .eixo span{ flex:1; font-size:9.5px; color:var(--faint); text-align:center; min-width:0; }
+  .leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--mut); margin-top:8px; }
+  .leg i{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .urow .dias{ font-size:12px; color:var(--mut); text-align:right; min-width:86px; } .urow .dias b{ color:var(--ink); }
 </style>
 </head>
 <body>
@@ -115,14 +127,36 @@ async function sair(){ try{ await sb.auth.signOut(); }catch(e){} TOKEN=null; loc
 async function mostrarPainel(metrica){
   $("#loginView").classList.add("hidden"); $("#painelView").classList.remove("hidden");
   try{
-    const [col,usu,mkt,jobs]=await Promise.all([
+    const [col,usu,mkt,jobs,ace]=await Promise.all([
       api("/admin/coleta").then(r=>r.json()), api("/admin/usuarios").then(r=>r.json()),
-      api("/admin/mercados").then(r=>r.json()), api("/admin/coleta/jobs").then(r=>r.json()).catch(()=>({jobs:[]}))
+      api("/admin/mercados").then(r=>r.json()), api("/admin/coleta/jobs").then(r=>r.json()).catch(()=>({jobs:[]})),
+      api("/admin/acessos?dias=30").then(r=>r.json()).catch(()=>null)
     ]);
-    render(metrica,col,usu,mkt,jobs);
+    render(metrica,col,usu,mkt,jobs,ace);
   }catch(e){ $("#painel").innerHTML=`<div class="state">Erro ao carregar os dados.</div>`; }
 }
-function render(m,col,usu,mkt,jobs){
+// Acessos: quantos aparelhos abriram o app por dia (verde claro), quantos deles estavam
+// logados (verde) e dias com cadastro novo (ponto amarelo) + quem usou e quando.
+function acessosHTML(a){
+  if(!a||!a.serie) return `<div class="state">Sem dados de acesso ainda.</div>`;
+  const t=a.totais||{}, s=a.serie, max=Math.max(1,...s.map(d=>d.aparelhos));
+  const dm=d=>{ const [y,mm,dd]=d.split("-"); return `${dd}/${mm}`; };
+  const hoje=s[s.length-1].dia;
+  const cards=[["Hoje",t.hoje],["Últimos 7 dias",t.dias_7],["Últimos 30 dias",t.dias_30]]
+    .map(([l,v])=>`<div class="card"><div class="n num">${num(v||0)}</div><div class="l">${l} · aparelhos</div></div>`).join("");
+  const bars=s.map(d=>{ const h=Math.round(100*d.aparelhos/max), hl=d.aparelhos?Math.round(100*d.logados/d.aparelhos):0;
+    const tip=`${dm(d.dia)}: ${d.aparelhos} aparelho(s), ${d.logados} logado(s), ${d.aberturas} abertura(s)${d.cadastros?`, ${d.cadastros} cadastro(s)`:""}`;
+    return `<div class="c ${d.dia===hoje?"hoje":""}" title="${esc(tip)}"><div class="a" style="height:${h}%"><div class="lg" style="height:${hl}%"></div></div>${d.cadastros?`<span class="cad" style="bottom:calc(${h}% + 4px)"></span>`:""}</div>`; }).join("");
+  const eixo=s.map((d,i)=>`<span>${(i%5===0||d.dia===hoje)?dm(d.dia):""}</span>`).join("");
+  const desde=t.desde?`registro desde ${dm(t.desde)}`:"o registro começa a contar a partir de hoje";
+  const users=(a.usuarios||[]).map(u=>`<div class="urow"><div class="info"><b>${esc(u.email||u.nome||(u.id||"").slice(0,8))}</b><span class="s">${esc(u.plano)} · último acesso ${u.ultimo_acesso?"há "+relTempo(u.ultimo_acesso):"—"}</span></div>
+      <div class="dias"><b class="num">${u.dias_ativos}</b> de ${a.dias} dias</div></div>`).join("");
+  return `<div class="cards">${cards}</div>
+    <div class="chart"><div class="bars">${bars}</div><div class="eixo">${eixo}</div>
+      <div class="leg"><span><i style="background:rgba(46,204,113,.3)"></i>aparelhos</span><span><i style="background:var(--green)"></i>logados</span><span><i style="background:#e0b64a;border-radius:50%"></i>cadastro novo</span><span style="color:var(--faint)">${desde}</span></div></div>
+    <div class="sec">Quem usou <span class="m">últimos ${a.dias} dias · por último acesso</span></div><div class="list">${users}</div>`;
+}
+function render(m,col,usu,mkt,jobs,ace){
   const cards=[["Usuários",m.usuarios],["Assinantes",m.assinantes],["Em trial",m.em_trial],["Com lista",m.usuarios_com_lista],["Itens em listas",m.itens_em_listas],["Favoritos",m.favoritos],["Produtos",m.produtos],["Preços",m.precos_atuais],["Frescos",m.frescos],["Mercados ativos",m.mercados_ativos]];
   const cardsH=`<div class="cards">${cards.map(([l,v])=>`<div class="card"><div class="n num">${num(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`;
   const coletaH=`<div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
@@ -143,6 +177,7 @@ function render(m,col,usu,mkt,jobs){
   const pp=Object.entries(usu.por_plano||{}).map(([k,v])=>`${k} ${v}`).join(" · ");
   $("#painel").innerHTML=`
     <div class="sec">Coleta manual <span class="m">força uma coleta de todos os mercados agora</span></div>${coletaH}
+    <div class="sec">Acessos <span class="m">pessoas abrindo o app por dia</span></div>${acessosHTML(ace)}
     <div class="sec">Métricas</div>${cardsH}
     <div class="sec">Saúde da coleta <span class="m">últimas 24h</span></div><div class="list">${colH}</div>
     <div class="sec">Usuários <span class="m">${usu.total} · ${pp}</span></div><div class="list">${usuH}</div>
@@ -154,7 +189,7 @@ function renderColeta(jobs){
   jobs=jobs||[];
   const ativo=jobs.find(j=>j.status==="pendente"||j.status==="rodando");
   const btn=$("#btnColeta"); if(btn) btn.disabled=!!ativo;
-  const rot={pendente:"⏳ na fila — seu PC pega em até ~3 min",rodando:"⚙️ coletando agora…",concluido:"✓ concluída",erro:"✕ erro"};
+  const rot={pendente:"⏳ na fila — a nuvem começa em até ~5 min",rodando:"⚙️ coletando agora…",concluido:"✓ concluída",erro:"✕ erro"};
   if(!jobs.length){
     box.innerHTML="Nenhuma coleta manual ainda. (A coleta agendada roda sozinha; o botão força uma agora.)";
   }else{

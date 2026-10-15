@@ -202,10 +202,11 @@ def cron_pm_lista(x_coleta_token: str | None = Header(None)):
                 except BloqueioDetectado:
                     bloqueado = True
                     break
-                if resp is None or resp.status_code != 200:
+                if resp is None or (resp.status_code != 200 and resp.status_code != 404):
                     break   # falha pontual: não avança o cursor, repete na próxima chamada
                 paginas += 1
-                itens = extrair_listagem(resp.text)
+                # 404 = passou da última página (o site não devolve página vazia)
+                itens = extrair_listagem(resp.text) if resp.status_code == 200 else []
                 if not itens:   # passou da última página do departamento -> próximo
                     i, p = i + 1, 1
                     if i >= len(DEPARTAMENTOS):

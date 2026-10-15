@@ -4,8 +4,8 @@ name: Coleta VIP + Tenda (nuvem)
 # unica forma de manter fresco e re-coletar: 3x/dia. Era a MercadoBarato-VipTenda.
 
 on:
-  schedule:
-    - cron: "15 1,9,17 * * *"  # 22:15, 06:15 e 14:15 Brasilia
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}
 
 concurrency:

@@ -9,9 +9,8 @@ name: Coleta Pague Menos (nuvem)
 # usando o secret DATABASE_URL que ja existe.
 
 on:
-  schedule:
-    - cron: "0 8 * * *"    # 05:00 Brasilia
-    - cron: "0 20 * * *"   # 17:00 Brasilia (2x/dia: o catalogo nunca passa de ~12h sem conferir)
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}    # botao "Run workflow" pra rodar na hora
 
 concurrency:

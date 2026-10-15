@@ -5,8 +5,8 @@ name: Coleta VTEX completa (nuvem)
 # Era a tarefa MercadoBarato-Rapidos do PC.
 
 on:
-  schedule:
-    - cron: "0 11 * * *"   # 11:00 UTC = 08:00 Brasilia
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}
 
 concurrency:
@@ -23,18 +23,3 @@ jobs:
         python coletar.py savegnago covabra atacadao oba
         python manutencao.py || echo "::warning::manutencao falhou (segue)"
         python conferir_precos.py --corrigir || echo "::warning::conferidor achou divergencias (ver log)"
-
-  # Repositorio PUBLICO: o GitHub desliga workflows agendados apos 60 dias sem commit.
-  # Este job religa todos 1x/dia, pra coleta nunca parar sozinha de novo.
-  manter-ligado:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Religar workflows agendados
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for id in $(gh api "repos/${{ github.repository }}/actions/workflows" --jq '.workflows[].id'); do
-            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$id/enable" || true
-          done

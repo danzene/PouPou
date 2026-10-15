@@ -5,8 +5,8 @@ name: Refresh rapido VTEX (nuvem)
 # O Pague Menos (Convertiez) NAO entra aqui: tem robo proprio (paguemenos-nuvem.yml).
 
 on:
-  schedule:
-    - cron: "30 */3 * * *"  # a cada 3h, no minuto 30
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}
 
 concurrency:

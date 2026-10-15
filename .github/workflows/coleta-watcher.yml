@@ -5,8 +5,8 @@ name: Vigia da coleta manual (nuvem)
 # aqui roda a cada 10 min (o GitHub nao garante cron mais curto que isso).
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}
 
 concurrency:

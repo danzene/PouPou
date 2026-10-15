@@ -4,8 +4,8 @@ name: Coleta Pao de Acucar (nuvem)
 # de madrugada. Era a MercadoBarato-GPA.
 
 on:
-  schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC = 03:00 Brasilia
+  # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
+  # o 'schedule' do GitHub atrasava horas ou pulava execucoes.
   workflow_dispatch: {}
 
 concurrency:

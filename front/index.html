@@ -1115,6 +1115,81 @@
     .pf2-ref-title{ font-size:21px; }
     .benef{ grid-template-columns:1fr; }
   }
+
+  /* ===== card de assinatura (não-assinante): estrutura de venda, cartão premium escuro ===== */
+  .pf2-plus.pr{ position:relative; overflow:hidden; padding:24px; border-radius:22px; color:#eef5f0;
+    border:1px solid rgba(217,164,65,.45);
+    background:
+      radial-gradient(420px 260px at 105% -10%, rgba(244,185,66,.30), transparent 62%),
+      radial-gradient(380px 260px at -10% 110%, rgba(57,199,139,.22), transparent 60%),
+      linear-gradient(165deg, #0f2a1e 0%, #0b1712 100%);
+    box-shadow:0 24px 48px -28px rgba(7,40,25,.75), inset 0 1px 0 rgba(255,255,255,.06); }
+  .pr-glow{ display:none; }
+  .pr-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pr-marca{ display:inline-flex; align-items:center; gap:8px; font-family:var(--disp); font-weight:800; font-size:20px; letter-spacing:-.02em; color:#fff; }
+  .pr-marca svg{ width:20px; height:20px; color:#f4b942; } .pr-marca em{ font-style:normal; color:#f4b942; margin-left:-5px; }
+  .pr-pill{ font-size:12px; font-weight:700; padding:5px 11px; border-radius:999px; background:rgba(244,185,66,.16);
+    color:#ffd27a; border:1px solid rgba(244,185,66,.35); white-space:nowrap; }
+  .pr-pill.urg{ background:rgba(255,124,109,.16); color:#ffb3a9; border-color:rgba(255,124,109,.4); }
+  .pr-t{ margin:18px 0 8px; font-family:var(--disp); font-size:clamp(26px, 3.4vw, 32px); line-height:1.05; letter-spacing:-.03em; color:#fff; max-width:18ch; }
+  .pr-s{ margin:0; font-size:14.5px; line-height:1.5; color:rgba(238,245,240,.78); max-width:46ch; }
+  .pr-s b{ color:#ffd27a; }
+  .pr-oferta{ margin:18px 0 6px; padding:16px; border-radius:16px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); }
+  .pr-preco{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .pr-preco .old{ font-size:15px; color:rgba(238,245,240,.5); text-decoration:line-through; }
+  .pr-preco .now{ font-family:var(--disp); font-size:44px; font-weight:800; letter-spacing:-.03em; line-height:1; color:#fff; }
+  .pr-preco .per{ font-size:14px; font-weight:600; color:rgba(238,245,240,.7); }
+  .pr-preco .off{ align-self:center; font-size:12px; font-weight:800; padding:3px 8px; border-radius:7px; background:#f4b942; color:#3a2600; }
+  .pr-anual{ margin-top:6px; font-size:13px; color:rgba(238,245,240,.7); } .pr-anual b{ color:#fff; font-weight:700; }
+  .pr-btn{ display:block; width:100%; height:54px; margin-top:16px; border:none; border-radius:14px; cursor:pointer;
+    background:linear-gradient(180deg, #45d495, #2fb87e); color:#04140d; font:700 16px var(--body); letter-spacing:-.01em;
+    box-shadow:0 14px 30px -14px rgba(57,199,139,.75), inset 0 1px 0 rgba(255,255,255,.35);
+    transition:transform .12s, filter .15s; }
+  .pr-btn:hover{ filter:brightness(1.06); } .pr-btn:active{ transform:scale(.98); }
+  .pr-micro{ margin:9px 0 0; text-align:center; font-size:12px; color:rgba(238,245,240,.6); }
+  .pf2-plus.pr .benef-t{ color:rgba(238,245,240,.55); }
+  .pf2-plus.pr .benef li{ background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
+  .pf2-plus.pr .benef li .bi{ background:rgba(57,199,139,.16); color:#5fe0a8; }
+  .pf2-plus.pr .benef li .bt b{ color:#fff; } .pf2-plus.pr .benef li .bt small{ color:rgba(238,245,240,.62); }
+  .pr-roi{ display:flex; gap:9px; align-items:flex-start; margin:4px 0 0; padding:12px 14px; border-radius:14px; font-size:13px; line-height:1.45;
+    color:#d8f6e7; background:rgba(57,199,139,.12); border:1px solid rgba(57,199,139,.25); }
+  .pr-roi .ico{ color:#5fe0a8; margin-top:2px; } .pr-roi b{ color:#fff; }
+  .pr-confia{ display:flex; justify-content:center; flex-wrap:wrap; gap:6px 16px; margin-top:14px; font-size:12px; color:rgba(238,245,240,.55); }
+  .pr-confia span{ display:inline-flex; align-items:center; gap:5px; }
+  .pr-mais{ text-align:center; margin-top:10px; }
+  .pf2-plus.pr .pf2-manage{ color:rgba(238,245,240,.85); }
+  .pf2-plus.pr .pf2-planos{ border-top-color:rgba(255,255,255,.12); }
+  /* seletor de plano e pagamento dentro do cartão escuro */
+  .pf2-plus.pr .ps{ background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.14); color:rgba(238,245,240,.75); }
+  .pf2-plus.pr .ps b{ color:#fff; } .pf2-plus.pr .ps b i{ color:rgba(238,245,240,.6); }
+  .pf2-plus.pr .ps.on{ background:rgba(57,199,139,.16); border-color:#45d495; color:#bff3da; }
+  .pf2-plus.pr .ps em.badge-off{ background:#f4b942; color:#3a2600; }
+  .pf2-plus.pr .btn-ghost{ border-color:rgba(255,255,255,.35); color:#fff; background:rgba(255,255,255,.04); }
+  .pf2-plus.pr .btn-ghost:hover{ background:rgba(255,255,255,.1); }
+  .pf2-plus.pr .fine{ color:rgba(238,245,240,.6); }
+
+  /* ===== indique e ganhe: cupons de recompensa + WhatsApp ===== */
+  .ref-cupons{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:2px 0 14px; }
+  .ref-cupom{ position:relative; display:flex; flex-direction:column; gap:2px; padding:14px 14px 13px; border-radius:16px;
+    background:#fff; color:#0b3a26; box-shadow:0 10px 24px -16px rgba(0,0,0,.45); }
+  .ref-cupom::before, .ref-cupom::after{ content:""; position:absolute; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; background:#0b8f57; }
+  .ref-cupom::before{ left:-7px; } .ref-cupom::after{ right:-7px; }
+  .ref-cupom .q{ font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#3d7a5d; }
+  .ref-cupom b{ font-family:var(--disp); font-size:30px; font-weight:800; letter-spacing:-.03em; line-height:1.05; color:#0b6b43; }
+  .ref-cupom .d{ font-size:12px; line-height:1.3; color:#4b6b5c; }
+  .ref-cupom.voce{ background:#fff7e3; } .ref-cupom.voce b{ color:#9a6400; } .ref-cupom.voce .q{ color:#9a6a16; }
+  .ref-whats{ display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:50px; margin:0 0 10px; border:none;
+    border-radius:14px; background:#fff; color:#0b6b43; font:800 15px var(--body); cursor:pointer;
+    box-shadow:0 12px 26px -16px rgba(0,0,0,.5); transition:transform .12s, background-color .15s; }
+  .ref-whats .ico{ font-size:20px; color:#16a34a; } .ref-whats:hover{ background:#f1fff7; } .ref-whats:active{ transform:scale(.98); }
+  .pf2-ref-link{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22); }
+  .pf2-ref-link input{ color:#fff; } .pf2-ref-link input::selection{ background:rgba(255,255,255,.3); }
+  .pf2-ref-copy{ background:rgba(255,255,255,.95); color:#0b6b43; } .pf2-ref-copy:hover{ background:#fff; }
+  @media (max-width:560px){
+    .pf2-plus.pr{ padding:20px; }
+    .pr-preco .now{ font-size:38px; }
+    .ref-cupom b{ font-size:26px; }
+  }
 </style>
 </head>
 <body>
@@ -1189,6 +1264,7 @@ let categorias=[], catAtiva=null;
 /* ---------- ícones (um conjunto só, estilo Lucide) ---------- */
 const ICONS={
   pin:'<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  whats:'<path d="M3.5 20.5l1.3-4A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.2c.2 2.6 3 5.6 5.8 5.8l1.2-1.5-2-1-1 .7a5 5 0 0 1-2.2-2.2l.7-1-1-2z"/>',
   rota:'<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   cart:'<path d="M5 7h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>',
@@ -2423,24 +2499,33 @@ function loadPerfil(secao, manterPlanos){
     const trialAvail = !trialJaUsado() && !emTrial;
     const _num=s=>parseFloat(String(s).replace(/[^\d,]/g,"").replace(",","."))||0;
     const off=Math.round((1-_num(PRECO_MENSAL)/_num(PRECO_DE))*100);
+    const nMk = (MERCADOS && MERCADOS.length) || 11;
     const pill = emTrial
-      ? `<span class="pf2-promo-free urg">⏳ grátis termina em ${diasRestantesTrial()} dia(s)</span>`
-      : (trialAvail ? `<span class="pf2-promo-free">✨ ${trialDiasOferta()} dias grátis · sem cartão</span>` : `<span class="pf2-promo-free">Oferta de lançamento</span>`);
-    const hook = emTrial
-      ? `Seu acesso completo termina logo — <b>garanta o PouPou+</b> e siga economizando em toda feira.`
-      : `Desbloqueie <b>onde comprar cada item mais barato</b> e economize em toda feira.`;
+      ? `<span class="pr-pill urg">Seu teste termina em ${diasRestantesTrial()} dia(s)</span>`
+      : (trialAvail ? `<span class="pr-pill">${trialDiasOferta()} dias grátis</span>` : `<span class="pr-pill">Oferta de lançamento</span>`);
+    const titulo = emTrial ? "Continue economizando em toda feira." : "Pare de pagar mais caro na feira.";
+    const sub = emTrial
+      ? `Garanta o PouPou+ e siga vendo onde cada item sai mais barato nos ${nMk} mercados.`
+      : `Veja em qual dos ${nMk} mercados cada item sai mais barato e monte a rota que faz sua feira render.`;
     const cta = trialAvail
-      ? `<button class="btn-primary pf2-cta big" type="button" onclick="desbloquear(this)">${ic("crown")} Começar — ${trialDiasOferta()} dias grátis</button>`
-      : `<button class="btn-primary pf2-cta big" type="button" onclick="pfPlanos(this)">${ic("crown")} Assinar por ${PRECO_MENSAL}/mês</button>`;
-    plus=`<div class="pf2-plus promo">
-        <div class="pf2-promo-glow" aria-hidden="true"></div>
-        <div class="pf2-promo-top"><span class="pf2-plus-t">${ic("crown")} PouPou+</span>${pill}</div>
-        <div class="pf2-promo-hook" data-k="ecohook">${hook}</div>
-        <div class="pf2-promo-price"><span class="old">${PRECO_DE}</span><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
-        ${benef}
-        <div class="pf2-promo-roi">${ic("check")}<span>Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+ — se paga na 1ª compra.</span></div>
-        <div class="pf2-plus-actions">${cta}
-          <button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">${trialAvail?"ou ver planos e pagar agora":"escolher plano e forma de pagamento"}</button></div>
+      ? `<button class="pr-btn" type="button" onclick="desbloquear(this)">Começar ${trialDiasOferta()} dias grátis</button>`
+      : `<button class="pr-btn" type="button" onclick="pfPlanos(this)">Assinar por ${PRECO_MENSAL}/mês</button>`;
+    const micro = trialAvail ? "Sem cartão de crédito · sem compromisso" : "Pix ou cartão · cancele a renovação quando quiser";
+    plus=`<div class="pf2-plus promo pr">
+        <div class="pr-glow" aria-hidden="true"></div>
+        <div class="pr-top"><span class="pr-marca">${ic("crown")} PouPou<em>+</em></span>${pill}</div>
+        <h3 class="pr-t">${titulo}</h3>
+        <p class="pr-s" data-k="ecohook">${sub}</p>
+        <div class="pr-oferta">
+          <div class="pr-preco"><span class="old">${PRECO_DE}</span><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
+          <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · 2 meses grátis</div>
+          ${cta}
+          <p class="pr-micro">${micro}</p>
+        </div>
+        <div class="benef-t">O que você desbloqueia</div>${benef}
+        <div class="pr-roi">${ic("check")}<span>Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+. Ele se paga na primeira compra.</span></div>
+        <div class="pr-confia"><span>${ic("lock")} Pagamento seguro via Mercado Pago</span><span>Pix ou cartão</span></div>
+        <div class="pr-mais"><button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">${trialAvail?"Ver planos e pagar agora":"Escolher plano e forma de pagamento"}</button></div>
         <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${seletor}${payBtns}</div>
       </div>`;
   }
@@ -2473,19 +2558,19 @@ function loadPerfil(secao, manterPlanos){
   // ---------- Indique e ganhe (card hero, chamativo) ----------
   const indica=`<div class="pf2-ref-hero">
       <div class="pf2-ref-glow" aria-hidden="true"></div>
-      <div class="pf2-ref-gift" aria-hidden="true">${ic("gift")}</div>
       <div class="pf2-ref-body">
         <span class="pf2-ref-eyebrow">${ic("gift")} Indique e ganhe</span>
-        <h3 class="pf2-ref-title">Ganhe meses grátis chamando os amigos</h3>
-        <ol class="pf2-ref-steps">
-          <li><span class="n">1</span><span><b>Seu amigo ganha 7 dias grátis</b><small>O dobro do teste normal, entrando pelo seu link</small></span></li>
-          <li><span class="n">2</span><span><b>Você ganha 1 mês a cada 2 assinaturas</b><small>Contamos sozinhos quando eles assinam</small></span></li>
-        </ol>
+        <h3 class="pf2-ref-title">Chame seus amigos e ganhe meses de PouPou+</h3>
+        <div class="ref-cupons">
+          <div class="ref-cupom"><span class="q">Seu amigo ganha</span><b>7 dias</b><span class="d">grátis ao entrar pelo seu link</span></div>
+          <div class="ref-cupom voce"><span class="q">Você ganha</span><b>1 mês</b><span class="d">a cada 2 amigos que assinarem</span></div>
+        </div>
+        <button class="ref-whats" type="button" onclick="enviarWhatsRef()">${ic("whats")} Enviar convite no WhatsApp</button>
         <div class="pf2-ref-link">
           <input id="refLink" type="text" readonly value="…" aria-label="Seu link de indicação" onclick="this.select()">
           <button class="pf2-ref-copy" type="button" id="refCopy" onclick="copiarRefLink()">${ic("copy")} Copiar</button>
         </div>
-        <button class="pf2-ref-share-b" type="button" id="refShareBtn" onclick="compartilharRef()" hidden>${ic("external")} Compartilhar convite</button>
+        <button class="pf2-ref-share-b" type="button" id="refShareBtn" onclick="compartilharRef()" hidden>${ic("external")} Outros apps</button>
         <div class="pf2-ref-prog"><span>Próximo mês grátis</span><b class="num" data-ri="prog">0 de 2 assinaturas</b></div>
         <div class="pf2-ref-bar"><span id="refBar" style="width:0%"></span></div>
         <div class="pf2-ref-nums">
@@ -2537,7 +2622,7 @@ async function carregarResumoPerfil(){
     const p2=document.querySelector('[data-k2="alertas"]'); if(p2) p2.textContent=`${nAl} ${nAl===1?"ativo":"ativos"}`;
     // gancho personalizado da promoção: mostra a economia REAL da feira atual
     const hk=document.querySelector('[data-k="ecohook"]');
-    if(hk && eco>0){ hk.innerHTML=`Na sua feira de agora dá pra economizar <b>${brl(eco)}</b> — o PouPou+ te mostra <b>onde</b> comprar cada item. 👀`; }
+    if(hk && eco>0){ hk.innerHTML=`Na sua lista de agora dá pra economizar <b>${brl(eco)}</b>. O PouPou+ mostra onde comprar cada item.`; }
   }catch(e){}
 }
 
@@ -2588,6 +2673,12 @@ async function copiarRefLink(){
   try{ await navigator.clipboard.writeText(inp.value); }
   catch(e){ try{ inp.select(); document.execCommand("copy"); }catch(_){} }
   toast("Link copiado ✓ Manda pros amigos!");
+}
+function enviarWhatsRef(){
+  const inp=document.getElementById("refLink"); const link=inp?inp.value:"";
+  if(!link || link==="…"){ toast("Seu link ainda está carregando"); return; }
+  const msg=`Tô usando o PouPou pra ver em qual mercado a feira sai mais barata. Entrando pelo meu link você ganha 7 dias grátis: ${link}`;
+  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank","noopener");
 }
 async function compartilharRef(){
   const inp=document.getElementById("refLink"); const link=inp?inp.value:"";

@@ -385,15 +385,18 @@ _CLASSES_PERECIVEL = [
                 "camarao", "sardinha fresca", "file de peixe", "posta", "lula", "polvo")),
     ("frios",   ("queijo", "mussarela", "mucarela", "presunto", "mortadela", "salame",
                  "frios", "apresuntado", "peito de peru", "provolone", "parmesao",
-                 "prato lanche", "copa", "lombo canadense")),
+                 "prato lanche", "copa", "lombo canadense", "salaminho", "requeijao")),
     ("carnes", ("carne", "bovin", "boi", "acem", "alcatra", "patinho", "coxao", "musculo",
                 "picanha", "fraldinha", "maminha", "costela", "cupim", "file",
                 "lombo", "pernil", "suino", "porco", "frango", "coxa", "sobrecoxa", "peito de frango",
                 "asa", "linguica", "bisteca", "moida", "carne seca",
                 "contra file", "capa de file", "paleta", "figado", "coracao",
-                "hamburguer", "chester", "peru", "bacon", "carre")),
+                "hamburguer", "chester", "peru", "bacon", "carre",
+                "panceta", "ossobuco", "osso buco", "rabo", "pele suina", "orelha",
+                "ponta de peito", "peito bovino", "lagarto", "costelinha", "toucinho")),
     ("padaria", ("pao", "paes", "bisnaga", "baguete", "sonho", "croissant",
-                 "rosca", "bolo", "torta", "folhado", "padaria", "brioche", "focaccia")),
+                 "rosca", "bolo", "torta", "folhado", "padaria", "brioche", "focaccia",
+                 "pudim", "rocambole", "pastel", "muffin", "panetone", "queijadinha")),
     ("ovos",    ("ovo", "ovos", "duzia de ovo", "ovo caipira")),
     ("hortifruti", ("abacaxi", "abacate", "abobora", "abobrinha", "acelga", "alface", "banana",
                     "tomate", "cebola", "batata", "cenoura", "maca", "laranja", "limao",
@@ -403,7 +406,9 @@ _CLASSES_PERECIVEL = [
                     "coentro", "gengibre", "pepino", "berinjela", "milho verde", "verdura",
                     "legume", "fruta", "hortalica", "mexerica", "tangerina", "kiwi", "goiaba",
                     "maracuja", "caqui", "figo", "ameixa", "nectarina", "pessego",
-                    "rabanete", "nabo", "aipim", "mandioquinha", "escarola", "almeirao", "agriao")),
+                    "rabanete", "nabo", "aipim", "mandioquinha", "escarola", "almeirao", "agriao",
+                    "pinhao", "pitaia", "pitaya", "roma", "lichia", "carambola", "jabuticaba",
+                    "moranga", "cabotia", "kabotia")),
 ]
 # Pré-compila 1 regex por classe (alternância com fronteira de palavra), com as
 # chaves já sem acento (mesma normalização do nome), pra casar palavra inteira.
@@ -448,6 +453,14 @@ _NEGATIVOS_FRESCO = [
     r"pao.*hamburg", r"\bbauducco\b|\bmelhor bocado\b",
     r"\b(hossomaki|uramaki|temaki|niguiri|nigiri|sashimi|sushi|combinado)\b",
     r"kit combinacao", r"strogonoff de|estrogonofe|(^|exec\.?\s*)strogonoff", r"\bbatata palito\b",
+    # vistos na busca em 15/10/2026: cosmético/higiene ('Des Dove Rollon ... Pessego E Leite
+    # Arroz' virava hortifrúti), comida de bebê, snack de marca, limpeza e kit de produtos
+    # diferentes somados com '+' (esponja + detergente virava hortifrúti)
+    r"\bdes\b|desodor|roll ?on|antitransp|shampoo|condicionador|hidratante|\blocao\b",
+    r"\bpapinha|\bsopinha|papapa", r"\binstantaneo\b|\bknorr\b|cup noodles|\bmiojo\b",
+    r"\blays\b|\bruffles\b|\bdoritos\b|\bcheetos\b|\bpringles\b|\bsnacks?\b",
+    r"\besponja|scotch.?brite|\bdesinfetante\b|\bamaciante\b",
+    r"\bkit\b.*\+",
 ]
 _NEG_FRESCO_RE = re.compile("|".join(f"(?:{p})" for p in _NEGATIVOS_FRESCO))
 
@@ -472,6 +485,21 @@ _RUIDO_FRESCO = [re.compile(p) for p in [
 ]]
 # Conectivos/artigos que, isolados, só atrapalham o casamento (não carregam corte).
 _FILLER_FRESCO = re.compile(r"\b(a|ao|as|os|o|de|da|do|das|dos|e|em|no|na|para)\b")
+
+
+# "Preço por quilo (na peça/bandeja)", "Abacate Quilo", "Contra Filé Kg": vendido por kg e o
+# preço JÁ é R$/kg. "1 KG"/"500g" (com número antes) é tamanho de pacote, não entra aqui.
+_RE_POR_QUILO = re.compile(r"preco por quilo|\bquilo\b|\bpor kg\b|\bkg\b")
+_RE_PESO_FIXO = re.compile(r"\d[\d.,]*\s*kg\b")
+
+
+def unidade_perecivel(nome: str | None, unidade: str | None) -> str | None:
+    """Unidade de venda corrigida pelo nome: o Atacadão manda 'Preço por quilo na peça'
+    com unidade 'un' (392 itens), e aí o app comparava R$/kg com preço de bandeja."""
+    n = normalizar_nome(nome) or ""
+    if unidade != "kg" and _RE_POR_QUILO.search(n) and not _RE_PESO_FIXO.search(n):
+        return "kg"
+    return unidade
 
 
 def eh_falso_fresco(nome: str | None) -> bool:
@@ -526,8 +554,9 @@ def upsert_perecivel(
 ) -> None:
     """Upsert do preço ATUAL de um item fresco/por peso (sem EAN) num mercado.
     Itens claramente não-frescos (ração, bebida, industrializado...) são ignorados."""
-    if eh_falso_fresco(nome):
+    if classificar_perecivel(nome) == "outros":   # veto de não-fresco OU sem seção (pilha, sacola...)
         return
+    unidade = unidade_perecivel(nome, unidade)
     if oferta_tipo is None and desconto_pct:
         oferta_tipo = "oferta"
     nnorm = normalizar_nome(nome)
@@ -619,7 +648,8 @@ def gravar_lote_pereciveis(conn, mercado_id: int, itens: list[dict], coletado_em
     """Versão em lote do upsert_perecivel (mesmos filtros e mesmo histórico por mudança).
     Cada item: cod_interno, nome, preco, unidade, imagem_url, url, so_no_site, preco_de,
     desconto_pct, oferta_tipo."""
-    itens = [it for it in itens if not eh_falso_fresco(it["nome"])]
+    # veto de não-fresco OU sem seção de fresco (pilha, sacola de Natal...) não entra
+    itens = [it for it in itens if classificar_perecivel(it["nome"]) != "outros"]
     if not itens:
         return 0
     ant: dict[str, float | None] = {}
@@ -641,7 +671,7 @@ def gravar_lote_pereciveis(conn, mercado_id: int, itens: list[dict], coletado_em
         if a is None or abs(float(a) - float(preco)) > 0.005:
             hist.append((mercado_id, it["cod_interno"], nnorm, preco, coletado_em))
         linhas.append((mercado_id, it["cod_interno"], nome, nnorm, classificar_perecivel(nome), preco,
-                       it.get("unidade"), it.get("imagem_url"), it.get("url"), coletado_em,
+                       unidade_perecivel(nome, it.get("unidade")), it.get("imagem_url"), it.get("url"), coletado_em,
                        1 if it.get("so_no_site") else 0, it.get("preco_de"),
                        it.get("desconto_pct"), oferta_tipo))
     if hist:

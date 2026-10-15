@@ -1371,20 +1371,28 @@ async function loadCategoria(slug,nome){ catAtiva=slug; marcarNav();
   try{ const d=await fetch(`${API}/categoria/${slug}?limite=60`).then(r=>r.json());
     render(d.produtos,`${d.produtos.length} produtos em ${d.categoria.nome}`);
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar.</p>`; } }
-async function loadBusca(q){ catAtiva=null; marcarNav();
+let BUSCA_Q="", BUSCA_TIPOS=[];
+function buscaTipo(btn){ loadBusca(BUSCA_Q, btn.dataset.t||null); }
+function barraTipos(ativo){ // "Todos · Longa vida · Condensado · Em pó…" (vem do servidor, a partir dos resultados)
+  if(!BUSCA_TIPOS.length) return "";
+  const b=(t,rot,n)=>`<button class="tab ${(ativo||"")===t?"on":""}" type="button" data-t="${esc(t)}" onclick="buscaTipo(this)">${esc(rot)}${n?` <span class="muted">${n}</span>`:""}</button>`;
+  return `<div class="tabs busca-tipos" role="group" aria-label="Filtrar por tipo">${b("","Todos")}${BUSCA_TIPOS.map(t=>b(t.tipo,t.rotulo.charAt(0).toUpperCase()+t.rotulo.slice(1),t.n)).join("")}</div>`;
+}
+async function loadBusca(q,tipo){ catAtiva=null; marcarNav();
   if(q.length<2){ saida.innerHTML=""; ctx.textContent=""; return; }
   saida.innerHTML=`<p class="state">Buscando…</p>`;
-  try{ const d=await fetch(`${API}/buscar?q=${encodeURIComponent(q)}`).then(r=>r.json());
+  try{ const d=await fetch(`${API}/buscar?q=${encodeURIComponent(q)}${tipo?`&tipo=${encodeURIComponent(tipo)}`:""}`).then(r=>r.json());
     const per=d.pereciveis||[], res=d.resultados||[];
+    if(!tipo){ BUSCA_Q=q; BUSCA_TIPOS=d.tipos||[]; } // botões vêm da busca sem filtro
     ctx.textContent=`${res.length} resultado(s)${per.length?` + ${per.length} fresco(s)`:""} para “${q}”`;
     if(!res.length && !per.length){
       saida.innerHTML=`<p class="state"><span class="big">${ic("search")}</span>Nada encontrado. Tente outro termo ou categoria.</p>`; return;
     }
-    // frescos (peças/açougue/hortifrúti) PRIMEIRO — é o que a pessoa busca por nome;
-    // depois os industrializados/embalados com código de barras.
+    // frescos na frente só quando a busca É de fresco (picanha, banana); em "arroz"/"leite"
+    // os embalados vêm primeiro — o servidor decide (frescos_primeiro).
     const blocoFrescos=per.length?blocoPereciveis(per):"";
     const blocoProdutos=res.length?`<div class="sec-title">${ic("cat_outros")} Embalados e industrializados <span class="muted">com código de barras</span></div><div class="grid">${res.map(cardProduto).join("")}</div>`:"";
-    saida.innerHTML=blocoFrescos+blocoProdutos;
+    saida.innerHTML=barraTipos(tipo)+(d.frescos_primeiro?blocoFrescos+blocoProdutos:blocoProdutos+blocoFrescos);
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao buscar.</p>`; } }
 
 /* ---------- frescos / ofertas ---------- */

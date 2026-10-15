@@ -31,7 +31,7 @@ from fastapi import Body, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from analise import normalizar
-from analise.ranking import _unaccent, buscar_produtos
+from analise.ranking import _unaccent, buscar_com_tipos
 from db import database
 
 load_dotenv()
@@ -988,15 +988,16 @@ def _buscar_pereciveis(conn: sqlite3.Connection, q: str, limite: int = 30) -> li
     tokens = [t for t in full.split() if t]
     if not tokens:
         return []
-    cond = " AND ".join(["p.nome_norm LIKE ?"] * len(tokens))
-    params = [f"%{t}%" for t in tokens]
+    # início de palavra ('arroz' não casa no meio de outra palavra) e só frescos de verdade
+    cond = " AND ".join(["(p.nome_norm LIKE ? OR p.nome_norm LIKE ?)"] * len(tokens))
+    params = [x for t in tokens for x in (f"{t}%", f"% {t}%")]
     rows = conn.execute(
         f"""
         SELECT p.nome, p.nome_norm, p.preco, p.unidade, p.url, p.imagem_url, p.coletado_em,
                p.so_no_site, p.preco_de, p.desconto_pct, p.oferta_tipo,
                m.nome AS mercado, m.slug AS mercado_slug, m.cor_badge, m.plataforma
         FROM pereciveis p JOIN mercados m ON m.id = p.mercado_id
-        WHERE {cond}
+        WHERE {cond} AND p.categoria <> 'outros'
         ORDER BY p.nome_norm, p.preco
         """,
         params,
@@ -1173,13 +1174,14 @@ def clube(limite: int = 500):
 
 
 @app.get("/buscar")
-def buscar(q: str):
+def buscar(q: str, tipo: str | None = None):
     q = (q or "").strip()
     if len(q) < 2:
-        return {"q": q, "resultados": [], "pereciveis": []}
+        return {"q": q, "resultados": [], "pereciveis": [], "tipos": [], "frescos_primeiro": False}
     conn = _conn()
     try:
-        achados = buscar_produtos(conn, q, limite=40)
+        # relevância + botões de tipo ('leite' -> condensado, longa vida, em pó...); `tipo` filtra
+        achados, tipos = buscar_com_tipos(conn, q, limite=40, tipo=tipo or None)
         # busca os produtos completos + rankings EM LOTE (sem N+1: era 1 query de produto
         # + 1 de ranking por resultado ~= 80 idas; vira ~2).
         eans = [a["ean"] for a in achados]
@@ -1196,8 +1198,14 @@ def buscar(q: str):
                 _produto_dict(conn, por_ean[e], com_sparkline=False, ranking=rk.get(e, []))
                 for e in eans if e in por_ean  # preserva a ordem de relevância
             ]
-        pereciveis = _buscar_pereciveis(conn, q)
-        return {"q": q, "resultados": resultados, "pereciveis": pereciveis}
+        pereciveis = [] if tipo else _buscar_pereciveis(conn, q)
+        # frescos vão na frente só quando a busca É de fresco ('picanha', 'banana'): algum
+        # grupo começa com o termo. Em 'arroz'/'leite' os embalados vêm primeiro.
+        base = database.normalizar_nome(q) or ""
+        frescos_primeiro = any((database.normalizar_nome(g["nome"]) or "").startswith(base)
+                               for g in pereciveis)
+        return {"q": q, "resultados": resultados, "pereciveis": pereciveis,
+                "tipos": tipos, "frescos_primeiro": frescos_primeiro}
     finally:
         conn.close()
 

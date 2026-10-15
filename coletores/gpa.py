@@ -14,6 +14,7 @@ produto, consulta o EAN. É uma requisição a mais por produto (como o Converti
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Iterator
 
@@ -23,9 +24,14 @@ from .base import (Coletor, ItemColeta, ItemPerecivel, MercadoIndisponivel,
                    perecivel_se_fresco)
 from .vtex import ean_valido
 
+from analise import normalizar
+
 log = logging.getLogger("coletor.gpa")
 
 API = "https://api.vendas.gpa.digital/pa"
+# "kg" vendido por peso = "kg" NÃO precedido de número ("Contra Filé Bovino Kg");
+# "1,5kg"/"500g" é o peso da peça/bandeja (aí o preço da API é o da peça inteira)
+_RE_POR_KG = re.compile(r"(?<![\d.,])\bkg\b", re.I)
 IMG_BASE = "https://static-images.gpa.digital"  # thumbPath/productImages começam com /img/...
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -141,6 +147,8 @@ class ColetorGPA(Coletor):
         preco = p.get("price")
         if not pid or not preco or preco <= 0:
             return None
+        if p.get("stock") is False:
+            return None   # "Ops :( No momento não temos esse produto em estoque" no site
         nome = p.get("name")
         marca = p.get("brand")
         imgs = p.get("productImages") or []
@@ -159,8 +167,18 @@ class ColetorGPA(Coletor):
                 imagem_url=imagem, preco=float(preco), categoria=categoria, url=url,
             )
         # Sem EAN universal: só entra como fresco se o nome for de fato fresco.
+        # Item por peso: a API dá o preço da PEÇA/BANDEJA ("Contra Filé Swift 1,5kg" =
+        # 104,85 = 69,90/kg). Com o peso no nome -> R$/kg; só "Kg" sem número -> já é
+        # R$/kg; sem peso nenhum -> preço da peça, SEM "/kg" (não dá pra comparar por kg).
+        preco = float(preco)
+        if por_peso:
+            medida = normalizar.extrair_medida(nome or "")
+            if medida and medida.unidade == "kg" and medida.qtd_base > 0:
+                preco = round(preco / medida.qtd_base, 2)
+            elif not _RE_POR_KG.search(nome or ""):
+                unidade = None
         return perecivel_se_fresco(
-            cod_interno=str(pid), nome=nome, preco=float(preco), unidade=unidade,
+            cod_interno=str(pid), nome=nome, preco=preco, unidade=unidade,
             imagem_url=imagem, url=url,
         )
 

@@ -1898,6 +1898,46 @@ def admin_acessos(dias: int = 30, authorization: str | None = Header(None)):
         conn.close()
 
 
+@app.get("/admin/acessos/dia")
+def admin_acessos_dia(dia: str, authorization: str | None = Header(None)):
+    """Quem entrou num dia (clique na barra do gráfico): logados com e-mail, plano, horário
+    da 1ª e da última abertura e quantas vezes abriu; visitantes sem login só contados."""
+    try:
+        dia = datetime.strptime(dia, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="dia inválido (use AAAA-MM-DD)")
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        rows = conn.execute(
+            "SELECT a.user_id, MIN(a.primeiro) AS primeiro, MAX(a.ultimo) AS ultimo, SUM(a.n) AS aberturas, "
+            "COUNT(*) AS aparelhos FROM acessos a WHERE a.dia = ? AND a.user_id IS NOT NULL "
+            "GROUP BY a.user_id", (dia,)).fetchall()
+        perfis = {}
+        if rows:
+            ph = ",".join("?" * len(rows))
+            for r in conn.execute(
+                    f"SELECT p.id, u.email, p.nome, p.plano FROM profiles p LEFT JOIN auth.users u ON u.id = p.id "
+                    f"WHERE p.id::text IN ({ph})", tuple(r["user_id"] for r in rows)).fetchall():
+                perfis[str(r["id"])] = r
+        pessoas = []
+        for r in rows:
+            p = perfis.get(str(r["user_id"]))
+            pessoas.append({"id": str(r["user_id"]), "email": p["email"] if p else None,
+                            "nome": p["nome"] if p else None, "plano": (p["plano"] if p else None) or "gratis",
+                            "primeiro": r["primeiro"], "ultimo": r["ultimo"],
+                            "aberturas": r["aberturas"], "aparelhos": r["aparelhos"]})
+        pessoas.sort(key=lambda x: str(x["primeiro"]))
+        anon = conn.execute(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(n), 0) AS ab FROM acessos WHERE dia = ? AND user_id IS NULL",
+            (dia,)).fetchone()
+        return {"dia": dia, "pessoas": pessoas,
+                "sem_login": {"aparelhos": anon["n"], "aberturas": anon["ab"]}}
+    finally:
+        conn.close()
+
+
 @app.get("/admin/usuarios")
 def admin_usuarios(authorization: str | None = Header(None)):
     conn = _conn()
@@ -2238,46 +2278,6 @@ def admin_toggle_mercado(slug: str, body: dict = Body(...), authorization: str |
         ativo = 1 if (body or {}).get("ativo") else 0
         conn.execute("UPDATE mercados SET ativo = ? WHERE slug = ?", (ativo, slug))
         return {"ok": True, "slug": slug, "ativo": bool(ativo)}
-    finally:
-        conn.close()
-
-
-@app.post("/admin/coleta/solicitar")
-def admin_coleta_solicitar(authorization: str | None = Header(None)):
-    """Enfileira um pedido de coleta (o coleta_watcher.py no PC do dono é quem roda o
-    coletar.py). Se já houver um pendente/rodando, devolve esse — não duplica."""
-    conn = _conn()
-    try:
-        uid = _admin_uid(conn, authorization)
-        if not uid:
-            raise HTTPException(status_code=403, detail="Acesso restrito")
-        r = conn.execute(
-            "SELECT id, status FROM coleta_jobs WHERE status IN ('pendente','rodando') ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        if r:
-            return {"ok": True, "ja_existe": True, "id": r["id"], "status": r["status"]}
-        cur = conn.execute(
-            "INSERT INTO coleta_jobs (status, solicitado_por, solicitado_em) VALUES ('pendente', ?, ?) RETURNING id",
-            (uid, datetime.now(timezone.utc).isoformat()))
-        novo = cur.fetchone()
-        return {"ok": True, "id": (novo["id"] if novo else None), "status": "pendente"}
-    finally:
-        conn.close()
-
-
-@app.get("/admin/coleta/jobs")
-def admin_coleta_jobs(authorization: str | None = Header(None)):
-    """Últimos pedidos de coleta + status (o painel usa pra acompanhar)."""
-    conn = _conn()
-    try:
-        if not _admin_uid(conn, authorization):
-            raise HTTPException(status_code=403, detail="Acesso restrito")
-        rows = conn.execute(
-            "SELECT id, status, solicitado_em, iniciado_em, terminado_em, resultado "
-            "FROM coleta_jobs ORDER BY id DESC LIMIT 10").fetchall()
-        return {"jobs": [{"id": r["id"], "status": r["status"], "solicitado_em": r["solicitado_em"],
-                          "iniciado_em": r["iniciado_em"], "terminado_em": r["terminado_em"],
-                          "resultado": r["resultado"]} for r in rows]}
     finally:
         conn.close()
 

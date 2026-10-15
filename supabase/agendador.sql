@@ -52,11 +52,6 @@ select cron.schedule('poupou-vtex',        '0 11 * * *',     $$select privado.di
 select cron.schedule('poupou-refresh',     '30 */3 * * *',   $$select privado.disparar_workflow('refresh-vtex.yml')$$);      -- a cada 3h
 select cron.schedule('poupou-vip-tenda',   '15 1,9,17 * * *',$$select privado.disparar_workflow('coleta-vip-tenda.yml')$$);  -- 22:15, 06:15, 14:15
 select cron.schedule('poupou-gpa',         '0 6 * * *',      $$select privado.disparar_workflow('coleta-gpa.yml')$$);        -- 03:00
--- vigia do botão "coletar agora" do /gestao: só dispara quando HÁ pedido pendente
-select cron.schedule('poupou-vigia',       '*/3 * * * *',
-  $$select privado.disparar_workflow('coleta-watcher.yml')
-      where exists (select 1 from public.coleta_jobs where status = 'pendente')$$);
-
 -- Conferir:   select jobname, schedule, active from cron.job;
 -- Histórico:  select * from cron.job_run_details order by start_time desc limit 20;
 -- Respostas do GitHub (204 = disparou): select status_code, content from net._http_response order by created desc limit 10;

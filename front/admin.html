@@ -67,6 +67,14 @@
   .leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--mut); margin-top:8px; }
   .leg i{ display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   .urow .dias{ font-size:12px; color:var(--mut); text-align:right; min-width:86px; } .urow .dias b{ color:var(--ink); }
+  .bars .c{ cursor:pointer; } .bars .c:hover .a{ filter:brightness(1.35); }
+  .bars .c.sel .a{ outline:2px solid #e0b64a; outline-offset:1px; }
+  .dia-det{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 13px; margin-top:10px; }
+  .dia-det .h{ font-size:13.5px; font-weight:700; margin-bottom:8px; } .dia-det .h span{ color:var(--mut); font-weight:500; }
+  .dia-det .p{ display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:13px; }
+  .dia-det .p .e{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dia-det .p .hr{ color:var(--mut); font-size:12px; text-align:right; white-space:nowrap; }
+  .dia-det .anon{ color:var(--faint); font-size:12px; padding-top:8px; border-top:1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -127,12 +135,12 @@ async function sair(){ try{ await sb.auth.signOut(); }catch(e){} TOKEN=null; loc
 async function mostrarPainel(metrica){
   $("#loginView").classList.add("hidden"); $("#painelView").classList.remove("hidden");
   try{
-    const [col,usu,mkt,jobs,ace]=await Promise.all([
+    const [col,usu,mkt,ace]=await Promise.all([
       api("/admin/coleta").then(r=>r.json()), api("/admin/usuarios").then(r=>r.json()),
-      api("/admin/mercados").then(r=>r.json()), api("/admin/coleta/jobs").then(r=>r.json()).catch(()=>({jobs:[]})),
+      api("/admin/mercados").then(r=>r.json()),
       api("/admin/acessos?dias=30").then(r=>r.json()).catch(()=>null)
     ]);
-    render(metrica,col,usu,mkt,jobs,ace);
+    render(metrica,col,usu,mkt,ace);
   }catch(e){ $("#painel").innerHTML=`<div class="state">Erro ao carregar os dados.</div>`; }
 }
 // Acessos: quantos aparelhos abriram o app por dia (verde claro), quantos deles estavam
@@ -146,22 +154,36 @@ function acessosHTML(a){
     .map(([l,v])=>`<div class="card"><div class="n num">${num(v||0)}</div><div class="l">${l} · aparelhos</div></div>`).join("");
   const bars=s.map(d=>{ const h=Math.round(100*d.aparelhos/max), hl=d.aparelhos?Math.round(100*d.logados/d.aparelhos):0;
     const tip=`${dm(d.dia)}: ${d.aparelhos} aparelho(s), ${d.logados} logado(s), ${d.aberturas} abertura(s)${d.cadastros?`, ${d.cadastros} cadastro(s)`:""}`;
-    return `<div class="c ${d.dia===hoje?"hoje":""}" title="${esc(tip)}"><div class="a" style="height:${h}%"><div class="lg" style="height:${hl}%"></div></div>${d.cadastros?`<span class="cad" style="bottom:calc(${h}% + 4px)"></span>`:""}</div>`; }).join("");
+    return `<div class="c ${d.dia===hoje?"hoje":""}" data-dia="${d.dia}" title="${esc(tip)} — clique pra ver quem" onclick="verDia('${d.dia}')"><div class="a" style="height:${h}%"><div class="lg" style="height:${hl}%"></div></div>${d.cadastros?`<span class="cad" style="bottom:calc(${h}% + 4px)"></span>`:""}</div>`; }).join("");
   const eixo=s.map((d,i)=>`<span>${(i%5===0||d.dia===hoje)?dm(d.dia):""}</span>`).join("");
   const desde=t.desde?`registro desde ${dm(t.desde)}`:"o registro começa a contar a partir de hoje";
   const users=(a.usuarios||[]).map(u=>`<div class="urow"><div class="info"><b>${esc(u.email||u.nome||(u.id||"").slice(0,8))}</b><span class="s">${esc(u.plano)} · último acesso ${u.ultimo_acesso?"há "+relTempo(u.ultimo_acesso):"—"}</span></div>
       <div class="dias"><b class="num">${u.dias_ativos}</b> de ${a.dias} dias</div></div>`).join("");
   return `<div class="cards">${cards}</div>
     <div class="chart"><div class="bars">${bars}</div><div class="eixo">${eixo}</div>
-      <div class="leg"><span><i style="background:rgba(46,204,113,.3)"></i>aparelhos</span><span><i style="background:var(--green)"></i>logados</span><span><i style="background:#e0b64a;border-radius:50%"></i>cadastro novo</span><span style="color:var(--faint)">${desde}</span></div></div>
+      <div class="leg"><span style="color:var(--ink)">👆 clique num dia pra ver quem entrou</span><span><i style="background:rgba(46,204,113,.3)"></i>aparelhos</span><span><i style="background:var(--green)"></i>logados</span><span><i style="background:#e0b64a;border-radius:50%"></i>cadastro novo</span><span style="color:var(--faint)">${desde}</span></div></div>
+    <div id="diaDetalhe"></div>
     <div class="sec">Quem usou <span class="m">últimos ${a.dias} dias · por último acesso</span></div><div class="list">${users}</div>`;
 }
-function render(m,col,usu,mkt,jobs,ace){
+const hora=iso=>iso?new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"}):"—";
+async function verDia(dia){
+  document.querySelectorAll(".bars .c").forEach(c=>c.classList.toggle("sel",c.dataset.dia===dia));
+  const box=$("#diaDetalhe"); if(!box) return;
+  box.innerHTML=`<div class="dia-det"><div class="h">Carregando…</div></div>`;
+  try{
+    const d=await api(`/admin/acessos/dia?dia=${dia}`).then(r=>r.json());
+    const dt=new Date(dia+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
+    const ps=d.pessoas||[], an=d.sem_login||{aparelhos:0,aberturas:0};
+    const linhas=ps.map(p=>`<div class="p"><div class="e"><b>${esc(p.email||p.nome||p.id.slice(0,8))}</b> <span class="tag">${esc(p.plano)}</span></div>
+        <div class="hr">${hora(p.primeiro)}${p.ultimo&&hora(p.ultimo)!==hora(p.primeiro)?` – ${hora(p.ultimo)}`:""} · abriu ${p.aberturas}x</div></div>`).join("");
+    const anon=an.aparelhos?`<div class="anon">+ ${an.aparelhos} aparelho(s) sem login · ${an.aberturas} abertura(s) — sem identificação</div>`:"";
+    box.innerHTML=`<div class="dia-det"><div class="h">${esc(dt)} <span>· ${ps.length} logado(s), ${an.aparelhos} sem login</span></div>
+      ${linhas||(an.aparelhos?"":`<div class="anon">Ninguém abriu o app nesse dia.</div>`)}${anon}</div>`;
+  }catch(e){ box.innerHTML=`<div class="dia-det"><div class="h">Erro ao carregar o dia.</div></div>`; }
+}
+function render(m,col,usu,mkt,ace){
   const cards=[["Usuários",m.usuarios],["Assinantes",m.assinantes],["Em trial",m.em_trial],["Com lista",m.usuarios_com_lista],["Itens em listas",m.itens_em_listas],["Favoritos",m.favoritos],["Produtos",m.produtos],["Preços",m.precos_atuais],["Frescos",m.frescos],["Mercados ativos",m.mercados_ativos]];
   const cardsH=`<div class="cards">${cards.map(([l,v])=>`<div class="card"><div class="n num">${num(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`;
-  const coletaH=`<div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
-      <button class="btn" id="btnColeta" onclick="solicitarColeta()" style="margin:0;height:46px">▶ Iniciar coleta de todos os mercados</button>
-      <div id="coletaStatus" style="font-size:12.5px;color:var(--mut)"></div></div>`;
   const colH=(col.mercados||[]).map(x=>{ const c=x.pct_24h>=80?"ok":x.pct_24h>=40?"warn":"bad";
     return `<div class="row ${x.ativo?"":"off"}"><div class="mk"><b>${esc(x.nome)}</b><span class="s">${esc(x.plataforma||"")}${x.ativo?"":" · inativo"}</span></div>
       <div class="met"><span class="v num">${num(x.n_no_site??x.n_produtos)}</span><span class="l">no site</span></div>
@@ -176,43 +198,12 @@ function render(m,col,usu,mkt,jobs,ace){
       <label class="sw"><input type="checkbox" ${x.ativo?"checked":""} onchange="toggleMercado('${esc(x.slug)}',this.checked)"><span class="t"></span></label></div>`).join("");
   const pp=Object.entries(usu.por_plano||{}).map(([k,v])=>`${k} ${v}`).join(" · ");
   $("#painel").innerHTML=`
-    <div class="sec">Coleta manual <span class="m">força uma coleta de todos os mercados agora</span></div>${coletaH}
     <div class="sec">Acessos <span class="m">pessoas abrindo o app por dia</span></div>${acessosHTML(ace)}
     <div class="sec">Métricas</div>${cardsH}
     <div class="sec">Saúde da coleta <span class="m">últimas 24h</span></div><div class="list">${colH}</div>
     <div class="sec">Usuários <span class="m">${usu.total} · ${pp}</span></div><div class="list">${usuH}</div>
     <div class="sec">Mercados <span class="m">ligar/desligar</span></div><div class="list">${mktH}</div>`;
-  renderColeta((jobs&&jobs.jobs)||[]);
-}
-function renderColeta(jobs){
-  const box=$("#coletaStatus"); if(!box) return;
-  jobs=jobs||[];
-  const ativo=jobs.find(j=>j.status==="pendente"||j.status==="rodando");
-  const btn=$("#btnColeta"); if(btn) btn.disabled=!!ativo;
-  const rot={pendente:"⏳ na fila — a nuvem começa em até ~5 min",rodando:"⚙️ coletando agora…",concluido:"✓ concluída",erro:"✕ erro"};
-  if(!jobs.length){
-    box.innerHTML="Nenhuma coleta manual ainda. (A coleta agendada roda sozinha; o botão força uma agora.)";
-  }else{
-    box.innerHTML=jobs.slice(0,5).map(j=>{
-      const cor=j.status==="concluido"?"ok":j.status==="erro"?"bad":"warn";
-      const quando=j.terminado_em?("terminou há "+relTempo(j.terminado_em)):(j.iniciado_em?("rodando há "+relTempo(j.iniciado_em)):("pedida há "+relTempo(j.solicitado_em)));
-      const res=(j.resultado&&j.status!=="rodando")?`<div style="color:var(--faint);font-size:11px;margin-top:2px;white-space:pre-wrap;max-height:60px;overflow:auto">${esc((j.resultado||"").slice(-220))}</div>`:"";
-      return `<div style="padding:7px 0;border-top:1px solid var(--line)"><span class="${cor}">${rot[j.status]||j.status}</span> <span style="color:var(--faint)">· ${quando}</span>${res}</div>`;
-    }).join("");
-  }
-  if(ativo){ if(!window._coletaPoll) window._coletaPoll=setInterval(atualizarColeta,5000); }
-  else if(window._coletaPoll){ clearInterval(window._coletaPoll); window._coletaPoll=null; }
-}
-async function atualizarColeta(){
-  try{ const j=await api("/admin/coleta/jobs").then(r=>r.json()); renderColeta(j.jobs); }catch(e){}
-}
-async function solicitarColeta(){
-  const btn=$("#btnColeta"); if(btn) btn.disabled=true;
-  try{
-    const r=await api("/admin/coleta/solicitar",{method:"POST"});
-    if(r.ok){ toast("Coleta solicitada ✓ — seu PC vai começar em instantes"); atualizarColeta(); }
-    else{ toast("Erro ao solicitar coleta"); if(btn) btn.disabled=false; }
-  }catch(e){ toast("Erro ao solicitar"); if(btn) btn.disabled=false; }
+  if(ace&&ace.serie&&ace.serie.length) verDia(ace.serie[ace.serie.length-1].dia);   // abre em "hoje"
 }
 async function setPlano(uid,plano){
   try{ const r=await api(`/admin/usuario/${uid}/plano`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plano})}); toast(r.ok?`Plano → ${plano} ✓`:"Erro"); }catch(e){ toast("Erro"); }

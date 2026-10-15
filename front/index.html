@@ -1033,6 +1033,88 @@
     .btn-compare{ height:38px; font-size:13px; padding:0 6px; }
     .btn-add{ width:38px; height:38px; font-size:18px; }
   }
+
+  /* ===== plano e indicação (redesign 10/2026) ===== */
+  /* benefícios: blocos com ícone, título e explicação (o flex antigo separava os negritos do texto) */
+  .benef{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:8px; margin:14px 0 16px; }
+  .benef li{ display:flex; align-items:flex-start; gap:11px; padding:11px 12px; border-radius:14px;
+    background:color-mix(in srgb, var(--surface) 72%, transparent); border:1px solid color-mix(in srgb, var(--line) 80%, transparent); }
+  .benef li .bi{ flex:0 0 auto; width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
+    background:var(--green-light); color:var(--green-dark); font-size:17px; }
+  :root[data-theme="dark"] .benef li .bi{ color:var(--green); }
+  .benef li .bt{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .benef li .bt b{ font-size:13.5px; font-weight:700; color:var(--ink); line-height:1.25; }
+  .benef li .bt small{ font-size:12px; color:var(--mut); line-height:1.35; }
+  .benef-t{ margin:18px 0 -4px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); }
+  .pf2-promo-roi span{ min-width:0; }
+  .benef li:last-child:nth-child(odd){ grid-column:1 / -1; }   /* 5 benefícios: o último ocupa a linha toda */
+
+  /* assinante: cartão de membro (dourado discreto, marca em destaque) */
+  .pf2-plus.on{ position:relative; overflow:hidden; padding:22px; border:1px solid color-mix(in srgb, #d9a441 55%, var(--line));
+    background:
+      radial-gradient(520px 220px at 100% 0%, color-mix(in srgb, #f4b942 22%, transparent), transparent 70%),
+      linear-gradient(160deg, color-mix(in srgb, #f4b942 10%, var(--surface)) 0%, var(--surface) 60%);
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 18px 40px -26px rgba(122,78,0,.45); }
+  :root[data-theme="dark"] .pf2-plus.on{ border-color:color-mix(in srgb, #d9a441 38%, var(--line));
+    background:
+      radial-gradient(520px 220px at 100% 0%, rgba(244,185,66,.16), transparent 70%),
+      linear-gradient(160deg, #1d1a10 0%, var(--surface) 65%);
+    box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 18px 40px -24px rgba(0,0,0,.7); }
+  .pf2-plus.on .pf2-plus-t{ font-family:var(--disp); font-size:24px; letter-spacing:-.02em; color:var(--ink); gap:9px; }
+  :root[data-theme="dark"] .pf2-plus.on .pf2-plus-t{ color:var(--ink); }
+  .pf2-plus.on .pf2-plus-t svg{ width:22px; height:22px; color:#d9a441; }
+  .pf2-plus.on .pf2-plus-t em{ font-style:normal; color:#d9a441; margin-left:-6px; }
+  .pf2-plus.on .pf2-plus-badge{ display:inline-flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0;
+    font-size:12px; font-weight:700; padding:5px 11px; background:color-mix(in srgb, var(--green) 16%, transparent); color:var(--green-dark); }
+  .pf2-plus.on .pf2-plus-badge::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--green);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent); }
+  :root[data-theme="dark"] .pf2-plus.on .pf2-plus-badge{ color:var(--green); }
+  .pf2-plus.on .pf2-plus-sub{ margin-top:8px; font-size:14px; }
+  .pf2-plus.on .benef li{ background:color-mix(in srgb, var(--surface) 80%, transparent); }
+  .pf2-plus.on .pf2-plus-actions{ flex-direction:row; }
+  .pf2-plus.on .pf2-manage{ text-decoration:none; border:1px solid var(--line-2); background:var(--surface); border-radius:11px;
+    padding:9px 14px; font-size:13.5px; color:var(--ink); transition:border-color .15s, background-color .15s, transform .12s; }
+  .pf2-plus.on .pf2-manage:hover{ border-color:#d9a441; }
+  .pf2-plus.on .pf2-manage:active{ transform:scale(.97); }
+
+  /* indique e ganhe: passos numerados, link + copiar num campo só, progresso explicado */
+  .pf2-ref-hero{ padding:22px; border-radius:20px;
+    background:
+      radial-gradient(420px 220px at 100% 0%, rgba(244,185,66,.28), transparent 65%),
+      linear-gradient(150deg,#075c39 0%,#0b8f57 55%,#11a565 100%); }
+  .pf2-ref-gift{ top:-10px; right:-14px; opacity:.10; }
+  .pf2-ref-eyebrow{ background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22); }
+  .pf2-ref-title{ font-size:24px; letter-spacing:-.02em; margin:14px 0 14px; max-width:20ch; }
+  .pf2-ref-steps{ list-style:none; margin:0 0 16px; padding:0; display:grid; gap:8px; }
+  .pf2-ref-steps li{ display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border-radius:14px;
+    background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.16); }
+  .pf2-ref-steps .n{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+    background:#fff; color:#0b8f57; font-weight:800; font-size:13px; font-family:var(--disp); }
+  .pf2-ref-steps li > span:last-child{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .pf2-ref-steps b{ font-size:14px; font-weight:700; color:#fff; line-height:1.3; }
+  .pf2-ref-steps small{ font-size:12px; color:rgba(255,255,255,.80); }
+  .pf2-ref-link{ gap:0; padding:5px; border-radius:14px; background:#fff; margin-bottom:10px; }
+  .pf2-ref-link input{ height:42px; background:transparent; border-radius:10px; color:#0a3a28; font-size:13.5px; }
+  .pf2-ref-link input:focus-visible{ outline:2px solid #0b8f57; outline-offset:0; }
+  .pf2-ref-copy{ height:42px; border-radius:10px; background:#0b8f57; color:#fff; padding:0 16px; transition:background-color .15s, transform .12s; }
+  .pf2-ref-copy:hover{ background:#075c39; } .pf2-ref-copy:active{ transform:scale(.97); }
+  .pf2-ref-share-b{ height:44px; border-radius:12px; border-width:1px; margin-bottom:18px; }
+  .pf2-ref-prog{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px; font-size:12.5px; color:rgba(255,255,255,.85); }
+  .pf2-ref-prog b{ color:#fff; font-size:13px; font-weight:700; }
+  .pf2-ref-bar{ height:10px; background:rgba(0,0,0,.18); box-shadow:inset 0 1px 2px rgba(0,0,0,.15); }
+  .pf2-ref-bar span{ background:linear-gradient(90deg, #fff, #ffe7a6); min-width:0; }
+  .pf2-ref-nums{ display:grid; grid-template-columns:repeat(3,1fr); gap:0; margin-top:16px; padding-top:14px;
+    border-top:1px solid rgba(255,255,255,.18); }
+  .pf2-ref-nums > div{ display:flex; flex-direction:column; align-items:center; gap:1px; }
+  .pf2-ref-nums > div + div{ border-left:1px solid rgba(255,255,255,.18); }
+  .pf2-ref-nums b{ font-family:var(--disp); font-size:22px; font-weight:800; line-height:1.1; }
+  .pf2-ref-nums span{ font-size:11.5px; color:rgba(255,255,255,.80); }
+  .pf2-ref-hint{ margin-top:14px; padding:10px 12px; border-radius:12px; background:rgba(0,0,0,.14); }
+  @media (max-width:560px){
+    .pf2-plus.on, .pf2-ref-hero{ padding:18px; }
+    .pf2-ref-title{ font-size:21px; }
+    .benef{ grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
@@ -1106,6 +1188,8 @@ let categorias=[], catAtiva=null;
 
 /* ---------- ícones (um conjunto só, estilo Lucide) ---------- */
 const ICONS={
+  pin:'<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  rota:'<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   cart:'<path d="M5 7h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/>',
   external:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>',
@@ -2273,11 +2357,11 @@ function loadPerfil(secao, manterPlanos){
   if(secao==="assinar") PF_PLANOS_ABERTO=true; else if(!manterPlanos) PF_PLANOS_ABERTO=false;
 
   const benef=`<ul class="benef">
-      <li><span class="ok">${ic("check")}</span> Ver <b>em qual mercado</b> pegar cada item da sua lista</li>
-      <li><span class="ok">${ic("check")}</span> A <b>rota otimizada</b>: o que comprar em cada mercado</li>
-      <li><span class="ok">${ic("check")}</span> Ranking de <b>qual supermercado</b> sai mais barato pra sua feira</li>
-      <li><span class="ok">${ic("check")}</span> <b>Alertas</b> quando um item da sua feira baixa de preço</li>
-      <li><span class="ok">${ic("check")}</span> Seus <b>mercados favoritos</b> em destaque</li>
+      <li><span class="bi">${ic("pin")}</span><span class="bt"><b>Onde comprar cada item</b><small>O mercado mais barato pra cada produto da lista</small></span></li>
+      <li><span class="bi">${ic("rota")}</span><span class="bt"><b>Rota otimizada</b><small>O que pegar em cada mercado pra gastar menos</small></span></li>
+      <li><span class="bi">${ic("chart")}</span><span class="bt"><b>Ranking de mercados</b><small>Qual supermercado sai mais barato pra sua feira</small></span></li>
+      <li><span class="bi">${ic("bell")}</span><span class="bt"><b>Alertas de preço</b><small>Aviso quando um item da sua lista baixa</small></span></li>
+      <li><span class="bi">${ic("star")}</span><span class="bt"><b>Mercados favoritos</b><small>Os seus mercados sempre em destaque</small></span></li>
     </ul>`;
 
   // ---------- visitante (não logado): entrada enxuta ----------
@@ -2328,8 +2412,9 @@ function loadPerfil(secao, manterPlanos){
       ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação automática</button>`
       : `<div class="pf2-renew-lbl">Renovar / mudar plano</div>${seletor}${payBtns}`;
     plus=`<div class="pf2-plus on">
-        <div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span><span class="pf2-plus-badge">ATIVO</span></div>
-        ${plusBody}${benef}
+        <div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou<em>+</em></span><span class="pf2-plus-badge">Ativo</span></div>
+        ${plusBody}
+        <div class="benef-t">Incluído no seu plano</div>${benef}
         <div class="pf2-plus-actions"><button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">Gerenciar assinatura</button></div>
         <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${plusReveal}</div>
       </div>`;
@@ -2353,7 +2438,7 @@ function loadPerfil(secao, manterPlanos){
         <div class="pf2-promo-hook" data-k="ecohook">${hook}</div>
         <div class="pf2-promo-price"><span class="old">${PRECO_DE}</span><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
         ${benef}
-        <div class="pf2-promo-roi">${ic("check")} Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+ — se paga na 1ª compra.</div>
+        <div class="pf2-promo-roi">${ic("check")}<span>Uma feira otimizada economiza <b>mais que um mês</b> de PouPou+ — se paga na 1ª compra.</span></div>
         <div class="pf2-plus-actions">${cta}
           <button class="pf2-manage" type="button" aria-expanded="${PF_PLANOS_ABERTO}" onclick="pfPlanos(this)">${trialAvail?"ou ver planos e pagar agora":"escolher plano e forma de pagamento"}</button></div>
         <div class="pf2-planos" id="pf2Planos" ${PF_PLANOS_ABERTO?"":"hidden"}>${seletor}${payBtns}</div>
@@ -2391,22 +2476,22 @@ function loadPerfil(secao, manterPlanos){
       <div class="pf2-ref-gift" aria-hidden="true">${ic("gift")}</div>
       <div class="pf2-ref-body">
         <span class="pf2-ref-eyebrow">${ic("gift")} Indique e ganhe</span>
-        <h3 class="pf2-ref-title">Ganhe <b>meses grátis</b> chamando os amigos 🎉</h3>
-        <p class="pf2-ref-pitch">Seu amigo começa com <b>7 dias grátis</b> — o dobro do normal. E a cada <b>2 amigos</b> que assinarem, <b>você ganha 1 mês</b> por nossa conta.</p>
-        <div class="pf2-ref-perks">
-          <span class="pf2-ref-perk">${ic("gift")} Amigo: <b>7 dias</b></span>
-          <span class="pf2-ref-perk">${ic("crown")} Você: <b>1 mês</b> a cada 2</span>
-        </div>
+        <h3 class="pf2-ref-title">Ganhe meses grátis chamando os amigos</h3>
+        <ol class="pf2-ref-steps">
+          <li><span class="n">1</span><span><b>Seu amigo ganha 7 dias grátis</b><small>O dobro do teste normal, entrando pelo seu link</small></span></li>
+          <li><span class="n">2</span><span><b>Você ganha 1 mês a cada 2 assinaturas</b><small>Contamos sozinhos quando eles assinam</small></span></li>
+        </ol>
         <div class="pf2-ref-link">
           <input id="refLink" type="text" readonly value="…" aria-label="Seu link de indicação" onclick="this.select()">
           <button class="pf2-ref-copy" type="button" id="refCopy" onclick="copiarRefLink()">${ic("copy")} Copiar</button>
         </div>
-        <button class="pf2-ref-share-b" type="button" id="refShareBtn" onclick="compartilharRef()" hidden>${ic("external")} Compartilhar convite com amigos</button>
+        <button class="pf2-ref-share-b" type="button" id="refShareBtn" onclick="compartilharRef()" hidden>${ic("external")} Compartilhar convite</button>
+        <div class="pf2-ref-prog"><span>Próximo mês grátis</span><b class="num" data-ri="prog">0 de 2 assinaturas</b></div>
         <div class="pf2-ref-bar"><span id="refBar" style="width:0%"></span></div>
         <div class="pf2-ref-nums">
-          <span><b class="num" data-ri="conv">0</b> assinaram</span>
-          <span><b class="num" data-ri="ind">0</b> indicados</span>
-          <span><b class="num" data-ri="meses">0</b> meses grátis</span>
+          <div><b class="num" data-ri="ind">0</b><span>indicados</span></div>
+          <div><b class="num" data-ri="conv">0</b><span>assinaram</span></div>
+          <div><b class="num" data-ri="meses">0</b><span>meses ganhos</span></div>
         </div>
         <p class="pf2-ref-hint" data-ri="hint">Compartilhe seu link pra começar a ganhar.</p>
       </div></div>`;
@@ -2490,6 +2575,7 @@ async function carregarIndicacao(){
   set("conv", d.convertidos); set("ind", d.indicados); set("meses", d.meses_ganhos);
   const por=d.por_mes||REF_POR_MES, resto=d.convertidos % por;
   const bar=document.getElementById("refBar"); if(bar) bar.style.width=Math.round(resto/por*100)+"%";
+  set("prog", `${resto} de ${por} assinatura${por!==1?"s":""}`);
   let hint;
   if(d.convertidos===0){ hint="Compartilhe seu link — quando <b>2 amigos</b> assinarem, você ganha <b>1 mês grátis</b>."; }
   else{ hint=(d.faltam_pro_proximo===1?"Falta só <b>1 amigo</b> assinar":"Faltam <b>"+d.faltam_pro_proximo+" amigos</b> assinarem")+" pro seu próximo mês grátis!"; }

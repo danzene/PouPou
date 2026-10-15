@@ -29,7 +29,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from analise import normalizar
 from analise.ranking import _unaccent, buscar_com_tipos
@@ -2515,7 +2515,24 @@ def vendor(fname: str):
     return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
 
 
+def _front_versao() -> tuple[str, str]:
+    """(html, versão): a versão é um hash do próprio index.html — muda exatamente quando o
+    app muda. Vai carimbada na página (<meta name="app-versao">) e em /versao; o app compara
+    as duas pra avisar quem está com a versão antiga aberta no celular."""
+    html = FRONT.read_text(encoding="utf-8")
+    return html, hashlib.sha1(html.encode("utf-8")).hexdigest()[:10]
+
+
 @app.get("/")
 def home():
     # no-cache no HTML: garante que atualizações (manifest/ícones/SW) sempre cheguem ao navegador
-    return FileResponse(FRONT, headers={"Cache-Control": "no-cache"})
+    html, versao = _front_versao()
+    html = html.replace("</head>", f'<meta name="app-versao" content="{versao}"></head>', 1)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/versao")
+def versao_app():
+    """Versão atual do app (o celular compara com a da página aberta e oferece atualizar)."""
+    return Response(content=json.dumps({"versao": _front_versao()[1]}), media_type="application/json",
+                    headers={"Cache-Control": "no-store"})

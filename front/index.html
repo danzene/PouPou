@@ -919,6 +919,18 @@
     .prod:hover{ transform:none; }
   }
 
+  /* aviso "nova versão disponível" (fica acima da barra da lista) */
+  .aviso-versao{ position:fixed; left:12px; right:12px; margin:0 auto; width:fit-content; max-width:460px;
+    bottom:calc(16px + env(safe-area-inset-bottom)); z-index:60;
+    display:flex; align-items:center; gap:12px; padding:10px 10px 10px 16px; border-radius:16px;
+    background:var(--ink); color:var(--surface); box-shadow:0 18px 40px -16px rgba(0,0,0,.55); font-size:14px; font-weight:600;
+    animation:sobe .25s ease-out; }
+  .aviso-versao .t{ display:inline-flex; align-items:center; gap:7px; }
+  .aviso-versao .t .ico{ color:var(--green); }
+  .aviso-versao button{ border:none; border-radius:11px; background:var(--green); color:var(--on-green); font-weight:700; font-size:14px;
+    padding:9px 16px; cursor:pointer; white-space:nowrap; transition:transform .12s; }
+  .aviso-versao button:active{ transform:scale(.96); }
+  @keyframes sobe{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
   /* ===== redesign 10/2026: topo vitrine, categorias com ícone, cards de loja ===== */
   /* --- topo: faixa verde com chamada grande; encolhe ao rolar --- */
   header{ background:
@@ -2667,6 +2679,25 @@ $("#btnCesta").addEventListener("click",loadCesta);
 })();
 
 /* ===== PWA: registra o service worker + banner "Instalar na tela inicial" ===== */
+// ---- aviso de nova versão: quem está com o app aberto/guardado no celular vê o botão Atualizar ----
+const APP_VERSAO=(document.querySelector('meta[name="app-versao"]')||{}).content||"";
+let AVISO_VERSAO=false;
+async function checarVersao(){
+  if(!APP_VERSAO||AVISO_VERSAO) return;
+  try{ const d=await fetch(`${API}/versao`,{cache:"no-store"}).then(r=>r.json());
+    if(d&&d.versao&&d.versao!==APP_VERSAO) mostrarAvisoVersao(); }catch(e){}
+}
+function mostrarAvisoVersao(){ AVISO_VERSAO=true;
+  const el=document.createElement("div"); el.className="aviso-versao"; el.setAttribute("role","status");
+  el.innerHTML=`<span class="t">${ic("check")} Nova versão do PouPou disponível</span><button type="button" onclick="atualizarApp(this)">Atualizar</button>`;
+  document.body.appendChild(el); }
+async function atualizarApp(btn){
+  if(btn){ btn.disabled=true; btn.textContent="Atualizando…"; }
+  try{ const r=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration(); if(r) await r.update(); }catch(e){}
+  location.reload(); }
+addEventListener("load",()=>setTimeout(checarVersao,4000));
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checarVersao(); });
+setInterval(checarVersao,30*60*1000);
 if("serviceWorker" in navigator){
   addEventListener("load",()=>{ navigator.serviceWorker.register("/sw.js").catch(()=>{}); });
 }

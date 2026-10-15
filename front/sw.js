@@ -4,7 +4,7 @@
    - estáticos do app (ícones/logos/manifest): cache primeiro (rápido, atualiza em 2º plano);
    - resto (API dinâmica: /cesta, /buscar, /mercados…): NÃO intercepta — vai direto pela rede
      (preços sempre frescos, sem quebrar auth). Também nunca mexe em origens externas (Supabase/CDN). */
-const CACHE = "poupou-v6";
+const CACHE = "poupou-v7";   // mudar a versão faz os celulares descartarem a cópia antiga
 const NAV_TIMEOUT = 2500;   // ms: tempo máx. esperando a rede antes de cair pro cache
 const SHELL = ["/", "/manifest.webmanifest", "/vendor/supabase.js",
                "/icons/icon-v2-192.png", "/icons/icon-v2-512.png"];
@@ -31,18 +31,22 @@ self.addEventListener("fetch", (e) => {
     // REDE PRIMEIRO: tenta buscar o HTML fresco (assim toda atualização aparece na hora).
     // Se a rede demorar > NAV_TIMEOUT ou falhar, serve o shell do cache (abre instantâneo
     // offline/lento). Sempre que a rede vence, atualiza o cache pro próximo boot offline.
+    // A busca na rede CONTINUA mesmo se o timeout vencer: termina em 2º plano e atualiza o
+    // cache — antes ela era descartada e quem tinha internet lenta ficava preso na versão velha.
+    const rede = fetch(req).then(async (res) => {
+      if (res.ok) { const c = await caches.open(CACHE); await c.put("/", res.clone()); }
+      return res;
+    });
+    e.waitUntil(rede.catch(() => {}));
     e.respondWith((async () => {
-      const cache = await caches.open(CACHE);
       try {
-        const res = await Promise.race([
-          fetch(req),
+        return await Promise.race([
+          rede.then((r) => r.clone()),
           new Promise((_, rej) => setTimeout(() => rej(new Error("nav-timeout")), NAV_TIMEOUT)),
         ]);
-        cache.put("/", res.clone());   // guarda o shell fresco (não bloqueia a resposta)
-        return res;
       } catch (_) {
-        const cached = await cache.match("/");
-        return cached || fetch(req);   // sem cache ainda: última tentativa direto na rede
+        const cached = await caches.match("/");
+        return cached || rede;   // sem cache ainda: espera a rede
       }
     })());
     return;

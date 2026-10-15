@@ -46,3 +46,9 @@ jobs:
 
       - name: Coletar
         run: ${{ inputs.comandos }}
+
+      # Tira do app o que a loja nao confirma ha +3 dias (indisponivel/fora do site).
+      # So age em mercado com coleta viva (>=50% do catalogo confirmado em 24h).
+      - name: Tirar indisponiveis do app
+        if: always()
+        run: python limpar_indisponiveis.py

@@ -49,3 +49,11 @@ jobs:
 
       - name: Coletar (despertando o Vercel/SP em sequencia)
         run: python .github/scripts/pingar_coleta.py
+
+      - name: Instalar o projeto (pra limpeza)
+        if: always()
+        run: pip install -q -r requirements.txt
+
+      - name: Tirar indisponiveis do app
+        if: always()
+        run: python limpar_indisponiveis.py

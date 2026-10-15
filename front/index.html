@@ -961,9 +961,16 @@
     transition:background-color .15s, border-color .15s, transform .12s; }
   .atalho:hover{ background:var(--surface); border-color:var(--green); }
   .atalho:active{ transform:scale(.96); }
-  header.compacto .hero, header.compacto .atalhos{ display:none; }
-  header.compacto .head-in{ padding-top:10px; padding-bottom:12px; }
-  header.compacto .search input, header.compacto .cesta-btn{ height:48px; }
+  /* topo em 2 partes: o header (marca + chamada) ROLA normal e só a .barra-fixa (busca +
+     categorias) fica presa. Nada muda de tamanho ao rolar — o "encolher" antigo mudava a
+     altura do topo e o navegador do celular compensava a rolagem, num vai-e-volta. */
+  header{ position:relative; top:auto; border-bottom:none; }
+  .barra-fixa{ position:sticky; top:0; z-index:20; border-bottom:1px solid var(--line);
+    background:color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter:saturate(1.4) blur(12px); }
+  .barra-fixa .head-in{ padding-top:10px; padding-bottom:10px; }
+  header .head-in{ padding-bottom:6px; }
+  .hero{ margin-bottom:8px; }
+  main .atalhos{ margin:0 0 18px; }
   /* --- categorias: abas com ícone --- */
   nav.cats{ gap:6px; padding:8px 20px 10px; border-bottom:none; position:relative; z-index:1; }
   .cat{ gap:7px; padding:9px 15px; border:1px solid var(--line); border-radius:var(--r-pill); background:var(--surface);
@@ -1026,9 +1033,8 @@
     .cesta-btn{ width:auto; padding:0 14px; gap:6px; }
     .cesta-btn .txt{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
     .search input{ font-size:15px; padding-left:44px; }
-    header.compacto .subcats{ display:none; }
-    header.compacto nav.cats{ padding-top:2px; padding-bottom:8px; }
-    header.compacto .search input, header.compacto .cesta-btn{ height:46px; }
+    .barra-fixa .head-in{ padding-top:8px; padding-bottom:8px; }
+    .barra-fixa .search input, .barra-fixa .cesta-btn{ height:48px; }
     .prod-foot{ padding:10px 11px 11px; gap:6px; }
     .btn-compare{ height:38px; font-size:13px; padding:0 6px; }
     .btn-add{ width:38px; height:38px; font-size:18px; }
@@ -1060,6 +1066,10 @@
       <h2 class="hero-t">Onde sua compra sai <em>mais barata</em> hoje.</h2>
       <p class="hero-s" id="heroStats">Preços dos supermercados de Campinas e região, atualizados todo dia.</p>
     </div>
+  </div>
+</header>
+<div class="barra-fixa" id="barraFixa">
+  <div class="head-in">
     <div class="searchrow">
       <div class="search" role="search">
         <span class="mag ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
@@ -1072,14 +1082,14 @@
         <span class="dot" id="cestaAlert" hidden></span>
       </button>
     </div>
-    <div class="atalhos" id="atalhos" aria-label="Buscas populares">
-      <span class="lbl">Populares</span>
-    </div>
   </div>
   <nav class="cats" id="cats" aria-label="Categorias"></nav>
   <div class="subcats" id="subcats" hidden></div>
-</header>
+</div>
 <main id="conteudo">
+  <div class="atalhos" id="atalhos" aria-label="Buscas populares">
+    <span class="lbl">Populares</span>
+  </div>
   <p class="ctx" id="ctx" aria-live="polite"></p>
   <div id="saida" aria-live="polite"></div>
 </main>
@@ -2634,11 +2644,6 @@ const ATALHOS=["Arroz","Feijão","Leite","Café","Óleo de soja","Açúcar","Car
 (function(){ const el=document.getElementById("atalhos"); if(!el) return;
   el.insertAdjacentHTML("beforeend",ATALHOS.map(a=>`<button class="atalho" type="button" data-q="${esc(a)}">${esc(a)}</button>`).join(""));
   el.addEventListener("click",e=>{ const b=e.target.closest(".atalho"); if(!b) return; const q=$("#q"); q.value=b.dataset.q; loadBusca(b.dataset.q); });
-})();
-// topo encolhe ao rolar (some a chamada e os atalhos; a busca fica). Histerese evita "piscar".
-(function(){ const h=document.querySelector("header"); let on=false;
-  addEventListener("scroll",()=>{ const y=scrollY;
-    if(!on&&y>160){ on=true; h.classList.add("compacto"); } else if(on&&y<24){ on=false; h.classList.remove("compacto"); } },{passive:true});
 })();
 $("#q").addEventListener("input",e=>{ clearTimeout(t); const q=e.target.value.trim(); $("#btnCesta").setAttribute("aria-pressed","false"); t=setTimeout(()=>loadBusca(q),260); });
 $("#btnCesta").addEventListener("click",loadCesta);

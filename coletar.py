@@ -58,6 +58,19 @@ def _instanciar(cfg: dict, *, delay: float, timeout: float, max_por_termo: int, 
     )
 
 
+def _catalogo_ou_sementes(coletor: Coletor, sementes: list[tuple[str, str]], slug: str):
+    """Catálogo completo; se não vier NADA (ex.: a árvore de categorias do Tenda dando
+    504 do lado deles), cai pros termos-semente — cobre menos produtos, mas o mercado
+    não fica dias sem atualizar."""
+    vazio = True
+    for item in coletor.coletar_catalogo():
+        vazio = False
+        yield item
+    if vazio:
+        log.warning("[%s] catálogo completo veio vazio -> caindo pros termos-semente", slug)
+        yield from coletor.coletar(sementes)
+
+
 def coletar_mercado(conn, cfg: dict, sementes: list[str], **opts) -> tuple[int, int]:
     """Coleta um mercado. Devolve (produtos_novos_ou_vistos, snapshots_gravados)."""
     mercado_id = database.upsert_mercado(
@@ -79,7 +92,7 @@ def coletar_mercado(conn, cfg: dict, sementes: list[str], **opts) -> tuple[int, 
     # senão, cai no modo antigo por termos-semente. A categoria vem do próprio item.
     if hasattr(coletor, "coletar_catalogo"):
         log.info("[%s] modo: catálogo completo (varredura por categoria)", cfg["slug"])
-        fonte = coletor.coletar_catalogo()
+        fonte = _catalogo_ou_sementes(coletor, sementes, cfg["slug"])
     else:
         log.info("[%s] modo: termos-semente", cfg["slug"])
         fonte = coletor.coletar(sementes)

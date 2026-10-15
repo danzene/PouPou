@@ -439,7 +439,7 @@
 
   /* ============ MOBILE FIRST (≤767px) ============ */
   @media(max-width:767px){
-    html,body{ overflow-x:hidden; }
+    html,body{ overflow-x:clip; }   /* clip (não hidden): hidden quebrava o topo fixo no celular */
     .head-in{ padding:14px 16px 10px; }
     .brand{ gap:10px; }
     .brand h1{ font-size:20px; }
@@ -918,6 +918,109 @@
     *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
     .prod:hover{ transform:none; }
   }
+
+  /* ===== redesign 10/2026: topo vitrine, categorias com ícone, cards de loja ===== */
+  /* --- topo: faixa verde com chamada grande; encolhe ao rolar --- */
+  header{ background:
+      radial-gradient(900px 300px at 85% -40%, color-mix(in srgb, #f4b942 16%, transparent), transparent 70%),
+      linear-gradient(180deg, color-mix(in srgb, var(--green) 13%, var(--surface)) 0%, color-mix(in srgb, var(--surface) 92%, transparent) 100%);
+    backdrop-filter:saturate(1.4) blur(12px); }
+  :root[data-theme="dark"] header{ background:
+      radial-gradient(900px 300px at 85% -40%, color-mix(in srgb, #f4b942 10%, transparent), transparent 70%),
+      linear-gradient(180deg, #123524 0%, color-mix(in srgb, var(--surface) 94%, transparent) 100%); }
+  header::after{ content:""; position:absolute; inset:0; pointer-events:none; opacity:.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .head-in{ position:relative; z-index:1; padding:16px 20px 18px; }
+  .hero{ margin:22px 0 18px; max-width:760px; }
+  .hero-t{ margin:0; font-family:var(--disp); font-weight:800; font-size:clamp(30px, 4.6vw, 50px); line-height:1.02;
+    letter-spacing:-.035em; color:var(--ink); }
+  .hero-t em{ font-style:normal; color:var(--green-dark); background:linear-gradient(transparent 62%, color-mix(in srgb,#f4b942 45%, transparent) 62%); padding:0 .06em; }
+  :root[data-theme="dark"] .hero-t em{ color:var(--green); background:linear-gradient(transparent 64%, color-mix(in srgb,#f4b942 30%, transparent) 64%); }
+  .hero-s{ margin:10px 0 0; color:var(--mut); font-size:15px; max-width:56ch; }
+  .search input{ height:56px; border-radius:16px; font-size:16px; background:var(--surface); border-color:var(--line-2);
+    box-shadow:0 1px 2px rgba(16,32,26,.05), 0 12px 32px -18px rgba(10,114,71,.45); padding-left:48px; }
+  .search .mag{ left:17px; font-size:20px; color:var(--green-dark); }
+  .cesta-btn{ height:56px; border-radius:16px; padding:0 20px; box-shadow:0 12px 28px -14px color-mix(in srgb, var(--green) 80%, transparent); }
+  .atalhos{ display:flex; gap:7px; align-items:center; margin-top:12px; overflow-x:auto; scrollbar-width:none; }
+  .atalhos::-webkit-scrollbar{ display:none; }
+  .atalhos .lbl{ font-size:12px; font-weight:600; color:var(--mut); margin-right:3px; white-space:nowrap; }
+  .atalho{ flex:0 0 auto; border:1px solid color-mix(in srgb, var(--green) 25%, var(--line)); background:color-mix(in srgb, var(--surface) 70%, transparent);
+    color:var(--ink); font-size:13px; font-weight:600; padding:6px 13px; border-radius:var(--r-pill); cursor:pointer;
+    transition:background-color .15s, border-color .15s, transform .12s; }
+  .atalho:hover{ background:var(--surface); border-color:var(--green); }
+  .atalho:active{ transform:scale(.96); }
+  header.compacto .hero, header.compacto .atalhos{ display:none; }
+  header.compacto .head-in{ padding-top:10px; padding-bottom:12px; }
+  header.compacto .search input, header.compacto .cesta-btn{ height:48px; }
+  /* --- categorias: abas com ícone --- */
+  nav.cats{ gap:6px; padding:8px 20px 10px; border-bottom:none; position:relative; z-index:1; }
+  .cat{ gap:7px; padding:9px 15px; border:1px solid var(--line); border-radius:var(--r-pill); background:var(--surface);
+    margin-bottom:0; border-bottom-width:1px; transition:background-color .15s, border-color .15s, color .15s, transform .12s; }
+  .cat .ci{ display:inline-flex; font-size:17px; color:var(--green-dark); }
+  :root[data-theme="dark"] .cat .ci{ color:var(--green); }
+  .cat:hover{ border-color:var(--green); }
+  .cat:active{ transform:scale(.97); }
+  .cat[aria-pressed="true"]{ background:var(--ink); border-color:var(--ink); color:var(--surface); }
+  .cat[aria-pressed="true"] .ci{ color:#f4b942; }
+  .subcats{ position:relative; z-index:1; padding:4px 20px 14px; }
+  /* --- grade: 4 colunas no computador, 2 no celular --- */
+  .grid{ grid-template-columns:repeat(auto-fill, minmax(232px, 1fr)); gap:16px; }
+  /* --- card de loja: foto grande em cima --- */
+  .prod{ border-radius:20px; overflow:hidden; }
+  .prod-top{ flex-direction:column; padding:0; gap:0; align-items:stretch; }
+  .prod .thumb{ width:100%; height:156px; border-radius:0; border:none; border-bottom:1px solid var(--line); padding:16px 18px; background:#fff; }
+  :root[data-theme="dark"] .prod .thumb{ border-bottom-color:transparent; }
+  .prod .thumb[data-no-image]{ font-size:42px; }
+  .prod-info{ padding:14px 16px 0; }
+  .prod-nome{ font-size:14.5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.6em; }
+  .prod-price{ margin-top:10px; }
+  .prod-preco{ font-size:28px; }
+  .prod-mkt{ margin-top:7px; font-size:13px; }
+  .prod-n{ font-size:12px; }
+  .economia{ margin-top:8px; font-size:12px; }
+  .prod-foot{ padding:12px 16px 16px; margin-top:4px; gap:8px; }
+  .btn-compare{ height:42px; font-size:14px; border-radius:12px; }
+  .btn-add{ width:42px; height:42px; border-radius:12px; }
+  /* faixa de preços: cada ponto é um mercado; verde = o mais barato */
+  .faixa{ margin-top:10px; }
+  .faixa .trilho{ position:relative; height:8px; border-radius:4px; margin:0 4px;
+    background:linear-gradient(90deg, color-mix(in srgb, var(--green) 35%, transparent), color-mix(in srgb, var(--red) 30%, transparent)); }
+  .faixa .trilho i{ position:absolute; top:50%; width:8px; height:8px; margin-left:-4px; transform:translateY(-50%); border-radius:50%;
+    background:var(--surface); border:1.5px solid var(--mut); }
+  .faixa .trilho i.min{ width:12px; height:12px; margin-left:-6px; background:var(--green); border-color:var(--surface); box-shadow:0 0 0 2px var(--green); z-index:1; }
+  .faixa .pontas{ display:flex; justify-content:space-between; margin-top:5px; font-size:11px; color:var(--faint); font-weight:600; }
+  @media (max-width:560px){
+    .head-in{ padding:12px 16px 14px; }
+    .hero{ margin:14px 0 14px; }
+    .hero-s{ font-size:14px; }
+    .search input, .cesta-btn{ height:52px; }
+    nav.cats, .subcats{ padding-left:16px; padding-right:16px; }
+    main{ padding-left:12px; padding-right:12px; }
+    .grid{ grid-template-columns:1fr 1fr; gap:10px; }
+    .prod{ border-radius:16px; }
+    .prod .thumb{ width:100%; height:118px; padding:10px 12px; }
+    .prod-info{ padding:11px 11px 0; }
+    .prod-nome{ font-size:13.5px; }
+    .prod-meta{ font-size:11.5px; }
+    .lbl-menor{ font-size:9.5px; }
+    .prod-preco{ font-size:21px; }
+    .prod-mkt{ font-size:12px; margin-top:6px; }
+    .prod-mkt.oculto{ font-size:11.5px; }
+    .economia{ font-size:11px; padding:3px 7px 3px 6px; }
+    .prod-n{ display:none; }
+    .faixa .pontas{ font-size:10px; }
+    /* topo enxuto no celular: "Minha lista" vira botão compacto ao lado da busca */
+    .searchrow{ flex-direction:row; gap:8px; }
+    .cesta-btn{ width:auto; padding:0 14px; gap:6px; }
+    .cesta-btn .txt{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+    .search input{ font-size:15px; padding-left:44px; }
+    header.compacto .subcats{ display:none; }
+    header.compacto nav.cats{ padding-top:2px; padding-bottom:8px; }
+    header.compacto .search input, header.compacto .cesta-btn{ height:46px; }
+    .prod-foot{ padding:10px 11px 11px; gap:6px; }
+    .btn-compare{ height:38px; font-size:13px; padding:0 6px; }
+    .btn-add{ width:38px; height:38px; font-size:18px; }
+  }
 </style>
 </head>
 <body>
@@ -941,7 +1044,10 @@
         <span class="plano-dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 7l4 4 5-6 5 6 4-4v11H3V7z"/></svg></span>
       </button>
     </div>
-    <p class="tagline"><b style="color:var(--ink)">Compare. Escolha. Economize.</b> Preços de supermercados de Campinas e região — descubra onde sua compra sai mais barata.</p>
+    <div class="hero">
+      <h2 class="hero-t">Onde sua compra sai <em>mais barata</em> hoje.</h2>
+      <p class="hero-s" id="heroStats">Preços dos supermercados de Campinas e região, atualizados todo dia.</p>
+    </div>
     <div class="searchrow">
       <div class="search" role="search">
         <span class="mag ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
@@ -950,9 +1056,12 @@
       </div>
       <button id="btnCesta" class="cesta-btn" aria-pressed="false" aria-label="Ver minha lista de compras">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/></svg></span>
-        Minha lista <span class="pill num" id="cestaN">0</span>
+        <span class="txt">Minha lista</span> <span class="pill num" id="cestaN">0</span>
         <span class="dot" id="cestaAlert" hidden></span>
       </button>
+    </div>
+    <div class="atalhos" id="atalhos" aria-label="Buscas populares">
+      <span class="lbl">Populares</span>
     </div>
   </div>
   <nav class="cats" id="cats" aria-label="Categorias"></nav>
@@ -1396,6 +1505,14 @@ function economiaChip(rk){
   const d=Math.max(...ps)-Math.min(...ps);
   return d>=0.10?`<div class="economia">${ic("cat_oferta")} Economize até ${brl(d)}</div>`:"";
 }
+// faixa do mais barato ao mais caro: um ponto por mercado (não revela qual mercado)
+function faixaPrecos(rk){
+  const ps=(rk||[]).map(r=>Number(r.preco)).filter(v=>v>0);
+  if(ps.length<3) return "";
+  const mn=Math.min(...ps), mx=Math.max(...ps); if(mx-mn<0.10) return "";
+  const pts=ps.map((v,i)=>`<i class="${i===ps.indexOf(mn)?"min":""}" style="left:${(100*(v-mn)/(mx-mn)).toFixed(1)}%"></i>`).join("");
+  return `<div class="faixa" role="img" aria-label="Preços de ${brl(mn)} a ${brl(mx)} entre ${ps.length} mercados"><div class="trilho">${pts}</div><div class="pontas num"><span>${brl(mn)}</span><span>${brl(mx)}</span></div></div>`;
+}
 function cardProduto(p){
   const rk=p.ranking||[], emb=embalagem(p.qtd_embalagem,p.unidade);
   const naCesta=CESTA_EANS.has(p.ean);
@@ -1408,11 +1525,11 @@ function cardProduto(p){
       ${best?(acessoPremium()
         ? `<div class="prod-mkt">${badgeMini({nome:best.mercado,cor_badge:best.cor_badge})} ${esc(best.mercado)}</div>`
         : `<div class="prod-mkt oculto">${ic("lock")} <span>ver o mercado</span></div>`):""}
-      ${economiaChip(rk)}
+      ${economiaChip(rk)}${faixaPrecos(rk)}
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" onclick="abrirProduto('${p.ean}')">Comparar preços e histórico ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')">Comparar ${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
   return `<article class="prod">
     <div class="prod-top">${thumb(p.imagem_url,p.nome)}
@@ -1490,7 +1607,7 @@ function cardPerecivel(g,ord,modo){
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}${bandeja?` · ${brl(g.menor_preco)}${uG}`:""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')">Comparar preços e histórico ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(g.nome)}" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')">Comparar ${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
   return `<article class="prod">
     <div class="prod-top">${thumb(g.imagem_url,g.nome)}
@@ -2500,6 +2617,17 @@ function renderFrescos(lista){
 }
 
 let t=null;
+// buscas populares (atalhos do topo)
+const ATALHOS=["Arroz","Feijão","Leite","Café","Óleo de soja","Açúcar","Carne","Ovos"];
+(function(){ const el=document.getElementById("atalhos"); if(!el) return;
+  el.insertAdjacentHTML("beforeend",ATALHOS.map(a=>`<button class="atalho" type="button" data-q="${esc(a)}">${esc(a)}</button>`).join(""));
+  el.addEventListener("click",e=>{ const b=e.target.closest(".atalho"); if(!b) return; const q=$("#q"); q.value=b.dataset.q; loadBusca(b.dataset.q); });
+})();
+// topo encolhe ao rolar (some a chamada e os atalhos; a busca fica). Histerese evita "piscar".
+(function(){ const h=document.querySelector("header"); let on=false;
+  addEventListener("scroll",()=>{ const y=scrollY;
+    if(!on&&y>160){ on=true; h.classList.add("compacto"); } else if(on&&y<24){ on=false; h.classList.remove("compacto"); } },{passive:true});
+})();
 $("#q").addEventListener("input",e=>{ clearTimeout(t); const q=e.target.value.trim(); $("#btnCesta").setAttribute("aria-pressed","false"); t=setTimeout(()=>loadBusca(q),260); });
 $("#btnCesta").addEventListener("click",loadCesta);
 
@@ -2521,6 +2649,8 @@ $("#btnCesta").addEventListener("click",loadCesta);
   atualizarBadge();
   try{ const mk=await fetch(`${API}/mercados`).then(r=>r.json());
     MERCADOS=mk.mercados||[];
+    { const n=MERCADOS.filter(m=>m.ativo!==false&&m.ativo!==0).length, hs=$("#heroStats");
+      if(n&&hs) hs.textContent=`Comparamos ${n} supermercados de Campinas e região. Preços atualizados todo dia.`; }
     MERCADOS.forEach(m=>{ if(m.logo_url){ MKT_LOGO[m.slug]=m.logo_url; MKT_LOGO[m.nome]=m.logo_url; } });
   }catch(e){}
   // usuário NOVO que entrou com Google -> mostra o onboarding (CEP + mercados da região),

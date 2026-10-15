@@ -2006,6 +2006,11 @@ def admin_set_plano(uid: str, body: dict = Body(...), authorization: str | None 
         if plano == "trial":
             conn.execute("UPDATE profiles SET plano = ?, trial_ini = ?, atualizado_em = ? WHERE id = ?",
                          (plano, agora, agora, uid))
+        elif plano == "assinante":
+            # Assinante dado à mão = sem validade (como os legados). Sem limpar, um
+            # plano_expira_em antigo (assinatura/bônus vencido) fazia o _premium negar acesso.
+            conn.execute("UPDATE profiles SET plano = ?, plano_expira_em = NULL, atualizado_em = ? WHERE id = ?",
+                         (plano, agora, uid))
         else:
             conn.execute("UPDATE profiles SET plano = ?, atualizado_em = ? WHERE id = ?",
                          (plano, agora, uid))

@@ -2531,6 +2531,13 @@ def home():
     return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/ajuda")
+def ajuda():
+    """Página pública "o app não abre?" — abre pelo link mesmo quando o ícone instalado falha
+    (ex.: Android pedindo o Chrome). Estática e leve, não depende do app carregar."""
+    return FileResponse(RAIZ / "front" / "ajuda.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/versao")
 def versao_app():
     """Versão atual do app (o celular compara com a da página aberta e oferece atualizar)."""

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ajuda — PouPou</title>
+<meta name="description" content="O app PouPou não abre? Veja como resolver em 1 minuto.">
+<meta name="theme-color" content="#0fa968">
+<link rel="icon" href="/icons/icon-v2-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f7f6; --surface:#ffffff; --ink:#14201a; --mut:#5b6b63; --line:#e1e8e4;
+    --green:#0fa968; --green-press:#0b8f57; --green-dark:#0a7247; --green-light:#e7f5ed; --on-green:#ffffff;
+    --warn-bg:#fff7e0; --warn-ink:#7a5a00;
+    --disp:"Bricolage Grotesque",system-ui,sans-serif; --body:"Hanken Grotesk",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1310; --surface:#121c17; --ink:#e8f0eb; --mut:#9db0a6; --line:#22322a;
+      --green:#39c78b; --green-press:#2fb87e; --green-dark:#66d9a4; --green-light:#122c20; --on-green:#04140d;
+      --warn-bg:#2a2410; --warn-ink:#f1d27a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1310; --surface:#121c17; --ink:#e8f0eb; --mut:#9db0a6; --line:#22322a;
+    --green:#39c78b; --green-press:#2fb87e; --green-dark:#66d9a4; --green-light:#122c20; --on-green:#04140d;
+    --warn-bg:#2a2410; --warn-ink:#f1d27a;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.5;
+    -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:620px; margin:0 auto; padding:24px 16px 48px; }
+  header{ display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+  header img{ width:48px; height:48px; border-radius:12px; }
+  header b{ font-family:var(--disp); font-size:22px; font-weight:800; letter-spacing:-.02em; }
+  h1{ font-family:var(--disp); font-size:28px; line-height:1.15; font-weight:800; letter-spacing:-.02em; margin:0 0 8px; }
+  .lead{ color:var(--mut); margin:0 0 20px; }
+  .abrir{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:54px;
+    background:var(--green); color:var(--on-green); border-radius:14px; font-weight:700; font-size:17px;
+    text-decoration:none; margin-bottom:8px; }
+  .abrir:hover{ background:var(--green-press); }
+  .nota{ font-size:13.5px; color:var(--mut); text-align:center; margin:0 0 28px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px 18px 8px; margin-bottom:16px; }
+  .card h2{ font-family:var(--disp); font-size:19px; font-weight:800; margin:0 0 6px; }
+  .card .sub{ color:var(--mut); font-size:14.5px; margin:0 0 12px; }
+  .aviso{ background:var(--warn-bg); color:var(--warn-ink); border-radius:10px; padding:10px 12px; font-size:14px; margin:0 0 12px; }
+  ol{ margin:0; padding:0; list-style:none; counter-reset:p; }
+  ol li{ counter-increment:p; position:relative; padding:0 0 14px 40px; }
+  ol li::before{ content:counter(p); position:absolute; left:0; top:0; width:28px; height:28px; border-radius:50%;
+    background:var(--green-light); color:var(--green-dark); font-weight:800; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  ol li b{ font-weight:700; }
+  .ok{ color:var(--mut); font-size:14px; margin:-4px 0 14px; }
+  footer{ text-align:center; color:var(--mut); font-size:13.5px; margin-top:28px; }
+  footer a{ color:var(--green-dark); font-weight:700; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header><img src="/icons/icon-v2-192.png" alt=""><b>PouPou</b></header>
+
+  <h1>O app não abre?</h1>
+  <p class="lead">Não se preocupe: sua conta, sua lista e seus favoritos estão salvos. Dá pra resolver em 1 minuto.</p>
+
+  <a class="abrir" href="/">Abrir o PouPou agora pelo navegador</a>
+  <p class="nota">Funciona igualzinho ao app, sem instalar nada.</p>
+
+  <section class="card">
+    <h2>Android: aparece “requer o seguinte app: Chrome”</h2>
+    <p class="sub">Isso acontece quando o Chrome do celular está desatualizado ou desligado. O PouPou não está na Play Store, então <b>não</b> é ele que está faltando.</p>
+    <ol>
+      <li>Abra a <b>Play Store</b>, procure <b>Chrome</b> e toque em <b>Atualizar</b> (se aparecer).</li>
+      <li>Vá em <b>Configurações → Aplicativos → Chrome</b>. Se tiver o botão <b>Ativar</b>, toque nele.</li>
+      <li>Tente abrir o PouPou de novo.</li>
+    </ol>
+    <p class="ok">Ainda não abriu? Reinstale o ícone (passo abaixo).</p>
+  </section>
+
+  <section class="card">
+    <h2>Reinstalar o ícone (resolve quase tudo)</h2>
+    <p class="sub">Apagar o ícone não apaga sua conta nem sua lista.</p>
+    <ol>
+      <li>Segure o ícone do PouPou na tela inicial e toque em <b>Desinstalar</b> ou <b>Remover</b>.</li>
+      <li>Toque no botão verde lá em cima, <b>Abrir o PouPou agora pelo navegador</b>.</li>
+      <li>No Chrome, toque em <b>⋮</b> (canto de cima) → <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>iPhone</h2>
+    <ol>
+      <li>Abra o PouPou no <b>Safari</b> pelo botão verde lá em cima.</li>
+      <li>Toque em <b>Compartilhar</b> (quadrado com seta) → <b>Adicionar à Tela de Início</b>.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Abre, mas fica em branco ou desatualizado</h2>
+    <ol>
+      <li>Confira se a internet está funcionando (Wi‑Fi ou dados).</li>
+      <li>Feche o PouPou por completo (tire da lista de apps abertos) e abra de novo.</li>
+      <li>Se continuar, reinstale o ícone como explicado acima.</li>
+    </ol>
+  </section>
+
+  <footer>Guarde este link: se um dia o app não abrir, é só voltar aqui.<br><a href="/">Voltar ao PouPou</a></footer>
+</main>
+</body>
+</html>

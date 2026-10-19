@@ -654,6 +654,7 @@
   .pf2-ref-hint{ margin:9px 0 0; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.93); } .pf2-ref-hint b{ color:#fff; font-weight:800; }
 
   .pf2-foot{ text-align:center; margin-top:20px; }
+  .pf2-ajuda{ display:block; margin-top:12px; font-size:13px; color:var(--mut); }
   .pf2-logout{ display:inline-flex; align-items:center; gap:8px; background:none; border:1px solid var(--line);
     color:var(--mut); font-size:13.5px; font-weight:600; padding:9px 18px; border-radius:var(--r-btn); cursor:pointer; }
   .pf2-logout svg{ width:16px; height:16px; }
@@ -2394,8 +2395,8 @@ function onbConcluir(){
 function onbPular(){ marcarOnbFeito(); fecharOnboarding(); }
 function fecharOnboarding(){ $("#onbModal").classList.remove("show"); const cb=_onbCb; _onbCb=null; if(typeof cb==="function") cb(); }
 
-function toast(msg){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
-  t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2800); }
+function toast(msg,ms){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.className="toast"; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),ms||2800); }
 
 function favMercados(){ try{ return JSON.parse(localStorage.getItem(FAV_KEY)||"[]"); }catch(e){ return []; } }
 function setFavMercados(a){ try{ localStorage.setItem(FAV_KEY,JSON.stringify(a)); }catch(e){} }
@@ -2609,7 +2610,8 @@ function loadPerfil(secao, manterPlanos){
         <div class="pf2-stat"><span class="ps-ic">${ic("bell")}</span><b class="ps-n" data-k="alertas">—</b><span class="ps-l">alertas de preço</span></div>
       </div></div></aside>`;
 
-  const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button></div>`;
+  const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button>`+
+    `<a class="pf2-ajuda" href="/ajuda">O app não abre ou travou? Veja a ajuda</a></div>`;
 
   saida.innerHTML=`<div class="pf2">${head}
       <div class="pf2-grid"><div class="pf2-main">${plus}${indica}${meus}${prefs}</div>${resumo}</div>
@@ -2930,7 +2932,7 @@ function mostrarInstalarPWA(){
   };
   bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_pwa_dismiss","1"); bar.remove(); };
 }
-addEventListener("appinstalled",()=>{ const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉"); }catch(e){} });
+addEventListener("appinstalled",()=>{ const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉 Se um dia não abrir: seu-link/ajuda".replace("seu-link",location.host),6000); }catch(e){} });
 
 /* ===== Notificações push (avisa no celular, mesmo com o app fechado) ===== */
 function pushSuportado(){ return ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window); }

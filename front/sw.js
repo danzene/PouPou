@@ -27,6 +27,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // não mexe em Supabase/CDN/externos
 
+  if (req.mode === "navigate" && url.pathname !== "/") return; // /ajuda, /gestao: rede direto
   if (req.mode === "navigate") {
     // REDE PRIMEIRO: tenta buscar o HTML fresco (assim toda atualização aparece na hora).
     // Se a rede demorar > NAV_TIMEOUT ou falhar, serve o shell do cache (abre instantâneo

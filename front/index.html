@@ -1199,6 +1199,32 @@
     .pr-preco .now{ font-size:38px; }
     .ref-cupom b{ font-size:26px; }
   }
+
+  /* ===== acessibilidade (público mais velho): "Comparar" e "Fechar" fáceis de achar =====
+     Antes o Comparar era branco com borda cinza (passava despercebido) e o X da gaveta tinha
+     36px com um "×" fino. Agora: Comparar é o botão verde cheio do card, o card inteiro abre
+     a comparação, e a gaveta fecha por um botão "✕ Fechar" grande, por "Voltar" no rodapé
+     ou pelo botão voltar do celular. */
+  .btn-compare{ background:var(--green); border-color:var(--green); color:var(--on-green); font-weight:700; font-size:15.5px; height:48px; }
+  .btn-compare:hover{ background:var(--green-press); border-color:var(--green-press); color:var(--on-green); }
+  .btn-compare .chev, .btn-compare:hover .chev{ color:var(--on-green); }
+  .btn-compare svg{ width:18px; height:18px; }
+  .prod.clicavel{ cursor:pointer; }
+  .prod.clicavel:hover{ border-color:var(--green); }
+  .drawer-x{ width:auto; height:44px; padding:0 16px 0 12px; gap:6px; display:inline-flex; align-items:center;
+    border:1.5px solid var(--line-2); border-radius:12px; background:var(--bg); color:var(--ink);
+    font-size:16px; font-weight:700; font-family:inherit; }
+  .drawer-x .xx{ font-size:20px; line-height:1; }
+  .drawer-x:hover{ border-color:var(--ink); }
+  .drawer-top .eyebrow{ font-size:12px; }
+  .drawer-voltar{ width:100%; height:46px; margin-top:8px; border:1.5px solid var(--line-2); border-radius:var(--r-btn);
+    background:transparent; color:var(--ink); font-size:15.5px; font-weight:700; font-family:inherit; cursor:pointer; }
+  .drawer-voltar:hover{ border-color:var(--ink); }
+  @media (max-width:560px){
+    .btn-compare{ height:44px; font-size:15px; gap:4px; padding:0 6px; }
+    .btn-compare .cmp-mais, .btn-compare svg{ display:none; }   /* 2 colunas: só "Comparar" cabe */
+    .btn-add{ width:44px; height:44px; }
+  }
 </style>
 </head>
 <body>
@@ -1485,7 +1511,7 @@ function renderDrawerFresco(){
   ov.setAttribute("onclick","fecharProduto(event)");
   ov.innerHTML=`<div class="drawer" role="dialog" aria-modal="true" aria-label="Detalhes do item fresco">
     <div class="drawer-top"><span class="eyebrow">Fresco · por peso</span>
-      <button class="drawer-x" type="button" aria-label="Fechar" onclick="fecharProduto()">×</button></div>
+      <button class="drawer-x" type="button" onclick="fecharProduto()"><span class="xx" aria-hidden="true">✕</span> Fechar</button></div>
     <div class="drawer-scroll">
       <h2 class="dp-nome">${esc(nome)}</h2>
       <div class="dp-price-lbl">${bandeja?"Bandeja a partir de hoje":"Menor preço hoje"}</div>
@@ -1501,10 +1527,12 @@ function renderDrawerFresco(){
     </div>
     <div class="drawer-foot">
       <button class="btn-primary" style="margin:0" onclick="addFrescoDrawer('${jsesc(chave)}','${jsesc(nome)}',this)">${naLista?"✓ já está na lista":"Adicionar à lista"}</button>
+      <button class="drawer-voltar" type="button" onclick="fecharProduto()">← Voltar</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
   document.addEventListener("keydown",_escFecha);
+  _gavetaAbriu();
   drRenderChart();
 }
 async function addFrescoDrawer(chave,nome,btn){
@@ -1528,8 +1556,18 @@ async function abrirProduto(ean){
     renderDrawer(prod);
   }catch(e){ /* ignora */ }
 }
-function fecharProduto(ev){ if(ev&&ev.target!==ev.currentTarget) return;
-  const ov=$("#drawerOv"); if(ov) ov.remove(); document.removeEventListener("keydown",_escFecha); }
+function fecharProduto(ev,manterHist){ if(ev&&ev.target!==ev.currentTarget) return;
+  const ov=$("#drawerOv"); if(ov) ov.remove(); document.removeEventListener("keydown",_escFecha);
+  // fechou pelo botão/fundo/Esc: desfaz o estado que a gaveta empilhou no histórico
+  if(!manterHist && history.state&&history.state.gaveta){ _ignorarPop=true; history.back(); } }
+// botão "voltar" do celular fecha a gaveta em vez de sair do app (o mais intuitivo pra quem
+// não acha o Fechar). Abrir a gaveta empilha {gaveta:1}; o voltar desempilha e fecha.
+let _ignorarPop=false;
+function _gavetaAbriu(){ if(!(history.state&&history.state.gaveta)){ try{ history.pushState({gaveta:1},""); }catch(e){} } }
+addEventListener("popstate",()=>{ if(_ignorarPop){ _ignorarPop=false; return; } fecharProduto(null,true); });
+// card inteiro abre a comparação (menos o "+" e links): alvo grande pra quem tem dificuldade
+function cardAbre(ev,card){ if(ev.target.closest("button, a, input, label")) return;
+  const b=card.querySelector(".btn-compare"); if(b) b.click(); }
 function _escFecha(e){ if(e.key==="Escape") fecharProduto(); }
 function renderDrawer(prod){
   const rk=prod.ranking||[], best=rk[0];
@@ -1548,7 +1586,7 @@ function renderDrawer(prod){
   ov.setAttribute("onclick","fecharProduto(event)");
   ov.innerHTML=`<div class="drawer" role="dialog" aria-modal="true" aria-label="Detalhes do produto">
     <div class="drawer-top"><span class="eyebrow">Produto</span>
-      <button class="drawer-x" type="button" aria-label="Fechar" onclick="fecharProduto()">×</button></div>
+      <button class="drawer-x" type="button" onclick="fecharProduto()"><span class="xx" aria-hidden="true">✕</span> Fechar</button></div>
     <div class="drawer-scroll">
       <h2 class="dp-nome">${esc(prod.nome)}</h2>
       <div class="dp-price-lbl">Menor preço hoje</div>
@@ -1575,10 +1613,12 @@ function renderDrawer(prod){
     </div>
     <div class="drawer-foot">
       <button class="btn-primary" style="margin:0" onclick="addCesta('${prod.ean}',this)">${naCesta?"✓ já está na lista":"Adicionar à lista"}</button>
+      <button class="drawer-voltar" type="button" onclick="fecharProduto()">← Voltar</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
   document.addEventListener("keydown",_escFecha);
+  _gavetaAbriu();
   drRenderChart();
 }
 function drSetPeriodo(d){ DRAWER.periodo=d; document.querySelectorAll("#drPer .tab").forEach((b,i)=>b.classList.toggle("on",PERIODOS[i].d===d)); drRenderChart(); }
@@ -1718,9 +1758,9 @@ function cardProduto(p){
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')">Comparar ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')">Comparar<span class="cmp-mais">&nbsp;preços</span> ${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
-  return `<article class="prod">
+  return `<article class="prod${rk.length?" clicavel":""}"${rk.length?` onclick="cardAbre(event,this)"`:""}>
     <div class="prod-top">${thumb(p.imagem_url,p.nome)}
       <div class="prod-info"><h3 class="prod-nome">${esc(p.nome)}</h3>
         ${emb?`<div class="prod-meta">${esc(emb)}</div>`:""}${price}</div></div>
@@ -1796,9 +1836,9 @@ function cardPerecivel(g,ord,modo){
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}${bandeja?` · ${brl(g.menor_preco)}${uG}`:""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(g.nome)}" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')">Comparar ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(g.nome)}" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')">Comparar<span class="cmp-mais">&nbsp;preços</span> ${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
-  return `<article class="prod">
+  return `<article class="prod${rk.length?" clicavel":""}"${rk.length?` onclick="cardAbre(event,this)"`:""}>
     <div class="prod-top">${thumb(g.imagem_url,g.nome)}
       <div class="prod-info"><h3 class="prod-nome">${esc(g.nome)}</h3>
         ${meta?`<div class="prod-meta">${meta}</div>`:""}${price}</div></div>
@@ -2213,7 +2253,7 @@ async function desbloquear(btn){
 }
 /* re-renderiza a vista aberta (drawer/lista/listagem/perfil) já com os mercados liberados */
 function reabrir(){
-  if($("#drawerOv") && DRAWER && DRAWER.prod){ fecharProduto(); renderDrawer(DRAWER.prod); return; }
+  if($("#drawerOv") && DRAWER && DRAWER.prod){ fecharProduto(null,true); renderDrawer(DRAWER.prod); return; }
   if($("#btnCesta").getAttribute("aria-pressed")==="true"){ loadCesta(); return; }
   if(document.querySelector(".pf2")){ loadPerfil(); return; }   // tela de conta: re-renderiza com o novo status
   if(catAtiva && catAtiva.indexOf("fresco")!==0){ const c=categorias.find(x=>x.slug===catAtiva); if(c) loadCategoria(c.slug,c.nome); }

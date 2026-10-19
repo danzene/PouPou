@@ -2504,6 +2504,26 @@ def pwa_icon(fname: str):
     return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
 
 
+@app.get("/screenshots/{fname}")
+def pwa_screenshot(fname: str):
+    """Capturas de tela citadas no manifest (lojas/instalação mostram como prévia do app)."""
+    base = (RAIZ / "front" / "screenshots").resolve()
+    p = (base / fname).resolve()
+    if p.parent != base or not p.is_file():
+        raise HTTPException(status_code=404, detail="imagem não encontrada")
+    return FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    """Digital Asset Links: prova pro Android que o app da Play Store (TWA br.app.poupou) é
+    deste site — sem isso o app abre com barra de endereço. Lista as digitais SHA-256 da chave
+    de upload e da chave de assinatura do Play (Play Console > Integridade do app)."""
+    return FileResponse(RAIZ / "front" / "assetlinks.json",
+                        media_type="application/json",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
 @app.get("/vendor/{fname}")
 def vendor(fname: str):
     """Libs de terceiros hospedadas no próprio app (ex.: supabase-js) — mesma origem, o SW

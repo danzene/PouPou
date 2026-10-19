@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.app.poupou",
+      "sha256_cert_fingerprints": [
+        "2F:D5:54:93:50:7A:AF:98:09:49:4E:FE:32:1D:27:F6:F8:50:55:E8:CE:73:8C:E9:25:15:F1:3E:E1:7C:4A:16"
+      ]
+    }
+  }
+]

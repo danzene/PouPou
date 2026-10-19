@@ -5,3 +5,14 @@ __pycache__/
 dados/
 *.db
 *.db-journal
+
+# Android (TWA da Play Store) — chave e senha NUNCA no Git; builds são gerados
+android/poupou-upload.keystore
+android/keystore-senha.txt
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/*.aab
+android/*.apk
+android/*.idsig

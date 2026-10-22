@@ -1,0 +1,27 @@
+name: Sonda Pague Menos VTEX (teste)
+on:
+  push:
+    branches: [fix-paguemenos]
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q -r requirements.txt
+      - run: |
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, ".")
+          from coletar import _instanciar
+          cfg = [m for m in json.load(open("config/mercados.json", encoding="utf-8"))["mercados"] if m["slug"] == "superpaguemenos"][0]
+          c = _instanciar(cfg, delay=1.0, timeout=20, max_por_termo=10, contato="sonda")
+          n = 0
+          for it in c.coletar([("arroz", "mercearia"), ("leite", "laticinios")]):
+              n += 1
+              print("RESULTADO item", getattr(it, "ean", None), getattr(it, "preco", None), (getattr(it, "nome", "") or "")[:40])
+              if n >= 5: break
+          print("RESULTADO TOTAL", n)
+          PY

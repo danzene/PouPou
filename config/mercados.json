@@ -66,22 +66,27 @@
       "loja_ref": "filial-1",
       "ativo": true,
       "classe": "coletores.vipcommerce:ColetorVIPCommerce",
-      "params": {"org": "153", "domainkey": "enxuto.com", "filial": 1, "cd": 1},
+      "params": {
+        "org": "153",
+        "domainkey": "enxuto.com",
+        "filial": 1,
+        "cd": 1
+      },
       "obs": "VIP Commerce. org=153, filial=1, cd=1. Token gerado dinamicamente (login público)."
     },
     {
       "slug": "superpaguemenos",
       "nome": "Supermercados Pague Menos",
       "url_base": "https://www.superpaguemenos.com.br",
-      "plataforma": "convertiez",
+      "plataforma": "vtex",
       "cidade": "Campinas (RM)",
       "cor_badge": "#E30613",
       "logo_url": null,
       "loja_ref": null,
       "ativo": true,
-      "classe": "coletores.convertiez:ColetorConvertiez",
-      "params": {"max_por_busca": 12, "limite_por_rodada": 1500},
-      "obs": "Plataforma Convertiez. EAN só na página do produto (gtin13). Catálogo completo via sitemap (20k+ produtos) varrido em fatias rotativas de limite_por_rodada por dia; cobre tudo em ~7 dias e segue reatualizando."
+      "classe": "coletores.vtex:ColetorVTEX",
+      "params": {},
+      "obs": "Migrou de Convertiez pra VTEX FastStore (~20/10/2026): coleta pela API pública de catálogo VTEX, igual Savegnago/Covabra."
     },
     {
       "slug": "tenda",
@@ -108,7 +113,12 @@
       "loja_ref": "filial-1",
       "ativo": true,
       "classe": "coletores.vipcommerce:ColetorVIPCommerce",
-      "params": {"org": "29", "domainkey": "superdalben.com.br", "filial": 1, "cd": 1},
+      "params": {
+        "org": "29",
+        "domainkey": "superdalben.com.br",
+        "filial": 1,
+        "cd": 1
+      },
       "obs": "VIP Commerce. org=29, filial=1, cd=1. Token gerado dinamicamente (login público)."
     },
     {
@@ -136,7 +146,12 @@
       "loja_ref": "filial-1",
       "ativo": true,
       "classe": "coletores.vipcommerce:ColetorVIPCommerce",
-      "params": {"org": "249", "domainkey": "taquaralsupermercado.com.br", "filial": 1, "cd": 1},
+      "params": {
+        "org": "249",
+        "domainkey": "taquaralsupermercado.com.br",
+        "filial": 1,
+        "cd": 1
+      },
       "obs": "VIP Commerce. org=249 (bucket vipc-org-249), filial=1, cd=1. Token dinâmico."
     },
     {
@@ -150,7 +165,13 @@
       "loja_ref": "cd-6",
       "ativo": true,
       "classe": "coletores.vipcommerce:ColetorVIPCommerce",
-      "params": {"org": "67", "domainkey": "spanionline.com.br", "filial": 1, "cd": 6, "api_base": "https://services-beta.vipcommerce.com.br/api-admin/v1"},
+      "params": {
+        "org": "67",
+        "domainkey": "spanionline.com.br",
+        "filial": 1,
+        "cd": 6,
+        "api_base": "https://services-beta.vipcommerce.com.br/api-admin/v1"
+      },
       "obs": "VIP Commerce host -beta (services-beta.vipcommerce.com.br). org=67, filial=1, cd=6. Atacarejo, catálogo online (Campinas)."
     },
     {
@@ -164,7 +185,10 @@
       "loja_ref": "store-461",
       "ativo": true,
       "classe": "coletores.gpa:ColetorGPA",
-      "params": {"store_id": 461, "limite_por_rodada": 3000},
+      "params": {
+        "store_id": 461,
+        "limite_por_rodada": 3000
+      },
       "obs": "GPA. API pública api.vendas.gpa.digital/pa (sem auth). Busca POST /search/search por termo; EAN via GET /v4/products/ecom/{id}. Store 461 (padrão SP). Preços de referência SP."
     }
   ]

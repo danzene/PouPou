@@ -68,8 +68,15 @@ class ColetorVTEX(Coletor):
         timeout: float = 20.0,
         max_por_termo: int = 50,
         contato: str = "contato@exemplo.com",
+        clube_colecao: str | None = None,
+        clube_nome: str | None = None,
     ) -> None:
         self.slug = slug
+        # Clube do mercado (ex.: Pague Menos -> coleção "Clube Leve Mais"): o produto nessa
+        # coleção COM desconto é oferta do clube (o site põe o selo do clube no card) e vai
+        # pra aba Clubes do app em vez de Ofertas. oferta_tipo = nome do programa.
+        self.clube_colecao = clube_colecao
+        self.clube_nome = clube_nome or clube_colecao
         self.nome = nome
         self.url_base = url_base.rstrip("/")
         self.cidade = cidade
@@ -294,6 +301,9 @@ class ColetorVTEX(Coletor):
             desconto_pct = round((preco_de - preco) / preco_de * 100)
             if desconto_pct <= 0:
                 preco_de = desconto_pct = None
+        oferta_tipo = None
+        if desconto_pct and self.clube_colecao and                 self.clube_colecao in (prod.get("productClusters") or {}).values():
+            oferta_tipo = self.clube_nome
 
         ean = (sku.get("ean") or "").strip()
         if not ean_valido(ean):
@@ -303,6 +313,7 @@ class ColetorVTEX(Coletor):
             return perecivel_se_fresco(
                 cod_interno=cod, nome=nome, preco=preco, unidade=unidade,
                 imagem_url=imagem, url=link, preco_de=preco_de, desconto_pct=desconto_pct,
+                oferta_tipo=oferta_tipo,
             )
 
         return ItemColeta(
@@ -317,6 +328,7 @@ class ColetorVTEX(Coletor):
             url=link,
             preco_de=preco_de,
             desconto_pct=desconto_pct,
+            oferta_tipo=oferta_tipo,
         )
 
     @staticmethod

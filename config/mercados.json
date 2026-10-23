@@ -85,7 +85,10 @@
       "loja_ref": null,
       "ativo": true,
       "classe": "coletores.vtex:ColetorVTEX",
-      "params": {},
+      "params": {
+        "clube_colecao": "Clube Leve Mais",
+        "clube_nome": "Leve Mais"
+      },
       "obs": "Migrou de Convertiez pra VTEX FastStore (~20/10/2026): coleta pela API pública de catálogo VTEX, igual Savegnago/Covabra."
     },
     {

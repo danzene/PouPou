@@ -52,7 +52,8 @@ def refrescar_vtex(conn, cfg: dict, delay: float, contato: str) -> int:
     if not eans:
         log.info("[%s] sem EANs conhecidos ainda (rode coletar.py antes).", slug)
         return 0
-    col = ColetorVTEX(slug=slug, nome=cfg["nome"], url_base=base, delay=delay, contato=contato)
+    col = ColetorVTEX(slug=slug, nome=cfg["nome"], url_base=base, delay=delay, contato=contato,
+                      **cfg.get("params", {}))
     agora = datetime.now(timezone.utc).isoformat()
     n = 0
     try:
@@ -76,7 +77,7 @@ def refrescar_vtex(conn, cfg: dict, delay: float, contato: str) -> int:
                     ppu, _ = normalizar.preco_por_unidade(item.preco, medida)
                     lote.append({"ean": item.ean, "preco": item.preco, "preco_por_unidade": ppu,
                                  "so_no_site": item.so_no_site, "preco_de": item.preco_de,
-                                 "desconto_pct": item.desconto_pct})
+                                 "desconto_pct": item.desconto_pct, "oferta_tipo": item.oferta_tipo})
                 # em lote: da nuvem (EUA -> banco em SP) item a item custava ~3 idas por produto
                 n += database.gravar_lote_ean(conn, mid, lote, agora)
                 if (i // LOTE) % 10 == 0:

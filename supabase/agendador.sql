@@ -47,7 +47,9 @@ $$;
 revoke all on function privado.disparar_workflow(text) from public, anon, authenticated;
 
 -- Horários em UTC (Brasília = UTC-3). cron.schedule com o mesmo nome substitui o job.
-select cron.schedule('poupou-pague-menos', '0 8,20 * * *',   $$select privado.disparar_workflow('paguemenos-nuvem.yml')$$);  -- 05:00 e 17:00
+select cron.schedule('poupou-pague-menos', '0 8,20 * * *',   $$select privado.disparar_workflow('paguemenos-nuvem.yml')$$);  -- 05:00 e 17:00 (VTEX desde out/2026)
+-- vigia: falha (e o GitHub manda e-mail pro dono) se algum mercado ativo parou de atualizar
+select cron.schedule('poupou-saude',       '0 15 * * *',     $$select privado.disparar_workflow('saude-coleta.yml')$$);      -- 12:00
 select cron.schedule('poupou-vtex',        '0 11 * * *',     $$select privado.disparar_workflow('coleta-vtex.yml')$$);       -- 08:00
 select cron.schedule('poupou-refresh',     '30 */3 * * *',   $$select privado.disparar_workflow('refresh-vtex.yml')$$);      -- a cada 3h
 select cron.schedule('poupou-vip-tenda',   '15 1,9,17 * * *',$$select privado.disparar_workflow('coleta-vip-tenda.yml')$$);  -- 22:15, 06:15, 14:15

@@ -2,7 +2,7 @@ name: Refresh rapido VTEX (nuvem)
 
 # Refresh LEVE dos VTEX: reconsulta em lote (~40 EANs/requisicao) os produtos ja conhecidos.
 # Poucos minutos, baixo risco de bloqueio -> a cada 3h. Era a MercadoBarato-RefreshRapido.
-# O Pague Menos (Convertiez) NAO entra aqui: tem robo proprio (paguemenos-nuvem.yml).
+# Inclui o Pague Menos (VTEX desde out/2026); a varredura completa dele e o paguemenos-nuvem.yml.
 
 on:
   # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
@@ -19,4 +19,4 @@ jobs:
     secrets: inherit
     with:
       timeout: 90
-      comandos: python refrescar.py savegnago covabra atacadao oba
+      comandos: python refrescar.py savegnago covabra atacadao oba superpaguemenos

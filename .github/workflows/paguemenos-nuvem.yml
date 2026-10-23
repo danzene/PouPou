@@ -1,12 +1,10 @@
 name: Coleta Pague Menos (nuvem)
 
-# O Pague Menos bloqueia IP de fora do Brasil. Os servidores do GitHub ficam nos EUA, entao
-# NAO coletamos direto daqui. Este robo so serve de "despertador": bate no nosso proprio Vercel
-# (Sao Paulo, IP brasileiro, que PASSA no site) em sequencia, e o Vercel faz a coleta de verdade,
-# uma leva pequena por chamada. Assim o bloqueio geografico nao nos afeta.
-#
-# Zero segredo novo: o token de autenticacao fica no banco (tabela app_config) e o robo o le
-# usando o secret DATABASE_URL que ja existe.
+# O Super Pague Menos migrou pra VTEX (~20/10/2026) e a API publica de catalogo responde
+# normal aos servidores do GitHub (EUA) - entao agora coleta direto daqui, igual aos outros
+# VTEX. O caminho antigo (Vercel raspando o HTML do site Convertiez) quebrou na migracao:
+# ficou ~2 dias em 0% com o robo dizendo "sucesso". Hoje coletar.py SAI COM ERRO se o
+# mercado vier vazio, e o checar_saude.py (saude-coleta.yml) vigia todo dia.
 
 on:
   # horario: quem dispara e o pg_cron do Supabase (supabase/agendador.sql) -
@@ -18,41 +16,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  disparar:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      BASE_URL: "https://poupou-three.vercel.app"
-      LISTA_MAX: "90"      # pm-lista: ~360 produtos/chamada, ~60 chamadas fecham o catalogo (~20 min)
-      BATCHES: "30"        # pm-batch (pagina de produto): so complemento - itens por peso e detalhes
-    steps:
-      - name: Baixar o codigo
-        uses: actions/checkout@v4
-
-      - name: Instalar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Conferir o secret DATABASE_URL
-        run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::Configure o secret DATABASE_URL em Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-          echo "DATABASE_URL presente. OK."
-
-      - name: Instalar dependencias (leves)
-        run: pip install "psycopg[binary]" "httpx>=0.27"
-
-      - name: Coletar (despertando o Vercel/SP em sequencia)
-        run: python .github/scripts/pingar_coleta.py
-
-      - name: Instalar o projeto (pra limpeza)
-        if: always()
-        run: pip install -q -r requirements.txt
-
-      - name: Tirar indisponiveis do app
-        if: always()
-        run: python limpar_indisponiveis.py
+  coleta:
+    uses: ./.github/workflows/_coleta.yml
+    secrets: inherit
+    with:
+      timeout: 240
+      comandos: python coletar.py superpaguemenos

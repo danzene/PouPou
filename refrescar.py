@@ -163,19 +163,28 @@ def main(argv: list[str]) -> int:
     database.inicializar(conn)
     log.info("Refresh rápido de %d mercado(s): %s", len(alvos), ", ".join(m["slug"] for m in alvos))
     total = 0
+    vazios: list[str] = []   # mercado com EANs conhecidos mas 0 atualizados -> termina com erro
     for cfg in alvos:
         fn = REFRESHERS[cfg["plataforma"]]
         try:
-            total += fn(conn, cfg, delay, contato)
+            n = fn(conn, cfg, delay, contato)
+            total += n
+            if n == 0:
+                log.error("[%s] refresh VAZIO: 0 preços atualizados. Site mudou ou bloqueou?", cfg["slug"])
+                vazios.append(cfg["slug"])
         except MercadoIndisponivel as exc:
             conn.commit()
             log.warning("[%s] abortado (rate-limit): %s", cfg["slug"], exc)
         except Exception:  # noqa: BLE001 — um mercado não derruba os outros
             log.exception("[%s] FALHOU no refresh — seguindo.", cfg["slug"])
+            vazios.append(cfg["slug"])
     database.rebuild_resumo(conn)
     conn.commit()
     conn.close()
     log.info("Fim do refresh. %d preços atualizados no total.", total)
+    if vazios:   # erro => GitHub marca a rodada como falha e avisa por e-mail
+        log.error("ATENÇÃO: refresh sem resultado em: %s", ", ".join(vazios))
+        return 1
     return 0
 
 

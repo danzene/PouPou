@@ -196,6 +196,7 @@ def main(argv: list[str]) -> int:
     log.info("%d termos-semente | delay=%.1fs | max/termo=%d", len(sementes), delay, max_por_termo)
 
     total_snap = 0
+    vazios: list[str] = []   # mercado que falhou ou não trouxe NADA -> a rodada termina com erro
     for cfg in alvos:
         log.info("── %s (%s) ──", cfg["nome"], cfg["plataforma"])
         try:
@@ -205,13 +206,22 @@ def main(argv: list[str]) -> int:
             )
             total_snap += n_snap
             log.info("[%s] OK: %d EANs, %d snapshots de preço gravados.", cfg["slug"], n_prod, n_snap)
+            if n_prod == 0:
+                log.error("[%s] VEIO VAZIO: 0 produtos. Site mudou ou bloqueou?", cfg["slug"])
+                vazios.append(cfg["slug"])
         except Exception:  # noqa: BLE001 — isolamento: um mercado não derruba os outros
             log.exception("[%s] FALHOU — seguindo para o próximo mercado.", cfg["slug"])
+            vazios.append(cfg["slug"])
 
     database.rebuild_resumo(conn)  # atualiza n_mercados/menor_preco por produto (listagem rápida)
     log.info("Fim. produtos=%d | precos=%d | snapshots nesta rodada=%d",
              database.contar(conn, "produtos"), database.contar(conn, "precos"), total_snap)
     conn.close()
+    if vazios:
+        # sair com erro faz o GitHub marcar a rodada como FALHA e mandar e-mail pro dono.
+        # (O Pague Menos ficou 2 dias sem coletar com o robô dizendo "sucesso" — out/2026.)
+        log.error("ATENÇÃO: mercado(s) sem coleta nesta rodada: %s", ", ".join(vazios))
+        return 1
     return 0
 
 

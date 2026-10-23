@@ -1,0 +1,24 @@
+name: Vigia da saude da coleta
+
+# 1x/dia confere se TODO mercado ativo atualizou (checar_saude.py). Se algum parou
+# (site mudou, bloqueio, robo quebrado), a rodada FALHA e o GitHub manda e-mail pro dono.
+# Quem dispara e o pg_cron do Supabase (supabase/agendador.sql).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -q -r requirements.txt
+      - name: Conferir saude de cada mercado
+        run: python checar_saude.py

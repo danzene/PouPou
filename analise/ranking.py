@@ -68,6 +68,63 @@ _LIGA = {"de", "da", "do", "em", "com", "sem", "e", "tipo", "para", "p", "c", "s
 _RE_MEDIDA = _re.compile(r"^\d|^(kg|g|ml|l|un|und|lt|cx|pct|pacote|caixa|lata|garrafa)$")
 
 
+# Medida digitada -> grafias que aparecem no nome do produto. Quem busca "coca 2 litros"
+# tem que achar "Coca-Cola Garrafa 2l" (e "350 ml" achar "350ml", "1 quilo" achar "1kg").
+_UNIDADE = {"l": "l", "lt": "l", "lts": "l", "litro": "l", "litros": "l",
+            "ml": "ml", "mls": "ml", "mililitro": "ml", "mililitros": "ml",
+            "g": "g", "gr": "g", "grs": "g", "grama": "g", "gramas": "g",
+            "kg": "kg", "kgs": "kg", "quilo": "kg", "quilos": "kg", "kilo": "kg", "kilos": "kg"}
+_GRAFIAS = {"l": ("l", "lt", "litro"), "ml": ("ml",), "g": ("g", "gr", "grama"),
+            "kg": ("kg", "quilo", "kilo")}
+_RE_NUM = _re.compile(r"^\d+(?:[.,]\d+)?$")
+_RE_NUM_UNID = _re.compile(r"^(\d+(?:[.,]\d+)?)([a-z]+)$")
+
+
+def _sem_hifen(s: str) -> str:
+    """'coca-cola' -> 'coca cola': hífen e barra separam palavras (busca e nome iguais)."""
+    return s.replace("-", " ").replace("/", " ")
+
+
+def _termos_busca(full: str) -> list[tuple[str, str]]:
+    """Separa a busca em ('palavra', 'coca') e ('medida', '2l'). Número + unidade, junto
+    ou separado ('2 litros', '2lt', '2l'), vira UMA medida com a unidade padronizada."""
+    pal = full.split()
+    out, i = [], 0
+    while i < len(pal):
+        w = pal[i]
+        m = _RE_NUM_UNID.match(w)
+        if m and m.group(2) in _UNIDADE:
+            out.append(("medida", m.group(1) + _UNIDADE[m.group(2)]))
+        elif _RE_NUM.match(w) and i + 1 < len(pal) and pal[i + 1] in _UNIDADE:
+            out.append(("medida", w + _UNIDADE[pal[i + 1]]))
+            i += 1
+        elif w == "zero" or (w == "sem" and i + 1 < len(pal) and pal[i + 1] == "acucar"):
+            # "zero" e "sem açúcar" são o mesmo pra quem busca: uma loja escreve
+            # "Coca-Cola Zero Açúcar", outra "Coca-Cola Sem Açúcar"
+            out.append(("zero", "zero"))
+            i += 1 if w == "sem" else 0
+        else:
+            out.append(("palavra", w))
+        i += 1
+    return out
+
+
+def _padroes_medida(medida: str) -> list[str]:
+    """LIKEs que acham a medida no nome em qualquer grafia: '2l' -> '2l', '2lt', '2 litros',
+    '2 l'... ('2,5' e '2.5' valem igual). Sempre no início de palavra ('12l' não casa '2l')."""
+    m = _RE_NUM_UNID.match(medida)
+    num, unid = m.group(1), m.group(2)
+    pads = []
+    for n in {num, num.replace(",", "."), num.replace(".", ",")}:
+        pads += [f"{n}{unid}%", f"% {n}{unid}%"]          # colado: 2l, 2lt, 2litros
+        for g in _GRAFIAS[unid]:
+            if len(g) == 1:                               # '2 l' sozinho ('2 latas' não)
+                pads += [f"% {n} {g}", f"% {n} {g} %"]
+            else:
+                pads.append(f"% {n} {g}%")                # '2 lt', '2 litros'
+    return pads
+
+
 def _tipo_do_nome(nome_norm: str, tokens: list[str]) -> tuple[int, int] | None:
     """Posição (início, nº de palavras) do 'tipo' logo depois do termo buscado:
     'leite condensado moca' -> 'condensado'; 'leite em po ninho' -> 'em po';
@@ -82,7 +139,7 @@ def _tipo_do_nome(nome_norm: str, tokens: list[str]) -> tuple[int, int] | None:
     w = pal[i]
     if w in ("em", "de") and i + 1 < len(pal) and not _RE_MEDIDA.match(pal[i + 1]):
         return (i, 2)
-    if w in _LIGA or _RE_MEDIDA.match(w) or len(w) < 3:
+    if w in _LIGA or _RE_MEDIDA.match(w) or len(w) < 3 or not any(ch.isalpha() for ch in w):
         return None
     if w == "longa" and i + 1 < len(pal) and pal[i + 1] == "vida":
         return (i, 2)
@@ -99,9 +156,6 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
     Casa por INÍCIO de palavra. Devolve (achados, tipos): tipos = botões de filtro
     [{tipo, n}] montados dos próprios resultados; `tipo` filtra por um deles."""
     full = " ".join((_unaccent(termo) or "").split())
-    tokens = [t for t in full.split() if t]
-    if not tokens:
-        return [], []
     if _eh_ean(full):
         rows = conn.execute(
             "SELECT pr.ean, pr.nome_canonico, pr.marca, pr.categoria, "
@@ -111,9 +165,24 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
             "GROUP BY pr.ean, pr.nome_canonico, pr.marca, pr.categoria", (full, full)).fetchall()
         return [dict(r) for r in rows], []
 
-    nome = "lower(unaccent(pr.nome_canonico))"
-    cond = " AND ".join([f"({nome} LIKE ? OR {nome} LIKE ?)"] * len(tokens))
-    params = [p for t in tokens for p in (f"{t}%", f"% {t}%")]
+    termos = _termos_busca(_sem_hifen(full))
+    if not termos:
+        return [], []
+    tokens = [t for _, t in termos]
+    full = " ".join(tokens)
+    # hífen/barra viram espaço também no nome: 'Coca-Cola' casa com a busca 'coca cola'
+    nome = "replace(replace(lower(unaccent(pr.nome_canonico)), '-', ' '), '/', ' ')"
+    conds, params = [], []
+    for tipo_t, t in termos:
+        if tipo_t == "medida":
+            pads = _padroes_medida(t)
+        elif tipo_t == "zero":
+            pads = ["zero%", "% zero%", "sem acucar%", "% sem acucar%"]
+        else:
+            pads = [f"{t}%", f"% {t}%"]
+        conds.append("(" + " OR ".join([f"{nome} LIKE ?"] * len(pads)) + ")")
+        params += pads
+    cond = " AND ".join(conds)
     rows = [dict(r) for r in conn.execute(
         f"""SELECT pr.ean, pr.nome_canonico, pr.marca, pr.categoria,
                    COUNT(DISTINCT pa.mercado_id) AS n_mercados
@@ -130,7 +199,7 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
               if len(w) >= 3} - set(tokens)
     rotulos: dict = {}   # tipo sem acento -> como está escrito no produto ('em po' -> 'em pó')
     for r in rows:
-        r["_n"] = " ".join((_unaccent(r["nome_canonico"]) or "").split())
+        r["_n"] = " ".join(_sem_hifen(_unaccent(r["nome_canonico"]) or "").split())
         pos = _tipo_do_nome(r["_n"], tokens)
         r["tipo"] = None
         if pos:
@@ -138,7 +207,7 @@ def buscar_com_tipos(conn, termo: str, limite: int = 40, tipo: str | None = None
             t = " ".join(r["_n"].split()[i:i + k])
             if t.split()[-1] not in marcas:
                 r["tipo"] = t
-                orig = (r["nome_canonico"] or "").split()[i:i + k]
+                orig = _sem_hifen(r["nome_canonico"] or "").split()[i:i + k]
                 if len(orig) == k:
                     rotulos.setdefault(t, " ".join(orig).lower())
     # categoria dominante: entre quem começa com a busca (senão, entre todos), pesada por mercados

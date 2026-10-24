@@ -44,16 +44,15 @@ def main() -> int:
     c7d = (agora - timedelta(days=7)).isoformat()
 
     conn = database.conectar()
-    try:
-        rows = {r["slug"]: r for r in conn.execute(
-            """SELECT m.slug,
-                      SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS frescos_24h,
-                      SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS vistos_7d,
-                      MAX(pa.coletado_em) AS ultima
-               FROM mercados m LEFT JOIN precos_atual pa ON pa.mercado_id = m.id
-               GROUP BY m.slug""", (c24, c7d)).fetchall()}
-    finally:
-        conn.close()
+    hist = []   # (dia, slug, pct, horas, n_no_site) -> histórico do painel /gestao
+    dia = (agora - timedelta(hours=3)).date().isoformat()   # dia de Brasília
+    rows = {r["slug"]: r for r in conn.execute(
+        """SELECT m.slug,
+                  SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS frescos_24h,
+                  SUM(CASE WHEN pa.coletado_em >= ? THEN 1 ELSE 0 END) AS vistos_7d,
+                  MAX(pa.coletado_em) AS ultima
+           FROM mercados m LEFT JOIN precos_atual pa ON pa.mercado_id = m.id
+           GROUP BY m.slug""", (c24, c7d)).fetchall()}
 
     problemas = []
     for slug, nome in ativos.items():
@@ -61,15 +60,29 @@ def main() -> int:
         ultima = r["ultima"] if r else None
         if not ultima:
             problemas.append(f"{nome}: nenhum preço no banco")
+            hist.append((dia, slug, 0, None, 0))
             continue
         horas = (agora - datetime.fromisoformat(str(ultima))).total_seconds() / 3600
         f, v = (r["frescos_24h"] or 0), (r["vistos_7d"] or 0)
         pct = round(100 * f / v) if v else 0
         log.info("%-18s %3d%% atualizado em 24h | última coleta há %.0fh", nome, pct, horas)
+        hist.append((dia, slug, pct, round(horas, 1), v))
         if horas > MAX_HORAS:
             problemas.append(f"{nome}: sem coleta há {horas:.0f}h")
         elif pct < MIN_PCT:
             problemas.append(f"{nome}: só {pct}% atualizado em 24h")
+
+    try:
+        database.garantir_painel(conn)
+        conn.executemany(
+            "INSERT INTO saude_hist (dia, slug, pct, horas, n_no_site) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT (dia, slug) DO UPDATE SET pct = excluded.pct, horas = excluded.horas, "
+            "n_no_site = excluded.n_no_site", hist)
+        conn.commit()
+    except Exception:  # noqa: BLE001 — histórico é extra; o alarme não pode depender dele
+        log.exception("não consegui gravar o histórico da saúde (segue)")
+    finally:
+        conn.close()
 
     if problemas:
         for p in problemas:

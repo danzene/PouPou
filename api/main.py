@@ -655,6 +655,7 @@ try:
     database.inicializar(_boot)
     database.garantir_equivalentes(_boot)   # de/para de EANs do mesmo produto + view unificada
     database.garantir_acessos(_boot)        # acessos por dia (painel /gestao)
+    database.garantir_painel(_boot)         # buscas e histórico da saúde (painel /gestao)
     _boot.close()
 except Exception as _boot_err:  # noqa: BLE001
     logging.getLogger("api").warning("boot: init do banco falhou, seguindo mesmo assim: %s", _boot_err)
@@ -1841,6 +1842,33 @@ def registrar_acesso(body: dict = Body(...), authorization: str | None = Header(
     return Response(status_code=204)
 
 
+@app.post("/busca-log", status_code=204)
+def registrar_busca(body: dict = Body(...)):
+    """O app avisa a busca que a pessoa FEZ (depois que parou de digitar) e quantos resultados
+    vieram. 1 linha por termo por dia, sem quem buscou. Alimenta 'buscas sem resultado' do
+    painel — o jeito de descobrir produto que o cliente procura e não acha (ex.: Coca Zero 2L)."""
+    termo = " ".join((_unaccent(str((body or {}).get("q") or "")) or "").split())[:80]
+    if len(termo) < 2:
+        return Response(status_code=204)
+    try:
+        n = max(0, min(int((body or {}).get("n") or 0), 9999))
+    except (TypeError, ValueError):
+        n = 0
+    agora = datetime.now(timezone.utc)
+    dia = agora.astimezone(_FUSO_BR).date().isoformat()
+    conn = _conn()
+    try:
+        conn.execute(
+            "INSERT INTO buscas (dia, termo, n, resultados, ultimo) VALUES (?, ?, 1, ?, ?) "
+            "ON CONFLICT (dia, termo) DO UPDATE SET n = buscas.n + 1, "
+            "resultados = excluded.resultados, ultimo = excluded.ultimo",
+            (dia, termo, n, agora.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+    return Response(status_code=204)
+
+
 @app.get("/admin/acessos")
 def admin_acessos(dias: int = 30, authorization: str | None = Header(None)):
     """Fluxo de pessoas no app: por dia (aparelhos, logados, cadastros novos), totais de
@@ -1945,7 +1973,9 @@ def admin_usuarios(authorization: str | None = Header(None)):
         if not _admin_uid(conn, authorization):
             raise HTTPException(status_code=403, detail="Acesso restrito")
         rows = conn.execute(
-            """SELECT p.id, u.email, p.nome, p.plano, p.trial_ini, p.criado_em, p.is_admin
+            """SELECT p.id, u.email, p.nome, p.plano, p.trial_ini, p.trial_dias, p.criado_em,
+                      p.is_admin, p.plano_expira_em, p.mp_status, p.indicado_por, p.ref_code,
+                      (SELECT MAX(a.dia) FROM acessos a WHERE a.user_id = p.id::text) AS ultimo_dia
                FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
                ORDER BY p.criado_em DESC"""
         ).fetchall()
@@ -1954,8 +1984,12 @@ def admin_usuarios(authorization: str | None = Header(None)):
             plano = r["plano"] or "gratis"
             por_plano[plano] = por_plano.get(plano, 0) + 1
             usuarios.append({"id": r["id"], "email": r["email"], "nome": r["nome"],
-                             "plano": plano, "trial_ini": r["trial_ini"],
-                             "criado_em": r["criado_em"], "is_admin": bool(r["is_admin"])})
+                             "plano": plano, "trial_ini": r["trial_ini"], "trial_dias": r["trial_dias"],
+                             "criado_em": r["criado_em"], "is_admin": bool(r["is_admin"]),
+                             "plano_expira_em": r["plano_expira_em"], "mp_status": r["mp_status"],
+                             "pagante": r["mp_status"] in ("approved", "authorized"),
+                             "indicado_por": r["indicado_por"], "ref_code": r["ref_code"],
+                             "ultimo_dia": r["ultimo_dia"]})
         return {"usuarios": usuarios, "total": len(usuarios), "por_plano": por_plano}
     finally:
         conn.close()
@@ -2260,10 +2294,11 @@ def admin_mercados(authorization: str | None = Header(None)):
         if not _admin_uid(conn, authorization):
             raise HTTPException(status_code=403, detail="Acesso restrito")
         rows = conn.execute(
-            "SELECT slug, nome, plataforma, cidade, ativo, loja_ref FROM mercados ORDER BY ativo DESC, nome"
+            "SELECT slug, nome, plataforma, cidade, ativo, loja_ref, cor_badge FROM mercados ORDER BY ativo DESC, nome"
         ).fetchall()
         return {"mercados": [{"slug": r["slug"], "nome": r["nome"], "plataforma": r["plataforma"],
-                              "cidade": r["cidade"], "ativo": bool(r["ativo"]), "loja_ref": r["loja_ref"]}
+                              "cidade": r["cidade"], "ativo": bool(r["ativo"]), "loja_ref": r["loja_ref"],
+                              "cor_badge": r["cor_badge"]}
                              for r in rows]}
     finally:
         conn.close()
@@ -2302,6 +2337,211 @@ def admin_metricas(authorization: str | None = Header(None)):
             "frescos": n("SELECT COUNT(*) n FROM pereciveis"),
             "mercados_ativos": n("SELECT COUNT(*) n FROM mercados WHERE ativo = 1"),
         }
+    finally:
+        conn.close()
+
+
+def _iso(v):
+    """datetime/str/None -> ISO string (o front formata)."""
+    if v is None:
+        return None
+    return v.isoformat() if hasattr(v, "isoformat") else str(v)
+
+
+def _dt_utc(v):
+    """timestamp do banco (datetime ou texto ISO) -> datetime com fuso, ou None."""
+    if isinstance(v, str):
+        try:
+            v = datetime.fromisoformat(v)
+        except ValueError:
+            return None
+    if v is not None and v.tzinfo is None:
+        v = v.replace(tzinfo=timezone.utc)
+    return v
+
+
+@app.get("/admin/dinheiro")
+def admin_dinheiro(authorization: str | None = Header(None)):
+    """Assinaturas e pagamentos: quanto entrou por mês (pagamentos aprovados do Mercado Pago),
+    quem paga, quem é cortesia, quem vence nos próximos 7 dias e quem cancelou."""
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        agora = datetime.now(timezone.utc)
+        pags = conn.execute(
+            """SELECT e.uid, e.valor, e.plano_alvo, e.processado_em, u.email
+               FROM mp_eventos e LEFT JOIN auth.users u ON u.id = e.uid
+               WHERE e.status = 'approved' ORDER BY e.processado_em DESC"""
+        ).fetchall()
+        por_mes: dict = {}
+        plano_de: dict = {}   # plano (mensal/anual) de cada pagante = o do último pagamento
+        for r in pags:
+            quando = _dt_utc(r["processado_em"])
+            mes = quando.astimezone(_FUSO_BR).strftime("%Y-%m") if quando else "?"
+            m = por_mes.setdefault(mes, {"mes": mes, "valor": 0.0, "n": 0})
+            m["valor"] += float(r["valor"] or 0)
+            m["n"] += 1
+            plano_de.setdefault(r["uid"], r["plano_alvo"])
+        meses = sorted(por_mes.values(), key=lambda x: x["mes"])[-12:]
+        for m in meses:
+            m["valor"] = round(m["valor"], 2)
+        ultimos = [{"email": r["email"], "valor": float(r["valor"] or 0), "plano": r["plano_alvo"],
+                    "quando": _iso(r["processado_em"])} for r in pags[:15]]
+        perfis = conn.execute(
+            """SELECT p.id, u.email, p.plano, p.plano_expira_em, p.mp_status
+               FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
+               WHERE p.plano = 'assinante' OR p.mp_status = 'cancelled'"""
+        ).fetchall()
+        pagantes, cortesia, vencendo, cancelados = [], [], [], []
+        mrr = 0.0
+        for r in perfis:
+            exp = _dt_utc(r["plano_expira_em"])
+            ativo = r["plano"] == "assinante" and (exp is None or exp > agora)
+            item = {"id": r["id"], "email": r["email"], "expira_em": _iso(exp),
+                    "plano": plano_de.get(r["id"]), "mp_status": r["mp_status"],
+                    "recorrente": r["mp_status"] == "authorized"}
+            if r["mp_status"] == "cancelled":
+                cancelados.append(item)
+            if not ativo:
+                continue
+            if r["mp_status"] in ("approved", "authorized"):
+                pagantes.append(item)
+                pl = PLANOS.get(plano_de.get(r["id"]) or "mensal") or PLANOS["mensal"]
+                mrr += pl["valor"] / pl["meses"]
+            else:
+                cortesia.append(item)
+            if exp is not None and exp - agora <= timedelta(days=7):
+                vencendo.append(item)
+        vencendo.sort(key=lambda x: x["expira_em"] or "")
+        mes_atual = agora.astimezone(_FUSO_BR).strftime("%Y-%m")
+        return {"meses": meses, "mes_atual": por_mes.get(mes_atual, {"mes": mes_atual, "valor": 0, "n": 0}),
+                "total_recebido": round(sum(float(r["valor"] or 0) for r in pags), 2),
+                "mrr": round(mrr, 2), "pagantes": pagantes, "cortesia": cortesia,
+                "vencendo": vencendo, "cancelados": cancelados, "ultimos": ultimos}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/buscas")
+def admin_buscas(dias: int = 7, authorization: str | None = Header(None)):
+    """O que as pessoas buscam: mais buscadas, as que NÃO acharam nada, e os produtos que
+    mais entram nas listas (e os mercados mais favoritados)."""
+    dias = max(1, min(int(dias or 7), 90))
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        hoje = datetime.now(_FUSO_BR).date()
+        desde = (hoje - timedelta(days=dias - 1)).isoformat()
+        rows = conn.execute(
+            """SELECT termo, SUM(n) AS n, MAX(ultimo) AS ultimo,
+                      (ARRAY_AGG(resultados ORDER BY ultimo DESC))[1] AS resultados
+               FROM buscas WHERE dia >= ? GROUP BY termo ORDER BY SUM(n) DESC""", (desde,)
+        ).fetchall()
+        termos = [{"termo": r["termo"], "n": r["n"], "resultados": r["resultados"],
+                   "ultimo": r["ultimo"]} for r in rows]
+        sem = [t for t in termos if not t["resultados"]]
+        total = sum(t["n"] for t in termos)
+        n_sem = sum(t["n"] for t in sem)
+        sem_hoje = conn.execute(
+            "SELECT COUNT(*) AS n FROM buscas WHERE dia = ? AND resultados = 0",
+            (hoje.isoformat(),)).fetchone()["n"]
+        listas = [dict(r) for r in conn.execute(
+            """SELECT COALESCE(pr.nome_canonico, l.nome) AS nome, MAX(pr.imagem_url) AS imagem_url,
+                      COUNT(DISTINCT l.user_id) AS pessoas, COUNT(*) AS vezes
+               FROM lista l LEFT JOIN produtos pr ON pr.ean = l.ean
+               GROUP BY COALESCE(pr.nome_canonico, l.nome)
+               ORDER BY COUNT(DISTINCT l.user_id) DESC, COUNT(*) DESC LIMIT 15""")]
+        favs = [dict(r) for r in conn.execute(
+            """SELECT f.mercado_slug AS slug, COALESCE(m.nome, f.mercado_slug) AS nome,
+                      m.cor_badge, COUNT(*) AS pessoas
+               FROM favoritos f LEFT JOIN mercados m ON m.slug = f.mercado_slug
+               GROUP BY f.mercado_slug, m.nome, m.cor_badge ORDER BY COUNT(*) DESC""")]
+        desde_reg = conn.execute("SELECT MIN(dia) AS d FROM buscas").fetchone()["d"]
+        return {"dias": dias, "total": total, "termos_distintos": len(termos),
+                "pct_sem_resultado": round(100 * n_sem / total) if total else 0,
+                "sem_resultado_hoje": sem_hoje, "mais_buscadas": termos[:30],
+                "sem_resultado": sem[:30], "listas": listas, "favoritos": favs, "desde": desde_reg}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/indicacoes")
+def admin_indicacoes(authorization: str | None = Header(None)):
+    """Indique e ganhe: quem indicou quem, quantos assinaram e quantos meses grátis saíram."""
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        rows = conn.execute(
+            """SELECT ui.email, i.criado_em, i.plano, i.ref_creditado,
+                      pa.id AS pad_id, up.email AS pad_email, pa.ref_meses_dados
+               FROM profiles i
+               LEFT JOIN profiles pa ON pa.ref_code = i.indicado_por
+               LEFT JOIN auth.users ui ON ui.id = i.id
+               LEFT JOIN auth.users up ON up.id = pa.id
+               WHERE i.indicado_por IS NOT NULL ORDER BY i.criado_em DESC"""
+        ).fetchall()
+        padrinhos: dict = {}
+        indicados = []
+        for r in rows:
+            indicados.append({"email": r["email"], "quando": _iso(r["criado_em"]), "plano": r["plano"],
+                              "assinou": bool(r["ref_creditado"]), "padrinho": r["pad_email"]})
+            if r["pad_id"]:
+                p = padrinhos.setdefault(r["pad_id"], {"email": r["pad_email"], "indicados": 0,
+                                                       "assinaram": 0, "meses_ganhos": r["ref_meses_dados"] or 0})
+                p["indicados"] += 1
+                p["assinaram"] += 1 if r["ref_creditado"] else 0
+        return {"indicados": indicados,
+                "padrinhos": sorted(padrinhos.values(), key=lambda p: (-p["assinaram"], -p["indicados"])),
+                "total": len(indicados), "assinaram": sum(1 for i in indicados if i["assinou"]),
+                "por_mes": REF_INDICADOS_POR_MES}
+    finally:
+        conn.close()
+
+
+@app.post("/admin/usuario/{uid}/dias")
+def admin_dar_dias(uid: str, body: dict = Body(...), authorization: str | None = Header(None)):
+    """Cortesia: dá N dias de PouPou+ a um cliente (ex.: reclamação). Soma a partir da validade
+    atual, nunca tira dias já pagos. Não mexe na assinatura do Mercado Pago."""
+    try:
+        dias = int((body or {}).get("dias") or 0)
+    except (TypeError, ValueError):
+        dias = 0
+    if not 1 <= dias <= 365:
+        raise HTTPException(status_code=400, detail="dias deve ser de 1 a 365")
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        if not conn.execute("SELECT 1 FROM profiles WHERE id = ?", (uid,)).fetchone():
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        _dar_dias(conn, uid, dias)
+        conn.commit()
+        r = conn.execute("SELECT plano, plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
+        return {"ok": True, "plano": r["plano"], "plano_expira_em": _iso(r["plano_expira_em"])}
+    finally:
+        conn.close()
+
+
+@app.get("/admin/coleta/historico")
+def admin_coleta_historico(dias: int = 14, authorization: str | None = Header(None)):
+    """Saúde de cada mercado dia a dia (o vigia checar_saude.py grava 1x/dia)."""
+    dias = max(3, min(int(dias or 14), 60))
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        hoje = datetime.now(_FUSO_BR).date()
+        lista_dias = [(hoje - timedelta(days=i)).isoformat() for i in range(dias - 1, -1, -1)]
+        rows = conn.execute(
+            "SELECT dia, slug, pct, horas FROM saude_hist WHERE dia >= ? ORDER BY dia", (lista_dias[0],)
+        ).fetchall()
+        por: dict = {}
+        for r in rows:
+            por.setdefault(r["slug"], {})[r["dia"]] = {"pct": r["pct"], "horas": r["horas"]}
+        return {"dias": lista_dias, "mercados": por}
     finally:
         conn.close()
 

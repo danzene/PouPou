@@ -735,3 +735,22 @@ def garantir_acessos(conn) -> None:
     if isinstance(conn, _PgConn):
         conn.execute("ALTER TABLE acessos ENABLE ROW LEVEL SECURITY")   # só o backend lê/grava
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Painel /gestao: o que as pessoas buscam (termo + quantos resultados vieram, 1 linha por
+# termo por dia — sem quem buscou) e a saúde de cada mercado por dia (o checar_saude.py
+# grava 1x/dia), pra ver tendência e não só as últimas 24h.
+# ---------------------------------------------------------------------------
+def garantir_painel(conn) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS buscas ("
+                 "dia TEXT NOT NULL, termo TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, "
+                 "resultados INTEGER NOT NULL DEFAULT 0, ultimo TEXT NOT NULL, "
+                 "PRIMARY KEY (dia, termo))")
+    conn.execute("CREATE TABLE IF NOT EXISTS saude_hist ("
+                 "dia TEXT NOT NULL, slug TEXT NOT NULL, pct INTEGER NOT NULL, "
+                 "horas REAL, n_no_site INTEGER, PRIMARY KEY (dia, slug))")
+    if isinstance(conn, _PgConn):
+        conn.execute("ALTER TABLE buscas ENABLE ROW LEVEL SECURITY")
+        conn.execute("ALTER TABLE saude_hist ENABLE ROW LEVEL SECURITY")
+    conn.commit()

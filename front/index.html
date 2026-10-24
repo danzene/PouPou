@@ -1777,19 +1777,23 @@ async function loadCategoria(slug,nome){ catAtiva=slug; marcarNav();
   try{ const d=await fetch(`${API}/categoria/${slug}?limite=60`).then(r=>r.json());
     render(d.produtos,`${d.produtos.length} produtos em ${d.categoria.nome}`);
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar.</p>`; } }
-let BUSCA_Q="", BUSCA_TIPOS=[];
+let BUSCA_Q="", BUSCA_TIPOS=[], BUSCA_LOG_T=null;
 function buscaTipo(btn){ loadBusca(BUSCA_Q, btn.dataset.t||null); }
 function barraTipos(ativo){ // "Todos · Longa vida · Condensado · Em pó…" (vem do servidor, a partir dos resultados)
   if(!BUSCA_TIPOS.length) return "";
   const b=(t,rot,n)=>`<button class="tab ${(ativo||"")===t?"on":""}" type="button" data-t="${esc(t)}" onclick="buscaTipo(this)">${esc(rot)}${n?` <span class="muted">${n}</span>`:""}</button>`;
   return `<div class="tabs busca-tipos" role="group" aria-label="Filtrar por tipo">${b("","Todos")}${BUSCA_TIPOS.map(t=>b(t.tipo,t.rotulo.charAt(0).toUpperCase()+t.rotulo.slice(1),t.n)).join("")}</div>`;
 }
-async function loadBusca(q,tipo){ catAtiva=null; marcarNav();
+async function loadBusca(q,tipo){ catAtiva=null; marcarNav(); clearTimeout(BUSCA_LOG_T);
   if(q.length<2){ saida.innerHTML=""; ctx.textContent=""; return; }
   saida.innerHTML=esqueleto(6);
   try{ const d=await fetch(`${API}/buscar?q=${encodeURIComponent(q)}${tipo?`&tipo=${encodeURIComponent(tipo)}`:""}`).then(r=>r.json());
     const per=d.pereciveis||[], res=d.resultados||[];
     if(!tipo){ BUSCA_Q=q; BUSCA_TIPOS=d.tipos||[]; } // botões vêm da busca sem filtro
+    // conta a busca pro painel só quando a pessoa PAROU de digitar (sem os pedaços "co", "coc")
+    clearTimeout(BUSCA_LOG_T);
+    if(!tipo) BUSCA_LOG_T=setTimeout(()=>{ try{ fetch(`${API}/busca-log`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({q,n:res.length+per.length}),keepalive:true}).catch(()=>{}); }catch(e){} },1500);
     ctx.textContent=`${res.length} resultado(s)${per.length?` + ${per.length} fresco(s)`:""} para “${q}”`;
     if(!res.length && !per.length){
       saida.innerHTML=`<p class="state"><span class="big">${ic("search")}</span>Nada encontrado. Tente outro termo ou categoria.</p>`; return;

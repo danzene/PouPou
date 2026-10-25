@@ -332,7 +332,10 @@ _tok_cache: dict = {}   # token -> (user_id, expira_em): evita bater no Supabase
 # .strip(): blinda contra espaço/tab/newline que vem colado no copy-paste do painel de env.
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()            # SECRETO — nunca no front
 MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "").strip()        # SECRETO — assina os webhooks
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://poupou.fly.dev").strip().rstrip("/")
+# Endereço público do app (volta do Mercado Pago, webhook, link de indicação). Domínio
+# próprio desde out/2026. SITE_URL só pra sobrescrever (ex.: teste local); a antiga
+# PUBLIC_BASE_URL ficou presa como "secret" na Vercel com o endereço velho, por isso é ignorada.
+PUBLIC_BASE_URL = (os.getenv("SITE_URL") or "https://poupouapp.com.br").strip().rstrip("/")
 _MP_TOLERANCIA_TS = 300   # janela anti-replay do webhook (5 min)
 # Preço e duração num só lugar: o SERVIDOR escolhe o valor a partir do id do plano —
 # o cliente NUNCA manda preço. 'meses' é pra recorrência no cartão (auto_recurring).

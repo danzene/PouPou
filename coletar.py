@@ -86,6 +86,8 @@ def coletar_mercado(conn, cfg: dict, sementes: list[str], **opts) -> tuple[int, 
         loja_ref=cfg.get("loja_ref"),
     )
     coletor = _instanciar(cfg, **opts)
+    if hasattr(coletor, "carregar_cache_ean"):   # GPA: EAN dos produtos já conhecidos
+        coletor.carregar_cache_ean(conn, mercado_id)
     agora = datetime.now(timezone.utc).isoformat()
 
     # Engine de CATÁLOGO COMPLETO (varredura por categoria) quando o coletor suporta;

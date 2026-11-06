@@ -3,8 +3,14 @@
 Descoberto por engenharia reversa do front (Next.js): a busca é
     POST /pa/search/search  {terms, page, resultsPerPage, storeId, department:'ecom',
                              customerPlus, partner:'fallback', allowRedirect}
-que devolve produtos com PREÇO (mas sem EAN). O EAN vem do detalhe:
-    GET  /pa/v4/products/ecom/{id}?storeId={store}   -> content.ean
+que devolve produtos com PREÇO (mas sem EAN). O EAN vem do detalhe do produto.
+
+Detalhe: até 05/11/2026 era GET /pa/v4/products/ecom/{id} (JSON leve). Em 06/11 o GPA
+tirou essa rota ("No matching handler", 404 em tudo) e o EAN passou a vir só da página do
+produto, montada no servidor (Next.js). Hoje:
+    1º) cache id->EAN dos links já gravados no banco (carregar_cache_ean) — a maioria;
+    2º) GET /_next/data/{buildId}/produto/{id}.json -> pageProps.product.ean (só os novos);
+        o buildId muda a cada deploy do site: lido do __NEXT_DATA__ da página do produto.
 
 Como a busca é por TERMO (não há varredura por categoria acessível), este coletor usa
 o modo termos-semente do projeto (coletar(sementes)): busca cada termo e, pra cada
@@ -13,6 +19,7 @@ produto, consulta o EAN. É uma requisição a mais por produto (como o Converti
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -60,6 +67,19 @@ class ColetorGPA(Coletor):
         self._coletados = 0
         self._falhas_seguidas = 0
         self._max_falhas = 6  # disjuntor: aborta o mercado após N falhas seguidas
+        self._ean_por_id: dict[str, str] = {}   # cache id do GPA -> EAN (links do banco)
+        self._build_id: str | None = None       # buildId do Next.js do site (muda a cada deploy)
+        self._ean_falhas = 0                    # detalhes seguidos sem EAN -> o site mudou
+        self._max_ean_falhas = 25
+
+    def carregar_cache_ean(self, conn, mercado_id: int) -> None:
+        """id do produto -> EAN a partir dos links já gravados (url /produto/{id}/...):
+        evita baixar a página de cada produto de novo todo dia."""
+        for r in conn.execute("SELECT ean, url FROM links WHERE mercado_id = ?", (mercado_id,)):
+            m = re.search(r"/produto/(\d+)", r["url"] or "")
+            if m and r["ean"]:
+                self._ean_por_id[m.group(1)] = r["ean"]
+        log.info("[%s] cache de EAN: %d produtos já conhecidos.", self.slug, len(self._ean_por_id))
 
     def _headers(self) -> dict:
         return {"User-Agent": _UA, "Accept": "application/json",
@@ -183,10 +203,43 @@ class ColetorGPA(Coletor):
         )
 
     def _ean(self, client, pid) -> str | None:
-        r = self._req(client, "GET", f"{API}/v4/products/ecom/{pid}?storeId={self.store_id}")
-        if r is not None and r.status_code == 200:
-            try:
-                return str((r.json().get("content") or {}).get("ean") or "").strip()
-            except ValueError:
-                return None
+        pid = str(pid)
+        if pid in self._ean_por_id:
+            return self._ean_por_id[pid]
+        ean = self._ean_do_site(client, pid)
+        if ean:
+            self._ean_falhas = 0
+            self._ean_por_id[pid] = ean
+            return ean
+        # muitos detalhes seguidos sem EAN = o site mudou de novo: aborta logo (o robô sai
+        # com erro e manda e-mail) em vez de ficar 1h30 batendo em 404 como em 06/11/2026
+        self._ean_falhas += 1
+        if self._ean_falhas >= self._max_ean_falhas:
+            raise MercadoIndisponivel(f"{self.slug}: detalhe do produto sem EAN {self._ean_falhas}x seguidas")
         return None
+
+    def _ean_do_site(self, client, pid: str) -> str | None:
+        """EAN pelos dados da página do produto (Next.js). Sem buildId (ou se ele venceu),
+        lê a página HTML, que já traz o EAN e o buildId novo."""
+        if self._build_id:
+            r = self._req(client, "GET", f"{self.url_base}/_next/data/{self._build_id}/produto/{pid}.json")
+            if r is not None and r.status_code == 200:
+                try:
+                    prod = ((r.json().get("pageProps") or {}).get("product") or {})
+                    return str(prod.get("ean") or "").strip() or None
+                except ValueError:
+                    pass
+            self._build_id = None   # site publicou versão nova: pega o buildId de novo
+        r = self._req(client, "GET", f"{self.url_base}/produto/{pid}")
+        if r is None or r.status_code != 200:
+            return None
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text, re.S)
+        if not m:
+            return None
+        try:
+            nd = json.loads(m.group(1))
+        except ValueError:
+            return None
+        self._build_id = nd.get("buildId")
+        prod = ((nd.get("props") or {}).get("pageProps") or {}).get("product") or {}
+        return str(prod.get("ean") or "").strip() or None

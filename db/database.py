@@ -176,6 +176,12 @@ def upsert_mercado(
     return int(row["id"])
 
 
+def _prefixo_foto(url: str | None) -> str:
+    """'https://host/' + '%' da foto (pra regra 'mesmo mercado mandou foto nova' do upsert)."""
+    m = re.match(r"^(https?://[^/]+/)", url or "")
+    return (m.group(1) + "%") if m else ""
+
+
 # SQL compartilhado entre a gravação item a item e a gravação EM LOTE (gravar_lote_*).
 _SQL_UPSERT_PRODUTO = """
         INSERT INTO produtos (ean, nome_canonico, marca, categoria, unidade, qtd_embalagem, imagem_url)
@@ -191,7 +197,15 @@ _SQL_UPSERT_PRODUTO = """
             categoria     = COALESCE(produtos.categoria, excluded.categoria),
             unidade       = COALESCE(excluded.unidade, produtos.unidade),
             qtd_embalagem = COALESCE(produtos.qtd_embalagem, excluded.qtd_embalagem),
-            imagem_url    = COALESCE(produtos.imagem_url, excluded.imagem_url)
+            imagem_url    = CASE
+                -- o MESMO mercado mandou foto nova (ele troca/apaga a antiga: a do Savegnago
+                -- dava 404 desde out/2026) -> fica a nova. Foto de outro mercado não troca.
+                WHEN excluded.imagem_url IS NOT NULL AND (produtos.imagem_url LIKE ?
+                     OR produtos.imagem_url LIKE 'https://static-images.gpa.digital/%'   -- host antigo do GPA, saiu do ar
+                     OR produtos.imagem_url LIKE '%/None')                              -- Convertiez sem foto (Pague Menos antigo)
+                THEN excluded.imagem_url
+                ELSE COALESCE(produtos.imagem_url, excluded.imagem_url)
+            END
         """
 _SQL_INSERT_PRECO_HIST = """
             INSERT INTO precos (ean, mercado_id, preco, preco_por_unidade, origem, coletado_em)
@@ -259,7 +273,7 @@ def upsert_produto(
     """
     conn.execute(
         _SQL_UPSERT_PRODUTO,
-        (ean, nome, marca, categoria, unidade, qtd_embalagem, imagem_url),
+        (ean, nome, marca, categoria, unidade, qtd_embalagem, imagem_url, _prefixo_foto(imagem_url)),
     )
 
 
@@ -626,7 +640,7 @@ def gravar_lote_ean(conn, mercado_id: int, itens: list[dict], coletado_em: str,
         if oferta_tipo is None and it.get("desconto_pct"):
             oferta_tipo = "oferta"   # mesma regra do inserir_preco
         if it.get("produto"):
-            produtos.append((ean, *it["produto"]))
+            produtos.append((ean, *it["produto"], _prefixo_foto(it["produto"][5])))
         a = ant.get(ean)
         if a is None or abs(float(a) - float(preco)) > 0.005:
             hist.append((ean, mercado_id, preco, it.get("preco_por_unidade"), origem, coletado_em))
@@ -699,7 +713,14 @@ def garantir_equivalentes(conn) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS produto_equivalente ("
                  "ean TEXT PRIMARY KEY, ean_principal TEXT NOT NULL)")
     if isinstance(conn, _PgConn):
-        conn.execute("CREATE OR REPLACE VIEW precos_atual_unif AS " + _SQL_VIEW_UNIF)
+        # security_invoker: quem consulta a view usa as PRÓPRIAS permissões (o anon do site
+        # não lê as tabelas de preço, que têm RLS). Sem isso a view rodava como o dono
+        # (postgres, ignora RLS) e a chave pública do site lia TODOS os preços com o
+        # mercado — furava a trava do "onde" (nov/2026). Tem que ir em todo CREATE OR
+        # REPLACE: sem o WITH, o Postgres zera a opção. O backend conecta como postgres.
+        conn.execute("CREATE OR REPLACE VIEW precos_atual_unif WITH (security_invoker = true) AS "
+                     + _SQL_VIEW_UNIF)
+        conn.execute("REVOKE ALL ON precos_atual_unif FROM anon, authenticated")
         # tabela nova no Supabase: RLS ligado e sem policy = só o backend lê (igual às da coleta)
         conn.execute("ALTER TABLE produto_equivalente ENABLE ROW LEVEL SECURITY")
     else:

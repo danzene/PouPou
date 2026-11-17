@@ -23,6 +23,7 @@ import re
 import secrets
 import sqlite3
 import time
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -336,19 +337,33 @@ MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "").strip()        # SECRETO 
 # próprio desde out/2026. SITE_URL só pra sobrescrever (ex.: teste local); a antiga
 # PUBLIC_BASE_URL ficou presa como "secret" na Vercel com o endereço velho, por isso é ignorada.
 PUBLIC_BASE_URL = (os.getenv("SITE_URL") or "https://poupouapp.com.br").strip().rstrip("/")
-_MP_TOLERANCIA_TS = 300   # janela anti-replay do webhook (5 min)
+# janela do 'ts' da assinatura do webhook: 3 dias, pra o REENVIO do MP (que acontece quando
+# respondemos 500) também passar. Repetir um aviso não faz mal: o servidor consulta o status
+# real no MP e a chave em mp_eventos impede creditar 2x.
+_MP_TOLERANCIA_TS = 3 * 86400
 # Preço e duração num só lugar: o SERVIDOR escolhe o valor a partir do id do plano —
 # o cliente NUNCA manda preço. 'meses' é pra recorrência no cartão (auto_recurring).
 PLANOS = {
     "mensal": {"valor": 9.90, "dias": 30, "meses": 1, "titulo": "PouPou+ Mensal"},
     "anual": {"valor": 99.90, "dias": 365, "meses": 12, "titulo": "PouPou+ Anual"},
 }
+# Folga do CARTÃO: o MP cobra a assinatura no mesmo dia de cada mês (e tenta de novo se o
+# cartão recusar), mas cada cobrança libera 30 dias — em mês de 31 dias o acesso venceria
+# ~1 dia ANTES da cobrança. Com assinatura ativa no cartão (mp_status 'authorized'), o acesso
+# vale até a validade + esta folga. A folga só entra na CONFERÊNCIA (nunca é gravada), então
+# não se acumula mês a mês. O front (assinanteAtivo) usa a mesma folga.
+FOLGA_CARTAO = timedelta(days=3)
 
 
 def _mp():
     """SDK do Mercado Pago (import tardio: não quebra o boot se o pacote faltar num env)."""
     import mercadopago
     return mercadopago.SDK(MP_ACCESS_TOKEN)
+
+
+# conexão reaproveitada com o Supabase Auth (agora toda listagem de quem está logado valida o
+# token pra saber se mostra o "onde"): sem abrir TLS novo a cada vez e sem esperar 8 s
+_AUTH_HTTP = httpx.Client(timeout=3)
 
 
 def _uid_do_header(authorization: str | None) -> str | None:
@@ -363,8 +378,8 @@ def _uid_do_header(authorization: str | None) -> str | None:
     if ent and ent[1] > time.time():
         return ent[0]
     try:
-        r = httpx.get(f"{SUPABASE_URL}/auth/v1/user",
-                      headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON}, timeout=8)
+        r = _AUTH_HTTP.get(f"{SUPABASE_URL}/auth/v1/user",
+                           headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON})
         uid = r.json().get("id") if r.status_code == 200 else None
     except Exception:  # noqa: BLE001
         uid = None
@@ -405,7 +420,8 @@ def _premium(conn, uid: str | None) -> bool:
     enquanto plano_expira_em > agora (cada pagamento aprovado estende essa data no webhook)."""
     if not uid:
         return False
-    r = conn.execute("SELECT plano, trial_ini, plano_expira_em, trial_dias FROM profiles WHERE id = ?", (uid,)).fetchone()
+    r = conn.execute("SELECT plano, trial_ini, plano_expira_em, trial_dias, mp_status FROM profiles WHERE id = ?",
+                     (uid,)).fetchone()
     if not r:
         return False
     if r["plano"] == "assinante":
@@ -419,6 +435,8 @@ def _premium(conn, uid: str | None) -> bool:
                 return True
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
+        if r["mp_status"] == "authorized":   # cartão ativo: folga até a próxima cobrança
+            exp = exp + FOLGA_CARTAO
         return datetime.now(timezone.utc) < exp
     if r["plano"] == "trial" and r["trial_ini"]:
         ini = r["trial_ini"]
@@ -448,6 +466,54 @@ def _cutoff_horas(horas: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
 
 
+def _premium_req(conn, authorization: str | None) -> bool:
+    """premium (teste ativo ou assinante) de quem fez a requisição; visitante sem token sai
+    na hora (não consulta o Supabase)."""
+    return _premium(conn, _uid_do_header(authorization)) if authorization else False
+
+
+def _rk_publico(rk: list[dict]) -> list[dict]:
+    """Ranking SEM identificar a loja, pra quem não tem PouPou+: só os preços, em ordem.
+    O menor preço é público (é a isca); qualquer coisa que diga DE QUAL loja ele é fica de
+    fora — nome, slug, id, cor, logo, link (o domínio já é o mercado), selo de clube (cada
+    programa é de 1 mercado), horário da coleta (cada mercado coleta num horário próprio),
+    preço "de"/desconto e sparkline."""
+    return [{"preco": l["preco"], "preco_por_unidade": l.get("preco_por_unidade"),
+             "rotulo_unidade": l.get("rotulo_unidade")} for l in rk]
+
+
+def _resposta_privada(response: Response | None) -> None:
+    """Resposta muda conforme quem pede (premium x visitante): nunca guardar em cache
+    compartilhado (CDN) — senão a versão do assinante iria pro visitante."""
+    if response is not None:
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["Vary"] = "Authorization"
+
+
+def _historico_agregado(series: dict[str, dict], atuais: set[str]) -> list[dict]:
+    """Histórico de quem não tem PouPou+: UMA linha com o menor preço de cada dia entre os
+    mercados, sem dizer de qual loja. Cada mercado vale pelo último preço conhecido (o
+    histórico só guarda mudanças); quem não vende mais o produto (sem preço atual) só conta
+    até o seu último registro. Data sem horário: o horário da coleta entrega o mercado."""
+    # ordem pela data-HORA completa (ISO em UTC ordena como o tempo): no mesmo dia, o último
+    # preço do mercado é o que vale — ordenar só pelo dia punha os pontos em ordem de PREÇO
+    ev = sorted((str(p["coletado_em"]), m, p["preco"])
+                for m, s in series.items() for p in s["pontos"])
+    ultimo_dia = {m: max(str(p["coletado_em"])[:10] for p in s["pontos"])
+                  for m, s in series.items() if s["pontos"]}
+    ult: dict[str, float] = {}
+    out: dict[str, float] = {}
+    i = 0
+    for d in sorted({e[0][:10] for e in ev}):
+        while i < len(ev) and ev[i][0][:10] == d:
+            ult[ev[i][1]] = ev[i][2]
+            i += 1
+        vivos = [v for m, v in ult.items() if m in atuais or ultimo_dia.get(m, "") >= d]
+        if vivos:
+            out[d] = min(vivos)
+    return [{"preco": round(v, 2), "coletado_em": f"{d}T12:00:00"} for d, v in sorted(out.items())]
+
+
 def _gate_cesta(resp: dict, premium: bool) -> dict:
     """TRAVA NO SERVIDOR: pra quem NÃO é premium, remove o "onde comprar" (rota, ranking,
     preço por mercado e qual loja) do payload — o dado acionável nem sai do backend. Mantém
@@ -459,6 +525,7 @@ def _gate_cesta(resp: dict, premium: bool) -> dict:
     mm = resp.get("melhor_mercado")
     if mm:                               # mantém o TOTAL, mascara QUAL loja
         mm["nome"] = mm["slug"] = mm["cor_badge"] = None
+        mm["faltantes"] = []             # os itens que ELA não tem também apontam a loja
     for it in resp.get("itens", []):
         m = it.get("melhor")
         it["melhor"] = {"preco": m.get("preco"), "rotulo": m.get("rotulo")} if m else None  # só o menor preço
@@ -468,7 +535,7 @@ def _gate_cesta(resp: dict, premium: bool) -> dict:
 def _valida_assinatura_mp(x_signature: str | None, x_request_id: str | None,
                           data_id: str | None) -> bool:
     """Valida o webhook do Mercado Pago: HMAC-SHA256 sobre o manifest 'id:..;request-id:..;ts:..;'.
-    Sem secret/assinatura -> rejeita. Janela anti-replay de 5 min."""
+    Sem secret/assinatura -> rejeita. Janela do ts: _MP_TOLERANCIA_TS."""
     if not (x_signature and x_request_id and data_id and MP_WEBHOOK_SECRET):
         return False
     ts = v1 = None
@@ -490,6 +557,13 @@ def _valida_assinatura_mp(x_signature: str | None, x_request_id: str | None,
     manifest = f"id:{did};request-id:{x_request_id};ts:{ts};"
     esperado = hmac.new(MP_WEBHOOK_SECRET.encode(), manifest.encode(), hashlib.sha256).hexdigest()
     return hmac.compare_digest(esperado, v1)
+
+
+def _transacao(conn):
+    """Grava o evento e estende o acesso JUNTOS: se cair no meio, nada fica gravado e o reenvio
+    do MP (ou o 2º aviso da mesma cobrança) credita. No SQLite (dev) não tem efeito."""
+    c = getattr(conn, "_c", None)
+    return c.transaction() if c is not None and hasattr(c, "transaction") else nullcontext()
 
 
 def _registra_evento(conn, payment_id, topico, status, uid, plano_id, valor, raw) -> bool:
@@ -522,15 +596,23 @@ def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapprova
             base = atual
     nova = (base + timedelta(days=dias)).isoformat()
     if preapproval_id is not None:
+        # cobrança (atrasada/reenviada) de uma assinatura que a pessoa JÁ cancelou: soma os dias
+        # que ela pagou, mas não volta a dizer que renova sozinho
         conn.execute(
             "UPDATE profiles SET plano='assinante', plano_expira_em=?, ultimo_pagamento_em=?, "
-            "mp_status=?, mp_preapproval_id=?, atualizado_em=? WHERE id=?",
-            (nova, agora.isoformat(), mp_status, preapproval_id, agora.isoformat(), uid))
+            "mp_status=CASE WHEN mp_status='cancelled' AND mp_preapproval_id=? THEN mp_status ELSE ? END, "
+            "mp_preapproval_id=?, atualizado_em=? WHERE id=?",
+            (nova, agora.isoformat(), preapproval_id, mp_status, preapproval_id, agora.isoformat(), uid))
     else:
+        # sem id de assinatura (Pix avulso, ou 1ª cobrança do cartão): quem tem cartão ativo
+        # e paga um Pix extra continua 'authorized' (a assinatura dele segue valendo); cobrança
+        # de cartão chegando pra quem já cancelou não volta a dizer que renova sozinho
         conn.execute(
             "UPDATE profiles SET plano='assinante', plano_expira_em=?, ultimo_pagamento_em=?, "
-            "mp_status=?, atualizado_em=? WHERE id=?",
-            (nova, agora.isoformat(), mp_status, agora.isoformat(), uid))
+            "mp_status=CASE WHEN mp_status='authorized' THEN mp_status "
+            "WHEN mp_status='cancelled' AND ?='authorized' THEN mp_status ELSE ? END, atualizado_em=? "
+            "WHERE id=?",
+            (nova, agora.isoformat(), mp_status, mp_status, agora.isoformat(), uid))
     return nova
 
 
@@ -838,7 +920,7 @@ CESTA_BASICA_TERMOS = [
 
 
 @app.get("/cesta-basica")
-def cesta_basica_itens():
+def cesta_basica_itens(response: Response, authorization: str | None = Header(None)):
     """Itens de cesta básica: pra cada um, o produto presente em MAIS mercados (comparável em
     quase todas) e mais barato. Uma feira pronta com o essencial do dia a dia."""
     conn = _conn()
@@ -863,9 +945,13 @@ def cesta_basica_itens():
                 vistos.add(r["ean"])
                 encontrados.append((rotulo, r))
         itens = _produtos_lote(conn, [r for _, r in encontrados])  # 1 query de ranking p/ todos
+        premium = _premium_req(conn, authorization)
         for (rotulo, _r), d in zip(encontrados, itens):
             d["rotulo_basico"] = rotulo
-        return {"itens": itens, "n": len(itens)}
+            if not premium:
+                d["ranking"] = _rk_publico(d["ranking"])
+        _resposta_privada(response)
+        return {"itens": itens, "n": len(itens), "premium": premium}
     finally:
         conn.close()
 
@@ -887,7 +973,8 @@ def categorias():
 
 
 @app.get("/categoria/{slug}")
-def categoria(slug: str, limite: int = 60):
+def categoria(slug: str, response: Response, limite: int = 60,
+              authorization: str | None = Header(None)):
     conn = _conn()
     try:
         cat = conn.execute(
@@ -907,10 +994,17 @@ def categoria(slug: str, limite: int = 60):
             """,
             (slug, limite),
         ).fetchall()
+        produtos = _produtos_lote(conn, prods)
+        premium = _premium_req(conn, authorization)
+        if not premium:   # a trava é no servidor: o "onde" nem sai daqui pra quem não tem PouPou+
+            for p in produtos:
+                p["ranking"] = _rk_publico(p["ranking"])
+        _resposta_privada(response)
         return {
             "categoria": {"slug": cat["slug"], "nome": cat["nome"],
                           "disponivel": bool(cat["disponivel"])},
-            "produtos": _produtos_lote(conn, prods),
+            "produtos": produtos,
+            "premium": premium,
         }
     finally:
         conn.close()
@@ -1079,8 +1173,10 @@ def frescos(categoria: str, limite: int = 200):
 
 
 @app.get("/ofertas")
-def ofertas(limite: int = 120):
-    """Itens que estão EM DESCONTO no site (produtos com EAN + frescos), do maior % ao menor."""
+def ofertas(response: Response, limite: int = 120, authorization: str | None = Header(None)):
+    """Itens que estão EM DESCONTO no site (produtos com EAN + frescos), do maior % ao menor.
+    Sem PouPou+, vai sem a loja: toda oferta listada é o menor preço do produto, então o
+    mercado dela entregaria o "onde" que os cards trancam."""
     conn = _conn()
     try:
         itens = []
@@ -1124,13 +1220,19 @@ def ofertas(limite: int = 120):
                           "so_no_site": bool(r["so_no_site"]), "mercado": r["mercado"],
                           "mercado_slug": r["mercado_slug"], "cor_badge": r["cor_badge"], "url": r["url"]})
         itens.sort(key=lambda x: -(x["desconto_pct"] or 0))
-        return {"itens": itens[:limite], "n": len(itens)}
+        premium = _premium_req(conn, authorization)
+        if not premium:
+            for it in itens:
+                it["mercado"] = it["mercado_slug"] = it["cor_badge"] = it["url"] = None
+                it["oferta_tipo"] = None
+        _resposta_privada(response)
+        return {"itens": itens[:limite], "n": len(itens), "premium": premium}
     finally:
         conn.close()
 
 
 @app.get("/clube")
-def clube(limite: int = 500):
+def clube(response: Response, limite: int = 500, authorization: str | None = Header(None)):
     """Ofertas de CLUBE/FIDELIDADE — o preço que SÓ vale com o programa do mercado (Viva,
     Fidelidade, etc.). Separado das ofertas comuns pra não misturar com o que é pra todos.
     Agrupa por mercado+programa: a pessoa escolhe o mercado cujo cartão ela tem e vê os itens."""
@@ -1185,13 +1287,21 @@ def clube(limite: int = 500):
               "programa": " · ".join(sorted(g["programas"])), "n": g["n"]} for g in grupos.values()),
             key=lambda x: -x["n"])
         itens.sort(key=lambda x: -(x["desconto_pct"] or 0))
-        return {"mercados": mercados, "itens": itens, "n": len(itens)}
+        premium = _premium_req(conn, authorization)
+        _resposta_privada(response)
+        if not premium:
+            # a tela é POR MERCADO e o preço de clube costuma ser o menor do produto: sem
+            # PouPou+ vão só os programas (quem tem e quantas ofertas), sem nenhum preço
+            return {"mercados": mercados, "itens": [], "n": len(itens), "bloqueado": True,
+                    "premium": False}
+        return {"mercados": mercados, "itens": itens, "n": len(itens), "premium": True}
     finally:
         conn.close()
 
 
 @app.get("/buscar")
-def buscar(q: str, tipo: str | None = None):
+def buscar(q: str, response: Response, tipo: str | None = None,
+           authorization: str | None = Header(None)):
     q = (q or "").strip()
     if len(q) < 2:
         return {"q": q, "resultados": [], "pereciveis": [], "tipos": [], "frescos_primeiro": False}
@@ -1221,14 +1331,19 @@ def buscar(q: str, tipo: str | None = None):
         base = database.normalizar_nome(q) or ""
         frescos_primeiro = any((database.normalizar_nome(g["nome"]) or "").startswith(base)
                                for g in pereciveis)
+        premium = _premium_req(conn, authorization)
+        if not premium:   # embalados: sem a loja. Frescos seguem livres (decisão de produto)
+            for p in resultados:
+                p["ranking"] = _rk_publico(p["ranking"])
+        _resposta_privada(response)
         return {"q": q, "resultados": resultados, "pereciveis": pereciveis,
-                "tipos": tipos, "frescos_primeiro": frescos_primeiro}
+                "tipos": tipos, "frescos_primeiro": frescos_primeiro, "premium": premium}
     finally:
         conn.close()
 
 
 @app.get("/produto/{ean}")
-def produto(ean: str):
+def produto(ean: str, response: Response, authorization: str | None = Header(None)):
     conn = _conn()
     try:
         prod = conn.execute(
@@ -1237,13 +1352,19 @@ def produto(ean: str):
         ).fetchone()
         if not prod:
             raise HTTPException(status_code=404, detail=f"EAN {ean} não encontrado")
-        return _produto_dict(conn, prod)
+        premium = _premium_req(conn, authorization)
+        d = _produto_dict(conn, prod, com_sparkline=premium)   # sparkline é por mercado
+        if not premium:
+            d["ranking"] = _rk_publico(d["ranking"])
+        d["premium"] = premium
+        _resposta_privada(response)
+        return d
     finally:
         conn.close()
 
 
 @app.get("/historico/{ean}")
-def historico(ean: str):
+def historico(ean: str, response: Response, authorization: str | None = Header(None)):
     conn = _conn()
     try:
         prod = conn.execute(
@@ -1272,16 +1393,29 @@ def historico(ean: str):
             s["pontos"].append({"preco": round(r["preco"], 2), "coletado_em": r["coletado_em"]})
         # Âncora: como o histórico só guarda MUDANÇAS (dedup), junta o preço ATUAL como
         # último ponto — assim um preço estável ainda desenha uma linha até hoje.
+        atuais: set[str] = set()   # mercados ATIVOS com preço hoje (base da linha agregada)
         for r in conn.execute(
-            """SELECT m.nome AS mercado, m.cor_badge, pa.preco, pa.coletado_em
+            """SELECT m.nome AS mercado, m.cor_badge, m.ativo, pa.preco, pa.coletado_em
                FROM precos_atual_unif pa JOIN mercados m ON m.id = pa.mercado_id WHERE pa.ean = ?""",
             (principal,),
         ):
+            if r["ativo"]:
+                atuais.add(r["mercado"])
             s = series.setdefault(r["mercado"], {"mercado": r["mercado"],
                                                  "cor_badge": r["cor_badge"], "pontos": []})
             if not s["pontos"] or s["pontos"][-1]["coletado_em"] != r["coletado_em"]:
                 s["pontos"].append({"preco": round(r["preco"], 2), "coletado_em": r["coletado_em"]})
-        return {"ean": ean, "nome": prod["nome_canonico"], "origem": "online",
+        premium = _premium_req(conn, authorization)
+        _resposta_privada(response)
+        if not premium:
+            # mesma base do "menor preço hoje" da gaveta: só mercados ativos
+            ativos = {r["nome"] for r in conn.execute("SELECT nome FROM mercados WHERE ativo = 1")}
+            # sem PouPou+: uma linha só ("menor preço do dia"), sem nome nem cor de loja
+            return {"ean": ean, "nome": prod["nome_canonico"], "origem": "online", "premium": False,
+                    "series": [{"mercado": None, "cor_badge": None, "agregado": "menor_do_dia",
+                                "pontos": _historico_agregado(
+                                    {m: v for m, v in series.items() if m in ativos}, atuais)}]}
+        return {"ean": ean, "nome": prod["nome_canonico"], "origem": "online", "premium": True,
                 "series": list(series.values())}
     finally:
         conn.close()
@@ -1358,178 +1492,11 @@ def _ranking_fresco(conn: sqlite3.Connection, chave: str) -> list[dict]:
     return sorted(por_mercado.values(), key=lambda x: x["preco"])
 
 
-def _item_lista(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
-    if _eh_fresco_key(row["ean"]):
-        chave = _fresco_chave(row["ean"])
-        ranking = _ranking_fresco(conn, chave)
-        melhor = ranking[0] if ranking else None
-        alvo = row["preco_alvo"]
-        return {
-            "ean": row["ean"], "tipo": "fresco",
-            "nome": (row["nome"] if "nome" in row.keys() else None) or chave,
-            "marca": None, "imagem_url": None,
-            "rotulo": melhor["rotulo"] if melhor else None,
-            "quantidade": row["quantidade"] if "quantidade" in row.keys() else 1,
-            "comprado": bool(row["comprado"]) if "comprado" in row.keys() else False,
-            "preco_alvo": alvo, "criado_em": row["criado_em"], "melhor": melhor,
-            "disparado": bool(melhor and alvo is not None and melhor["preco"] < alvo),
-        }
-    return _item_lista_produto(conn, row)
-
-
-def _item_lista_produto(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
-    prod = conn.execute(
-        "SELECT ean, nome_canonico, marca, imagem_url FROM produtos WHERE ean = ?", (row["ean"],)
-    ).fetchone()
-    ranking = _ranking_enriquecido(conn, row["ean"], com_sparkline=False)
-    melhor = ranking[0] if ranking else None
-    alvo = row["preco_alvo"]
-    disparado = bool(melhor and alvo is not None and melhor["preco"] < alvo)
-    return {
-        "ean": row["ean"], "tipo": "produto",
-        "nome": prod["nome_canonico"] if prod else row["ean"],
-        "marca": prod["marca"] if prod else None,
-        "imagem_url": prod["imagem_url"] if prod else None,
-        "quantidade": row["quantidade"] if "quantidade" in row.keys() else 1,
-        "comprado": bool(row["comprado"]) if "comprado" in row.keys() else False,
-        "preco_alvo": alvo,
-        "criado_em": row["criado_em"],
-        "melhor": melhor,          # linha de ranking (mercado, preco, cor_badge, url, ...)
-        "disparado": disparado,    # menor preço já está abaixo do alvo
-    }
-
-
-@app.get("/lista")
-def lista_get():
-    conn = _conn()
-    try:
-        rows = conn.execute(
-            "SELECT ean, nome, quantidade, preco_alvo, comprado, criado_em FROM lista ORDER BY criado_em DESC"
-        ).fetchall()
-        itens = [_item_lista(conn, r) for r in rows]
-        return {"itens": itens, "n_alertas": sum(1 for i in itens if i["disparado"])}
-    finally:
-        conn.close()
-
-
-@app.post("/lista")
-def _lista_add_fresco(payload: dict) -> dict:
-    """Adiciona/atualiza um item FRESCO na lista (chave sintética 'f:<chave>')."""
-    chave = str(payload.get("fresco") or "").strip()
-    if not chave:  # também aceita ean sintético 'f:<chave>' (updates de qtd/alvo/comprado)
-        e = str(payload.get("ean") or "").strip()
-        chave = _fresco_chave(e) if _eh_fresco_key(e) else ""
-    if not chave:
-        raise HTTPException(status_code=400, detail="fresco (chave) obrigatório")
-    key = FRESCO_PREFIX + chave
-    conn = _conn()
-    try:
-        rk = _ranking_fresco(conn, chave)
-        if not rk:
-            raise HTTPException(status_code=404, detail=f"Fresco '{chave}' não encontrado")
-        nome = str(payload.get("nome") or chave).strip()[:120]
-        atual = conn.execute(
-            "SELECT quantidade, preco_alvo, comprado, nome FROM lista WHERE ean = ?", (key,)
-        ).fetchone()
-        qtd = payload.get("quantidade")
-        qtd = max(1, int(float(qtd))) if qtd is not None else (int(atual["quantidade"]) if atual else 1)
-        if "preco_alvo" in payload:
-            alvo = float(payload["preco_alvo"]) if payload["preco_alvo"] is not None else None
-        elif atual:
-            alvo = atual["preco_alvo"]
-        else:
-            alvo = rk[0]["preco"]
-        if "comprado" in payload:
-            comprado = 1 if payload["comprado"] else 0
-        else:
-            comprado = atual["comprado"] if atual else 0
-        if atual and payload.get("nome") is None:
-            nome = atual["nome"] or nome
-        conn.execute(
-            """INSERT INTO lista (ean, nome, quantidade, preco_alvo, comprado, criado_em)
-               VALUES (?, ?, ?, ?, ?, ?)
-               ON CONFLICT(ean) DO UPDATE SET nome = excluded.nome, quantidade = excluded.quantidade,
-                   preco_alvo = excluded.preco_alvo, comprado = excluded.comprado""",
-            (key, nome, qtd, alvo, comprado, datetime.now(timezone.utc).isoformat()),
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT ean, nome, quantidade, preco_alvo, comprado, criado_em FROM lista WHERE ean = ?", (key,)
-        ).fetchone()
-        return _item_lista(conn, row)
-    finally:
-        conn.close()
-
-
-def lista_add(payload: dict = Body(...)):
-    """Adiciona/atualiza um item da lista. Mantém valores existentes se não vierem no payload.
-    Aceita produto por EAN (`ean`) OU item fresco por chave de agrupamento (`fresco` + `nome`)."""
-    if payload.get("fresco") or _eh_fresco_key(str(payload.get("ean") or "").strip()):
-        return _lista_add_fresco(payload)
-    ean = str(payload.get("ean") or "").strip()
-    conn = _conn()
-    try:
-        prod = conn.execute("SELECT ean FROM produtos WHERE ean = ?", (ean,)).fetchone()
-        if not prod:
-            raise HTTPException(status_code=404, detail=f"EAN {ean} não encontrado")
-        atual = conn.execute(
-            "SELECT quantidade, preco_alvo, comprado FROM lista WHERE ean = ?", (ean,)
-        ).fetchone()
-
-        qtd = payload.get("quantidade")
-        if qtd is None:
-            qtd = atual["quantidade"] if atual else 1
-        qtd = max(1, int(float(qtd)))
-
-        if "preco_alvo" in payload:
-            alvo = float(payload["preco_alvo"]) if payload["preco_alvo"] is not None else None
-        elif atual:
-            alvo = atual["preco_alvo"]
-        else:  # novo item sem alvo -> menor preço atual (alerta quando cair abaixo)
-            rk = _ranking_enriquecido(conn, ean)
-            alvo = rk[0]["preco"] if rk else None
-
-        if "comprado" in payload:
-            comprado = 1 if payload["comprado"] else 0
-        else:
-            comprado = atual["comprado"] if atual else 0
-
-        conn.execute(
-            """INSERT INTO lista (ean, quantidade, preco_alvo, comprado, criado_em) VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(ean) DO UPDATE SET quantidade = excluded.quantidade,
-                                              preco_alvo = excluded.preco_alvo,
-                                              comprado   = excluded.comprado""",
-            (ean, qtd, alvo, comprado, datetime.now(timezone.utc).isoformat()),
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT ean, quantidade, preco_alvo, criado_em FROM lista WHERE ean = ?", (ean,)
-        ).fetchone()
-        return _item_lista(conn, row)
-    finally:
-        conn.close()
-
-
-@app.delete("/lista/{ean}")
-def lista_del(ean: str):
-    conn = _conn()
-    try:
-        conn.execute("DELETE FROM lista WHERE ean = ?", (ean,))
-        conn.commit()
-        return {"ok": True, "ean": ean}
-    finally:
-        conn.close()
-
-
-@app.get("/alertas")
-def alertas():
-    conn = _conn()
-    try:
-        rows = conn.execute("SELECT ean, nome, quantidade, preco_alvo, comprado, criado_em FROM lista").fetchall()
-        itens = [_item_lista(conn, r) for r in rows]
-        return {"alertas": [i for i in itens if i["disparado"]]}
-    finally:
-        conn.close()
+# Rotas antigas da lista (GET/POST /lista, DELETE /lista/{ean}, GET /alertas) foram
+# REMOVIDAS em nov/2026: eram da época do SQLite de um usuário só e ficaram públicas, sem
+# login — o DELETE apagava o item da lista de TODOS os clientes e o GET mostrava as listas
+# de todo mundo com o mercado mais barato. A lista hoje é lida/gravada direto no Supabase
+# (RLS por dono) e comparada no GET /cesta, que tem a trava de PouPou+.
 
 
 _RM_CAMPINAS = {  # municípios da Região Metropolitana de Campinas (compara com a cidade do ViaCEP)
@@ -1593,7 +1560,9 @@ def cesta(authorization: str | None = Header(None), mercados: str | None = None)
     try:
         uid = _uid_do_header(authorization)
         premium = _premium(conn, uid)
-        filtro_slugs = {s.strip() for s in (mercados or "").split(",") if s.strip()} or None
+        # "Meus mercados" só pra PouPou+: com 1 mercado no filtro, o grátis comparava o preço
+        # dele com o menor geral e descobria se aquela loja era a mais barata
+        filtro_slugs = ({s.strip() for s in (mercados or "").split(",") if s.strip()} or None) if premium else None
         itens_lista = conn.execute(
             "SELECT ean, nome, quantidade, preco_alvo, comprado FROM lista "
             "WHERE user_id = ? ORDER BY criado_em DESC", (uid,)
@@ -1845,6 +1814,51 @@ def registrar_acesso(body: dict = Body(...), authorization: str | None = Header(
     return Response(status_code=204)
 
 
+# Foto de produto que não abriu no aparelho de alguém (o app avisa 1x por produto). O
+# servidor CONFERE o endereço (não confia no aviso) e, se ele morreu de vez (404/410), apaga a
+# foto: a próxima coleta de QUALQUER mercado que vende o produto põe uma nova. Sem isso, a foto
+# de um mercado que parou de vender o item (ex.: a Ervilha Quero, do Savegnago) nunca trocava.
+_FOTO_HTTP = httpx.Client(timeout=4, follow_redirects=True,
+                          headers={"User-Agent": "Mozilla/5.0 (compatible; PouPou/1.0)"})
+_FOTO_CONFERIDA: dict[str, float] = {}   # ean -> quando conferiu (no máx. 1x por dia)
+_RE_EAN = re.compile(r"[0-9]{8,14}")
+
+
+def _foto_morta(url: str) -> bool:
+    """True só se o endereço responde 404/410 (HEAD e, pra confirmar, um GET de 1 byte).
+    Erro de rede/DNS não conta: pode ser passageiro."""
+    try:
+        if _FOTO_HTTP.head(url).status_code not in (404, 410):
+            return False
+        return _FOTO_HTTP.get(url, headers={"Range": "bytes=0-0"}).status_code in (404, 410)
+    except httpx.HTTPError:
+        return False
+
+
+@app.post("/foto-falhou", status_code=204)
+def foto_falhou(ean: str = ""):
+    ean = (ean or "").strip()
+    if not _RE_EAN.fullmatch(ean):
+        return Response(status_code=204)
+    agora = time.time()
+    if agora - _FOTO_CONFERIDA.get(ean, 0) < 86400:
+        return Response(status_code=204)
+    if len(_FOTO_CONFERIDA) > 50000:
+        _FOTO_CONFERIDA.clear()
+    _FOTO_CONFERIDA[ean] = agora
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT imagem_url FROM produtos WHERE ean = ?", (ean,)).fetchone()
+        url = (r["imagem_url"] if r else None) or ""
+        if url.startswith("https://") and _foto_morta(url):
+            conn.execute("UPDATE produtos SET imagem_url = NULL WHERE ean = ? AND imagem_url = ?",
+                         (ean, url))
+            conn.commit()
+    finally:
+        conn.close()
+    return Response(status_code=204)
+
+
 @app.post("/busca-log", status_code=204)
 def registrar_busca(body: dict = Body(...)):
     """O app avisa a busca que a pessoa FEZ (depois que parou de digitar) e quantos resultados
@@ -1978,7 +1992,10 @@ def admin_usuarios(authorization: str | None = Header(None)):
         rows = conn.execute(
             """SELECT p.id, u.email, p.nome, p.plano, p.trial_ini, p.trial_dias, p.criado_em,
                       p.is_admin, p.plano_expira_em, p.mp_status, p.indicado_por, p.ref_code,
-                      (SELECT MAX(a.dia) FROM acessos a WHERE a.user_id = p.id::text) AS ultimo_dia
+                      (SELECT MAX(a.dia) FROM acessos a WHERE a.user_id = p.id::text) AS ultimo_dia,
+                      EXISTS (SELECT 1 FROM mp_eventos e WHERE e.uid = p.id AND e.status = 'approved'
+                              AND e.processado_em > now() - CASE WHEN e.plano_alvo = 'anual'
+                                  THEN interval '365 days' ELSE interval '30 days' END) AS pagou
                FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
                ORDER BY p.criado_em DESC"""
         ).fetchall()
@@ -1991,6 +2008,7 @@ def admin_usuarios(authorization: str | None = Header(None)):
                              "criado_em": r["criado_em"], "is_admin": bool(r["is_admin"]),
                              "plano_expira_em": r["plano_expira_em"], "mp_status": r["mp_status"],
                              "pagante": r["mp_status"] in ("approved", "authorized"),
+                             "pagou": bool(r["pagou"]),
                              "indicado_por": r["indicado_por"], "ref_code": r["ref_code"],
                              "ultimo_dia": r["ultimo_dia"]})
         return {"usuarios": usuarios, "total": len(usuarios), "por_plano": por_plano}
@@ -2017,6 +2035,7 @@ def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(
     p = PLANOS[plano_id]
     if metodo == "cartao":
         # assinatura recorrente no cartão (renova sozinho) — fluxo redirect (/preapproval)
+        _sem_cartao_ativo(uid)   # não abre uma 2ª assinatura (seria cobrança em dobro)
         return _criar_preapproval(uid, plano_id, _email_do_header(authorization))
     # ---- Pix / avulso: Checkout Pro (uma cobrança; libera N dias) ----
     pref = {
@@ -2041,6 +2060,48 @@ def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(
     if not init:
         raise HTTPException(status_code=502, detail="Falha ao criar pagamento")
     return {"init_point": init, "ref_id": res.get("id")}
+
+
+def _sem_cartao_ativo(uid) -> None:
+    """409 se a pessoa JÁ tem assinatura no cartão ativa no MP: abrir outra faria o MP cobrar
+    2x por mês (e o 'Cancelar renovação' só cancelaria uma). Confere SEMPRE no MP (o aviso pode
+    ter atrasado ou se perdido): ativa lá -> 409; não ativa/inexistente lá -> grava e segue."""
+    agora = datetime.now(timezone.utc).isoformat()
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT mp_preapproval_id, mp_status, plano, plano_expira_em FROM profiles WHERE id = ?",
+                         (uid,)).fetchone()
+        pid = r["mp_preapproval_id"] if r else None
+        local = (r["mp_status"] if r else None) or ""
+        if not pid or local == "cancelled":
+            return
+        cod, sub = _mp_get_cod(f"/preapproval/{pid}")
+        st = sub.get("status") if cod == 200 else None
+        if cod == 404 or (st and st != "authorized"):
+            if local == "authorized":   # aqui constava ativa: grava o que o MP diz e segue
+                conn.execute("UPDATE profiles SET mp_status=?, atualizado_em=? WHERE id=? AND mp_preapproval_id=?",
+                             (st or "cancelled", agora, uid, pid))
+            return
+        if st is None and local != "authorized":
+            return   # o MP não respondeu e aqui não consta ativa: não trava quem quer pagar
+        if st == "authorized" and local != "authorized":   # o aviso de 'autorizada' atrasou
+            conn.execute("UPDATE profiles SET mp_status='authorized', atualizado_em=? "
+                         "WHERE id=? AND mp_preapproval_id=?", (agora, uid, pid))
+        # período PAGO (igual ao assinanteAtivo do app): teste grátis não conta
+        com_acesso = r["plano"] == "assinante" and _premium(conn, uid)
+        ja_pagou = r["plano"] == "assinante" and r["plano_expira_em"] is not None
+    finally:
+        conn.close()
+    if com_acesso:
+        raise HTTPException(status_code=409, detail="Você já tem assinatura no cartão ativa — ela renova sozinha.")
+    if ja_pagou:   # já foi cobrada antes e venceu: a renovação está sendo recusada
+        raise HTTPException(status_code=409, detail=(
+            "A renovação do seu cartão não passou e o Mercado Pago ainda está tentando. Pra usar "
+            "outro cartão, cancele a assinatura antiga aqui na sua conta, ou pague no Pix."))
+    raise HTTPException(status_code=409, detail=(
+        "Seu cartão já foi autorizado e o Mercado Pago está processando a primeira cobrança "
+        "(pode levar alguns minutos). Se ela for recusada, cancele esta assinatura aqui na sua "
+        "conta e tente outro cartão."))
 
 
 def _criar_preapproval(uid, plano_id, email) -> dict:
@@ -2070,38 +2131,68 @@ def _criar_preapproval(uid, plano_id, email) -> dict:
     if pid:   # guarda a assinatura pendente (pra cancelar depois); acesso só vem no webhook
         conn = _conn()
         try:
-            conn.execute("UPDATE profiles SET mp_preapproval_id=?, mp_status='pending', atualizado_em=? "
+            # quem já paga (Pix 'approved') e só abriu o checkout do cartão fica como está até o
+            # MP autorizar — antes, desistir no meio mostrava "renova sozinho" sem cartão nenhum
+            conn.execute("UPDATE profiles SET mp_preapproval_id=?, mp_status=CASE WHEN mp_status IN "
+                         "('approved','authorized') THEN mp_status ELSE 'pending' END, atualizado_em=? "
                          "WHERE id=?", (pid, datetime.now(timezone.utc).isoformat(), uid))
         finally:
             conn.close()
     return {"init_point": init, "ref_id": pid, "recorrente": True}
 
 
-def _mp_get(path: str) -> dict:
-    """GET cru na API do MP (recursos sem método no SDK Python, ex.: /authorized_payments/{id})."""
+def _mp_get_cod(path: str) -> tuple[int, dict]:
+    """GET cru na API do MP (recursos sem método no SDK Python, ex.: /authorized_payments/{id}).
+    Devolve (código HTTP, json); código 0 = falha de rede."""
     try:
         r = httpx.get(f"https://api.mercadopago.com{path}",
                       headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"}, timeout=15)
-        return r.json() if r.status_code == 200 else {}
+        return r.status_code, (r.json() if r.status_code == 200 else {})
     except Exception:  # noqa: BLE001
-        return {}
+        return 0, {}
+
+
+def _mp_get(path: str) -> dict:
+    """Para os avisos do MP: 404 = não existe (segue sem fazer nada); qualquer outra falha
+    LEVANTA erro, o aviso responde 500 e o MP reenvia (antes virava {} e o aviso se perdia)."""
+    cod, js = _mp_get_cod(path)
+    if cod not in (200, 404):
+        raise RuntimeError(f"MP GET {path}: HTTP {cod}")
+    return js
 
 
 def _proc_payment(payment_id) -> None:
     """Confirma um pagamento avulso (Checkout Pro) e, se aprovado, estende o acesso."""
     if not payment_id:
         return
-    pay = _mp().payment().get(payment_id).get("response", {})
+    res = _mp().payment().get(payment_id) or {}
+    if res.get("status") not in (200, 404):   # o SDK não levanta erro em 4xx: falha -> 500 -> MP reenvia
+        raise RuntimeError(f"MP payment {payment_id}: HTTP {res.get('status')}")
+    pay = res.get("response") or {}
     status = pay.get("status")
     ext = (pay.get("external_reference") or "").split(":")
     uid = ext[0] if ext else ""
     plano_id = ext[1] if len(ext) > 1 else ""
     if status == "approved" and uid and plano_id in PLANOS:
+        # cobrança da ASSINATURA no cartão: o MP avisa a MESMA cobrança 2x — aqui (aviso
+        # "payment") e em _proc_authorized_payment (aviso da fatura). Os dois gravam com a
+        # chave = id do PAGAMENTO, então cada cobrança libera 30 dias uma vez só (antes, 60).
+        md = pay.get("metadata") or {}
+        assinatura = ((pay.get("point_of_interaction") or {}).get("type") == "SUBSCRIPTIONS"
+                      or pay.get("operation_type") == "recurring_payment"
+                      or bool(md.get("preapproval_id")))
+        chave = str(pay.get("id") or payment_id)
         conn = _conn()
         try:
-            if _registra_evento(conn, payment_id, "payment", status, uid, plano_id,
-                                 pay.get("transaction_amount"), pay):
-                _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+            with _transacao(conn):   # evento + dias juntos: se cair no meio, o reenvio credita
+                novo = _registra_evento(conn, chave, "payment", status, uid, plano_id,
+                                        pay.get("transaction_amount"), pay)
+                if novo and assinatura:   # recorrente: o painel mostra "renova sozinho"
+                    _estende_assinatura(conn, uid, plano_id, mp_status="authorized",
+                                        preapproval_id=md.get("preapproval_id") or None)
+                elif novo:
+                    _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+            if novo:
                 _processar_indicacao(conn, uid)
         finally:
             conn.close()
@@ -2110,7 +2201,8 @@ def _proc_payment(payment_id) -> None:
 def _proc_authorized_payment(ap_id) -> None:
     """Cada cobrança recorrente do cartão. Sucesso = status 'processed' + payment.status
     'approved'. O external_reference já vem no objeto -> identifica o usuário sem buscar o
-    preapproval. Idempotente pelo id da fatura (não estende 2x em reenvio)."""
+    preapproval. Idempotente pelo id do PAGAMENTO da fatura: nem o reenvio nem o aviso
+    "payment" da mesma cobrança (que também chega) estendem o acesso de novo."""
     if not ap_id:
         return
     ap = _mp_get(f"/authorized_payments/{ap_id}")
@@ -2121,13 +2213,28 @@ def _proc_authorized_payment(ap_id) -> None:
     uid = ext[0] if ext else ""
     plano_id = ext[1] if len(ext) > 1 else ""
     pre_id = ap.get("preapproval_id")
+    # chave = id do PAGAMENTO da fatura (o mesmo do aviso "payment"): a cobrança conta 1x só
+    chave = str((ap.get("payment") or {}).get("id") or ap_id)
     if uid and plano_id in PLANOS:
         conn = _conn()
         try:
-            if _registra_evento(conn, ap_id, "subscription_authorized_payment", "approved",
-                                 uid, plano_id, ap.get("transaction_amount"), ap):
-                _estende_assinatura(conn, uid, plano_id, mp_status="authorized", preapproval_id=pre_id)
+            with _transacao(conn):   # evento + dias juntos: se cair no meio, o reenvio credita
+                novo = _registra_evento(conn, chave, "subscription_authorized_payment", "approved",
+                                        uid, plano_id, ap.get("transaction_amount"), ap)
+                if novo:
+                    _estende_assinatura(conn, uid, plano_id, mp_status="authorized", preapproval_id=pre_id)
+            if novo:
                 _processar_indicacao(conn, uid)
+            elif pre_id:
+                # a cobrança já entrou pelo aviso "payment" (não estende de novo). Se a conta ficou
+                # como Pix ('approved') e a assinatura segue ATIVA no MP, marca como recorrente
+                atual = conn.execute("SELECT mp_status FROM profiles WHERE id = ?", (uid,)).fetchone()
+                if atual and atual["mp_status"] == "approved" and \
+                        (_mp_get(f"/preapproval/{pre_id}") or {}).get("status") == "authorized":
+                    conn.execute(
+                        "UPDATE profiles SET mp_status='authorized', mp_preapproval_id=?, atualizado_em=? "
+                        "WHERE id=? AND mp_status='approved'",
+                        (pre_id, datetime.now(timezone.utc).isoformat(), uid))
         finally:
             conn.close()
 
@@ -2145,8 +2252,13 @@ def _proc_preapproval(pre_id) -> None:
     if uid and status:
         conn = _conn()
         try:
-            conn.execute("UPDATE profiles SET mp_status=?, mp_preapproval_id=?, atualizado_em=? "
-                         "WHERE id=?", (status, pre_id, datetime.now(timezone.utc).isoformat(), uid))
+            # 'pending' (checkout do cartão aberto) não apaga o status de quem já paga; e aviso de
+            # uma assinatura ANTIGA/abandonada não mexe na atual (só 'authorized' vira a atual)
+            conn.execute(
+                "UPDATE profiles SET mp_status=CASE WHEN ?='pending' AND mp_status IN ('approved','authorized') "
+                "THEN mp_status ELSE ? END, mp_preapproval_id=?, atualizado_em=? "
+                "WHERE id=? AND (?='authorized' OR mp_preapproval_id IS NULL OR mp_preapproval_id=?)",
+                (status, status, pre_id, datetime.now(timezone.utc).isoformat(), uid, status, pre_id))
         finally:
             conn.close()
 
@@ -2174,6 +2286,9 @@ async def webhook_mp(request: Request):
             _proc_preapproval(data_id)
     except Exception as e:  # noqa: BLE001
         logging.getLogger("api").warning("webhook mp %s/%s: %s", topico, data_id, e)
+        # 500 pro MP reenviar (com 200 o pagamento podia ficar sem liberar pra sempre); a
+        # chave em mp_eventos impede creditar 2x no reenvio
+        return Response(status_code=500)
     return Response(status_code=200)
 
 
@@ -2199,7 +2314,7 @@ def assinatura_status(authorization: str | None = Header(None)):
             dias = max(0, (e - datetime.now(timezone.utc)).days)
         return {"plano": (r["plano"] if r else "gratis"), "ativo": ativo, "expira_em": exp,
                 "dias_restantes": dias,
-                "recorrente": bool(r and r["mp_preapproval_id"] and r["mp_status"] not in ("cancelled", None)),
+                "recorrente": bool(r and r["mp_preapproval_id"] and r["mp_status"] == "authorized"),
                 "mp_status": (r["mp_status"] if r else None)}
     finally:
         conn.close()
@@ -2221,10 +2336,17 @@ def assinatura_cancelar(authorization: str | None = Header(None)):
         if not pid:
             raise HTTPException(status_code=400, detail="Sem assinatura recorrente ativa")
         try:
-            _mp().preapproval().update(pid, {"status": "cancelled"})
+            res = _mp().preapproval().update(pid, {"status": "cancelled"}) or {}
         except Exception as e:  # noqa: BLE001
             logging.getLogger("api").warning("mp cancelar: %s", e)
             raise HTTPException(status_code=502, detail="Falha ao cancelar no Mercado Pago")
+        if not 200 <= int(res.get("status") or 0) < 300:
+            # o SDK não levanta erro em 4xx: confere no MP (já cancelada ou inexistente = nada
+            # mais é cobrado); em qualquer outro caso NÃO grava 'cancelado'
+            cod, sub = _mp_get_cod(f"/preapproval/{pid}")
+            if not (cod == 404 or (cod == 200 and sub.get("status") == "cancelled")):
+                logging.getLogger("api").warning("mp cancelar %s: %s", pid, res)
+                raise HTTPException(status_code=502, detail="Falha ao cancelar no Mercado Pago")
         conn.execute("UPDATE profiles SET mp_status='cancelled', atualizado_em=? WHERE id=?",
                      (datetime.now(timezone.utc).isoformat(), uid))
         return {"ok": True, "status": "cancelled",
@@ -2375,10 +2497,15 @@ def admin_dinheiro(authorization: str | None = Header(None)):
         pags = conn.execute(
             """SELECT e.uid, e.valor, e.plano_alvo, e.processado_em, u.email
                FROM mp_eventos e LEFT JOIN auth.users u ON u.id = e.uid
-               WHERE e.status = 'approved' ORDER BY e.processado_em DESC"""
+               WHERE e.status = 'approved'
+                 AND NOT (e.topico = 'subscription_authorized_payment' AND EXISTS (
+                      SELECT 1 FROM mp_eventos p WHERE p.status = 'approved' AND p.topico = 'payment'
+                        AND p.payment_id = e.raw->'payment'->>'id'))
+               ORDER BY e.processado_em DESC"""
         ).fetchall()
         por_mes: dict = {}
         plano_de: dict = {}   # plano (mensal/anual) de cada pagante = o do último pagamento
+        ultimo_de: dict = {}  # quando foi o último pagamento aprovado de cada um
         for r in pags:
             quando = _dt_utc(r["processado_em"])
             mes = quando.astimezone(_FUSO_BR).strftime("%Y-%m") if quando else "?"
@@ -2386,11 +2513,18 @@ def admin_dinheiro(authorization: str | None = Header(None)):
             m["valor"] += float(r["valor"] or 0)
             m["n"] += 1
             plano_de.setdefault(r["uid"], r["plano_alvo"])
+            ultimo_de.setdefault(r["uid"], quando)
         meses = sorted(por_mes.values(), key=lambda x: x["mes"])[-12:]
         for m in meses:
             m["valor"] = round(m["valor"], 2)
         ultimos = [{"email": r["email"], "valor": float(r["valor"] or 0), "plano": r["plano_alvo"],
                     "quando": _iso(r["processado_em"])} for r in pags[:15]]
+        def _cobre_hoje(uid) -> bool:
+            """O último pagamento aprovado ainda cobre hoje (pagou o período de agora)."""
+            ult = ultimo_de.get(uid)
+            pl = PLANOS.get(plano_de.get(uid) or "mensal") or PLANOS["mensal"]
+            return bool(ult) and ult + timedelta(days=pl["dias"]) > agora
+
         perfis = conn.execute(
             """SELECT p.id, u.email, p.plano, p.plano_expira_em, p.mp_status
                FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
@@ -2400,7 +2534,8 @@ def admin_dinheiro(authorization: str | None = Header(None)):
         mrr = 0.0
         for r in perfis:
             exp = _dt_utc(r["plano_expira_em"])
-            ativo = r["plano"] == "assinante" and (exp is None or exp > agora)
+            folga = FOLGA_CARTAO if r["mp_status"] == "authorized" else timedelta(0)
+            ativo = r["plano"] == "assinante" and (exp is None or exp + folga > agora)
             item = {"id": r["id"], "email": r["email"], "expira_em": _iso(exp),
                     "plano": plano_de.get(r["id"]), "mp_status": r["mp_status"],
                     "recorrente": r["mp_status"] == "authorized"}
@@ -2412,6 +2547,9 @@ def admin_dinheiro(authorization: str | None = Header(None)):
                 pagantes.append(item)
                 pl = PLANOS.get(plano_de.get(r["id"]) or "mensal") or PLANOS["mensal"]
                 mrr += pl["valor"] / pl["meses"]
+            elif _cobre_hoje(r["id"]):
+                item["nao_renova"] = True   # pagou o período de agora e não renova: pagante até vencer, fora da receita/mês
+                pagantes.append(item)
             else:
                 cortesia.append(item)
             if exp is not None and exp - agora <= timedelta(days=7):

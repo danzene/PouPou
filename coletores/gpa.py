@@ -39,7 +39,8 @@ API = "https://api.vendas.gpa.digital/pa"
 # "kg" vendido por peso = "kg" NÃO precedido de número ("Contra Filé Bovino Kg");
 # "1,5kg"/"500g" é o peso da peça/bandeja (aí o preço da API é o da peça inteira)
 _RE_POR_KG = re.compile(r"(?<![\d.,])\bkg\b", re.I)
-IMG_BASE = "https://static-images.gpa.digital"  # thumbPath/productImages começam com /img/...
+# thumbPath/productImages começam com /img/... — o static-images.gpa.digital saiu do ar (nov/2026)
+IMG_BASE = "https://static.paodeacucar.com"
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 

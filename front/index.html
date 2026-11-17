@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
-<script>(function(){try{var t=localStorage.getItem("mb-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem("mb-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t;}catch(e){}try{var h=document.documentElement,q=location.search+location.hash;if(localStorage.getItem("sb-ijtnozcomqzxfaidurso-auth-token")||localStorage.getItem("mb_oauth_pending")==="1"||/[?&#](code|access_token)=/.test(q))h.dataset.conta="1";if(/[?&]ref=/.test(location.search)||localStorage.getItem("mb_ref"))h.dataset.indicado="1";}catch(e){}window.heroCtaClique=function(){window.__heroPend=1;};})();</script>
 <title>PouPou — Compare, escolha e economize nas compras</title>
 <!-- PWA: instalável (tela inicial, tela cheia como app) -->
 <meta name="theme-color" content="#f5f8f5" id="metaTema">
@@ -129,8 +129,8 @@
   .prod-top{ display:flex; gap:14px; padding:20px 20px 0; flex:1 1 auto; }
   .thumb{ width:60px; height:60px; border-radius:12px; object-fit:contain; background:var(--surface-2); flex:0 0 auto;
     display:flex; align-items:center; justify-content:center; padding:4px; }
-  .thumb[data-no-image]{ color:var(--faint); font-size:26px; }
-  .thumb[data-no-image]::before{ content:"\1F6D2"; }
+  .thumb.sem-foto{ color:var(--faint); background:var(--surface-2); }
+  .thumb.sem-foto svg{ width:min(58%,64px); height:auto; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
   .prod-info{ flex:1; min-width:0; display:flex; flex-direction:column; }
   .prod-nome{ font-size:15px; font-weight:600; line-height:1.32; color:var(--ink); margin:0;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -702,7 +702,7 @@
   .pf2-plus .fine{ font-size:11.5px; color:var(--mut); text-align:center; margin:10px 0 0; }
 
   /* banner PWA "instalar na tela inicial" */
-  .pwa-bar{ position:fixed; left:12px; right:12px; bottom:12px; z-index:300; margin:0 auto; max-width:520px;
+  .pwa-bar{ position:fixed; left:12px; right:12px; bottom:12px; z-index:40; margin:0 auto; max-width:520px;
     display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line);
     border-radius:14px; padding:10px 12px; box-shadow:0 10px 30px rgba(0,0,0,.22); animation:pwaUp .25s ease; }
   @keyframes pwaUp{ from{ transform:translateY(16px); opacity:0; } to{ transform:none; opacity:1; } }
@@ -711,7 +711,8 @@
   .pwa-bar .pwa-inst{ flex:0 0 auto; background:var(--green); color:var(--on-green); border:none; border-radius:10px;
     padding:9px 16px; font-weight:700; font-size:13.5px; cursor:pointer; }
   .pwa-bar .pwa-inst:hover{ background:var(--green-press); }
-  .pwa-bar .pwa-x{ flex:0 0 auto; background:none; border:none; color:var(--faint); font-size:16px; cursor:pointer; padding:4px 6px; line-height:1; }
+  .pwa-bar .pwa-x{ flex:0 0 auto; background:none; border:none; color:var(--faint); font-size:18px; cursor:pointer; line-height:1;
+    min-width:44px; min-height:44px; display:grid; place-items:center; margin:-8px -8px -8px -4px; border-radius:10px; }
 
   @media (max-width:760px){
     .pf2-grid{ flex-direction:column; }
@@ -818,9 +819,9 @@
   .seg button.on{ background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.1); }
 
   /* modal de login (clímax, não é a primeira tela) */
-  .login-modal{ position:fixed; inset:0; z-index:120; background:rgba(10,20,15,.55); display:none; align-items:center; justify-content:center; padding:18px; overflow:auto; }
+  .login-modal{ position:fixed; inset:0; z-index:120; background:rgba(10,20,15,.55); display:none; align-items:flex-start; justify-content:center; padding:18px; overflow:auto; }
   .login-modal.show{ display:flex; }
-  .login-box{ position:relative; width:100%; max-width:400px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:26px 22px; box-shadow:0 18px 50px rgba(0,0,0,.28); }
+  .login-box{ position:relative; margin:auto; width:100%; max-width:400px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:26px 22px; box-shadow:0 18px 50px rgba(0,0,0,.28); }
   .modal-x{ position:absolute; top:12px; right:12px; width:32px; height:32px; border:none; background:var(--surface-2); color:var(--mut); border-radius:var(--r-pill); cursor:pointer; font-size:15px; }
   .auth-brand{ display:flex; justify-content:center; margin-bottom:2px; } .auth-brand h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:-.02em; color:var(--green-dark); } .auth-brand h2 .p2{ color:var(--green); }
   .auth-sub{ text-align:center; color:var(--mut); font-size:13px; margin:0 0 16px; }
@@ -991,7 +992,7 @@
   .prod-top{ flex-direction:column; padding:0; gap:0; align-items:stretch; }
   .prod .thumb{ width:100%; height:156px; border-radius:0; border:none; border-bottom:1px solid var(--line); padding:16px 18px; background:#fff; }
   :root[data-theme="dark"] .prod .thumb{ border-bottom-color:transparent; }
-  .prod .thumb[data-no-image]{ font-size:42px; }
+  .prod .thumb.sem-foto{ background:var(--surface-2); }
   .prod-info{ padding:14px 16px 0; }
   .prod-nome{ font-size:14.5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.6em; }
   .prod-price{ margin-top:10px; }
@@ -1156,6 +1157,8 @@
     transition:transform .12s, filter .15s; }
   .pr-btn:hover{ filter:brightness(1.06); } .pr-btn:active{ transform:scale(.98); }
   .pr-micro{ margin:9px 0 0; text-align:center; font-size:12px; color:rgba(238,245,240,.6); }
+  .pr-aviso{ margin:10px 0 2px; padding:10px 12px; border-radius:10px; background:rgba(244,185,66,.14); color:#f6d58e; font-size:12.5px; line-height:1.45; text-align:left; }
+  .pr-aviso .pr-link{ background:none; border:0; padding:0; color:#fff; font:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
   .pf2-plus.pr .benef-t{ color:rgba(238,245,240,.55); }
   .pf2-plus.pr .benef li{ background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); }
   .pf2-plus.pr .benef li .bi{ background:rgba(57,199,139,.16); color:#5fe0a8; }
@@ -1225,6 +1228,50 @@
     .btn-compare .cmp-mais, .btn-compare svg{ display:none; }   /* 2 colunas: só "Comparar" cabe */
     .btn-add{ width:44px; height:44px; }
   }
+
+  /* ===== Fase 0 (conversão) ===== */
+  /* cadastro: título que promete o teste + aviso do navegador do Instagram/Facebook */
+  .auth-tit{ text-align:center; font-size:17px; font-weight:800; line-height:1.3; color:var(--ink); margin:4px 0 14px; outline:none; }
+  .auth-inapp{ font-size:12.5px; color:var(--mut); background:var(--surface-2); border-radius:var(--r-btn); padding:9px 12px; margin:12px 0 0; line-height:1.4; text-align:center; }
+  /* botão do topo pro visitante: "Testar grátis por 3 dias" */
+  .hero-cta{ margin-top:16px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+  .hero-cta[hidden], :root[data-conta="1"] .hero-cta{ display:none; }
+  .hero-cta-btn{ height:50px; padding:0 24px; border:none; border-radius:14px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--green); color:var(--on-green); font:700 16px var(--body); box-shadow:0 12px 28px -14px color-mix(in srgb,var(--green) 80%,transparent); }
+  .hero-cta-btn:hover{ background:var(--green-press); }
+  .hero-cta-btn:active{ transform:scale(.98); }
+  .hero-cta-fine{ margin:0; font-size:12.5px; font-weight:500; color:var(--mut); }
+  /* cadeados viram botões (levam ao cadastro / à assinatura) */
+  button.prod-mkt.oculto, button.dp-mkt.oculto{ font-family:inherit; cursor:pointer; line-height:1.2; text-align:left; }
+  button.prod-mkt.oculto:hover, button.dp-mkt.oculto:hover, button.prod-mkt.oculto:focus-visible, button.dp-mkt.oculto:focus-visible{ border-color:var(--green); color:var(--green-dark); }
+  button.mkt-oculto{ font:inherit; font-weight:700; background:none; border:0; padding:2px 0; cursor:pointer; color:var(--green-dark);
+    text-decoration:underline dotted; text-underline-offset:3px; }
+  button.pw-inline{ font-family:inherit; cursor:pointer; }
+  .cmp-over, .pw-over{ cursor:pointer; }
+  .paywall.pw-solo .pw-over{ position:static; background:var(--surface-2); border:1px dashed var(--line-2); border-radius:var(--r-card); }
+  .per-loja button.mkt-oculto{ font-size:13px; }
+  /* gaveta: rodapé de quem ainda não tem PouPou+ */
+  .drawer-foot .dr-cta{ margin:0; height:auto; min-height:50px; padding:8px 14px; font-size:15.5px; font-weight:700; line-height:1.2; text-align:center; }
+  .drawer-foot .dr-cta svg{ width:17px; height:17px; flex:0 0 auto; }
+  .dr-foot-row{ display:flex; gap:8px; margin-top:8px; }
+  .drawer-sec{ flex:1 1 auto; min-width:0; height:46px; padding:0 12px; border:1.5px solid var(--green); border-radius:var(--r-btn); background:transparent;
+    color:var(--green-dark); font-size:15.5px; font-weight:700; font-family:inherit; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .drawer-sec:hover{ background:var(--green-light); }
+  .dr-foot-row .drawer-voltar{ flex:0 0 auto; width:auto; margin-top:0; padding:0 16px; }
+  .drawer-foot{ padding-bottom:calc(14px + env(safe-area-inset-bottom)); }
+  body:has(#drawerOv) .pwa-bar, body:has(#drawerOv) .aviso-versao{ display:none; }
+  /* histórico de quem não tem PouPou+: filtro por mercado trancado */
+  .tabs.mkts .tab-trava{ display:inline-flex; align-items:center; gap:5px; border-style:dashed; background:var(--surface-2); color:var(--mut); }
+  .tabs.mkts .tab-trava svg{ width:13px; height:13px; }
+  .tabs.mkts .tab-fixa{ cursor:default; }
+  /* lista "Comparar mercados" borrada: linhas falsas, sem nome nem logo */
+  .state .btn-ghost{ height:44px; padding:0 18px; border:1.5px solid var(--green); background:transparent; color:var(--green-dark);
+    border-radius:var(--r-btn); font-family:inherit; font-weight:700; font-size:14.5px; cursor:pointer; }
+  .state .btn-ghost:hover{ background:var(--green-light); }
+  .hero-cta-btn .d-ind, :root[data-indicado="1"] .hero-cta-btn .d-std{ display:none; }
+  :root[data-indicado="1"] .hero-cta-btn .d-ind{ display:inline; }
+  button.prod-mkt.oculto, button.dp-mkt.oculto{ min-height:28px; padding:5px 10px; }
+  .cmp .badge-oculto{ width:22px; height:22px; border-radius:7px; background:var(--line-2); flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -1251,6 +1298,10 @@
     <div class="hero">
       <h2 class="hero-t">Onde sua compra sai <em>mais barata</em> hoje.</h2>
       <p class="hero-s" id="heroStats">Preços dos supermercados de Campinas e região, atualizados todo dia.</p>
+      <div class="hero-cta" id="heroCta">
+        <button type="button" class="hero-cta-btn" id="heroCtaBtn" onclick="heroCtaClique()">Testar grátis por <span class="d-std">3</span><span class="d-ind">7</span> dias</button>
+        <p class="hero-cta-fine" id="heroCtaFine">Sem cartão · Depois R$ 9,90/mês · Cancele quando quiser</p>
+      </div>
     </div>
   </div>
 </header>
@@ -1362,7 +1413,7 @@ function embalagem(q,u){ if(q==null||!u) return "";
   return (q%1?q.toFixed(0):q)+" un"; }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function hrefSeguro(url){ const u=String(url??"").trim(); return /^https?:\/\//i.test(u)?u:null; }
-function iniciais(n){ const p=n.trim().split(/\s+/); return ((p[0]?.[0]||"")+(p[1]?.[0]||p[0]?.[1]||"")).toUpperCase(); }
+function iniciais(n){ const p=String(n||"").trim().split(/\s+/); return ((p[0]?.[0]||"")+(p[1]?.[0]||p[0]?.[1]||"")).toUpperCase(); }
 function corTexto(hex){ if(!hex) return "#fff"; const h=hex.replace("#","");
   const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
   return (0.299*r+0.587*g+0.114*b)/255>0.6? "#17211c":"#fff"; }
@@ -1370,9 +1421,19 @@ function corTexto(hex){ if(!hex) return "#fff"; const h=hex.replace("#","");
 // o próprio VTEX entrega miniatura pelo caminho .../ids/<id>-L-A/ (~5-15 KB). 300px fica
 // nítido até em tela de alta densidade no card. Outros servidores seguem como estão.
 function fotoMini(u,px){ return String(u).replace(/(vteximg\.com\.br\/arquivos\/ids\/\d+)\//,`$1-${px||300}-${px||300}/`); }
-function thumb(url,alt){ const u=hrefSeguro(url); return u
-  ? `<img class="thumb" src="${esc(fotoMini(u))}" alt="" width="300" height="300" loading="lazy" decoding="async" onerror="this.dataset.noImage='true'">`
-  : `<span class="thumb" data-no-image="true" aria-hidden="true"></span>`; }
+// imagem padrão quando o produto não tem foto ou a foto do mercado sumiu (404)
+const SEM_FOTO=`<span class="thumb sem-foto" role="img" aria-label="Foto indisponível"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 11h5l2.4 3.4"/><path d="M13.4 14.4H42l-3.2 15.4a3.5 3.5 0 0 1-3.4 2.8H19.6a3.5 3.5 0 0 1-3.4-2.8z"/><circle cx="20" cy="39" r="2.4"/><circle cx="35" cy="39" r="2.4"/></svg></span>`;
+function thumb(url,alt,ean){ const u=hrefSeguro(url); if(!u) return SEM_FOTO;
+  const mini=fotoMini(u), e=/^[0-9]{8,14}$/.test(String(ean||""))?String(ean):"";
+  return `<img class="thumb" src="${esc(mini)}"${mini!==u?` data-orig="${esc(u)}"`:""}${e?` data-ean="${e}"`:""} alt="" width="300" height="300" loading="lazy" decoding="async" onerror="fotoFalhou(this)">`; }
+// miniatura falhou -> tenta a foto original; falhou de novo -> imagem padrão (nunca o ícone quebrado)
+// e avisa o servidor (1x por produto): ele confere se o endereço morreu e deixa a coleta pôr outra
+const _fotoAvisada=new Set();
+function fotoFalhou(img){ if(img.dataset.orig&&!img.dataset.tentou){ img.dataset.tentou="1"; img.src=img.dataset.orig; return; }
+  const e=img.dataset.ean;
+  if(e&&!_fotoAvisada.has(e)&&navigator.onLine!==false){ _fotoAvisada.add(e);
+    try{ fetch(`${API}/foto-falhou?ean=${e}`,{method:"POST",keepalive:true}).catch(()=>{}); }catch(_){} }
+  img.onerror=null; img.insertAdjacentHTML("afterend",SEM_FOTO); img.remove(); }
 let MKT_LOGO={}; // slug/nome -> URL da logo (carregado de /mercados no init)
 function badgeMini(m){ const c=m.cor_badge||"#8a8a8a";
   const logo=(m.mercado_slug&&MKT_LOGO[m.mercado_slug])||(m.slug&&MKT_LOGO[m.slug])||MKT_LOGO[m.nome];
@@ -1434,7 +1495,7 @@ async function toggleHistorico(ean,mercado,btn){
   panel.innerHTML=`<div class="hist-inner"><div class="hist-top">Carregando histórico…</div></div>`;
   row.after(panel);
   try{ let d=HIST_CACHE[ean];
-    if(!d){ d=await fetch(`${API}/historico/${encodeURIComponent(ean)}`).then(r=>r.json()); HIST_CACHE[ean]=d; }
+    if(!d){ d=await fetchAuth(`${API}/historico/${encodeURIComponent(ean)}`).then(r=>r.json()); HIST_CACHE[ean]=d; }
     const s=(d.series||[]).find(x=>x.mercado===mercado);
     panel.innerHTML=histHTML(s,mercado);
   }catch(e){ panel.innerHTML=`<div class="hist-inner"><div class="hist-vazio">Não consegui carregar o histórico agora.</div></div>`; }
@@ -1536,7 +1597,7 @@ function renderDrawerFresco(){
   drRenderChart();
 }
 async function addFrescoDrawer(chave,nome,btn){
-  if(!estaLogado()){ abrirLogin(()=>addFrescoDrawer(chave,nome,btn)); return; }
+  if(!estaLogado()){ abrirCadastro(()=>addFrescoDrawer(chave,nome,btn)); return; }
   const ok=await listaSet("f:"+chave,{nome,quantidade:1,comprado:false});
   if(ok){ CESTA_EANS.add("f:"+chave); if(btn){ btn.textContent="✓ já está na lista"; }
     atualizarBadge();
@@ -1547,12 +1608,16 @@ async function addFrescoDrawer(chave,nome,btn){
 }
 async function abrirProduto(ean){
   try{
+    // com o login junto: o servidor só manda QUAL mercado tem o menor preço pra quem tem PouPou+
     const [prod,hist]=await Promise.all([
-      fetch(`${API}/produto/${encodeURIComponent(ean)}`).then(r=>r.json()),
-      fetch(`${API}/historico/${encodeURIComponent(ean)}`).then(r=>r.json())
+      fetchAuth(`${API}/produto/${encodeURIComponent(ean)}`).then(r=>r.json()),
+      fetchAuth(`${API}/historico/${encodeURIComponent(ean)}`).then(r=>r.json())
     ]);
     const rk=prod.ranking||[];
-    DRAWER={ean,hist,periodo:30,mercado:rk[0]?.mercado||null,cheap:rk[0]?.mercado||null,prod};
+    // sem PouPou+ a resposta vem sem a loja: o histórico é UMA linha ("menor preço do dia",
+    // mercado null) e nada vem pré-selecionado — antes o filtro abria no mercado mais barato
+    const cheap=rk[0]?.mercado||null;
+    DRAWER={ean,hist,periodo:30,mercado:cheap,cheap,prod};
     renderDrawer(prod);
   }catch(e){ /* ignora */ }
 }
@@ -1568,10 +1633,13 @@ addEventListener("popstate",()=>{ if(_ignorarPop){ _ignorarPop=false; return; } 
 // card inteiro abre a comparação (menos o "+" e links): alvo grande pra quem tem dificuldade
 function cardAbre(ev,card){ if(ev.target.closest("button, a, input, label")) return;
   const b=card.querySelector(".btn-compare"); if(b) b.click(); }
-function _escFecha(e){ if(e.key==="Escape") fecharProduto(); }
+function _escFecha(e){ if(e.key==="Escape" && !document.querySelector(".login-modal.show")) fecharProduto(); }   // Esc com o cadastro aberto fecha só o cadastro
 function renderDrawer(prod){
   const rk=prod.ranking||[], best=rk[0];
-  const prem=acessoPremium();   // grátis não vê OS MERCADOS (o "onde"), só o menor preço
+  // grátis não vê OS MERCADOS (o "onde"), só o menor preço. O servidor já manda sem a loja;
+  // se a resposta veio sem nome (sessão caiu, etc.), a tela também trava.
+  const prem=acessoPremium() && (!best || !!best.mercado);
+  marcaConferencia(best);
   const naCesta=CESTA_EANS.has(prod.ean);
   const cheapPts=_serie(DRAWER.cheap);
   const v=_variacao(cheapPts,7);
@@ -1579,9 +1647,15 @@ function renderDrawer(prod){
   const ver=_veredito(cheapPts);
   const verHTML=ver?`<div class="verdict ${ver.c}"><span class="vdot"></span><div><div class="vt">${ver.t}</div><div class="vs">${ver.s}</div></div></div>`:"";
   const mkts=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
-  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${esc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
+  // sem PouPou+: nenhum nome de mercado no filtro — 1 linha (menor preço do dia) + cadeado
+  const mktTabs=!prem
+    ? `<div class="tabs mkts" id="drMkts" role="group" aria-label="Filtro do gráfico"><span class="tab on tab-fixa">Menor preço do dia</span><button class="tab tab-trava" type="button" onclick="abrirCadeado(event,this)">${ic("lock")} Ver por mercado</button></div>`
+    : (mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${esc(m)}')">${esc(m)}</button>`).join("")}</div>`:"");
   const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
-  const cmp=rk.map((l,i)=>`<li class="${i===0?"best":""}">${badgeMini({nome:l.mercado,cor_badge:l.cor_badge})}<span class="nm">${esc(l.mercado)}</span>${i===0?'<span class="best-lbl">menor preço</span>':""}<span class="pr num">${brl(l.preco)}</span>${verLinkTxt(l.url,l.mercado)}</li>`).join("");
+  const cmp=prem
+    ? rk.map((l,i)=>`<li class="${i===0?"best":""}">${badgeMini({nome:l.mercado,cor_badge:l.cor_badge})}<span class="nm">${esc(l.mercado)}</span>${i===0?'<span class="best-lbl">menor preço</span>':""}<span class="pr num">${brl(l.preco)}</span>${verLinkTxt(l.url,l.mercado)}</li>`).join("")
+    // borrada pra quem não tem PouPou+: linhas FALSAS (sem nome, logo, cor nem link) — só os preços
+    : rk.map((l,i)=>`<li class="${i===0?"best":""}"><span class="badge-oculto" aria-hidden="true"></span><span class="nm">••••••••</span>${i===0?'<span class="best-lbl">menor preço</span>':""}<span class="pr num">${brl(l.preco)}</span></li>`).join("");
   const ov=document.createElement("div"); ov.className="drawer-ov"; ov.id="drawerOv";
   ov.setAttribute("onclick","fecharProduto(event)");
   ov.innerHTML=`<div class="drawer" role="dialog" aria-modal="true" aria-label="Detalhes do produto">
@@ -1593,7 +1667,7 @@ function renderDrawer(prod){
       <div class="dp-preco num">${brl(prod.menor_preco)}</div>
       ${best?(prem
         ? `<div class="dp-mkt">${badgeMini({nome:best.mercado,cor_badge:best.cor_badge})} ${esc(best.mercado)}</div>`
-        : `<div class="dp-mkt oculto">${ic("lock")} <span>desbloqueie pra ver o mercado</span></div>`):""}
+        : `<button type="button" class="dp-mkt oculto" onclick="abrirCadeado(event,this)">${ic("lock")} <span>desbloqueie pra ver o mercado</span></button>`):""}
       ${varHTML}${verHTML}
       <div class="dp-sec">Histórico de preço</div>
       ${perTabs}${mktTabs}
@@ -1602,24 +1676,33 @@ function renderDrawer(prod){
       ${prem
         ? `<ul class="cmp">${cmp}</ul>`
         : `<div class="cmp-lock">
-            <ul class="cmp blur" aria-hidden="true">${cmp}</ul>
-            <div class="cmp-over">
+            <ul class="cmp blur" aria-hidden="true" inert>${cmp}</ul>
+            <div class="cmp-over" onclick="abrirCadeado(event)">
               <div class="pw-lock">${ic("lock")}</div>
               <div class="cmp-tit">Veja o preço em cada mercado</div>
-              <button class="pw-cta" type="button" onclick="desbloquear()">${ic("crown")} ${trialJaUsado()?"Assine e desbloqueie":`Cadastre-se — ${trialDiasOferta()} dias grátis`}</button>
-              <div class="pw-fine">${trialJaUsado()?`a partir de ${PRECO_MENSAL}/mês`:`${trialDiasOferta()} dias grátis · sem cartão`}</div>
+              <button class="pw-cta" type="button" onclick="abrirCadeado(event,this)">${ic("crown")} ${acessoPremium()?"Ver onde está mais barato":(trialJaUsado()||plano()==="assinante")?"Assine e desbloqueie":`Cadastre-se — ${trialDiasOferta()} dias grátis`}</button>
+              ${acessoPremium()?"":`<div class="pw-fine">${(trialJaUsado()||plano()==="assinante")?`a partir de ${PRECO_MENSAL}/mês`:`${trialDiasOferta()} dias grátis · sem cartão`}</div>`}
             </div>
           </div>`}
     </div>
-    <div class="drawer-foot">
-      <button class="btn-primary" style="margin:0" onclick="addCesta('${prod.ean}',this)">${naCesta?"✓ já está na lista":"Adicionar à lista"}</button>
-      <button class="drawer-voltar" type="button" onclick="fecharProduto()">← Voltar</button>
-    </div>
+    ${drFoot(`addCesta('${prod.ean}',this)`, naCesta, !prem)}
   </div>`;
   document.body.appendChild(ov);
   document.addEventListener("keydown",_escFecha);
   _gavetaAbriu();
   drRenderChart();
+}
+// rodapé fixo da gaveta (aparece sem rolar). Sem PouPou+, o botão principal é o convite
+// "Ver onde está mais barato — grátis" e o "Adicionar à lista" vira secundário.
+function drFoot(onAdd, naLista, travado){
+  const add=naLista?"✓ já está na lista":"Adicionar à lista";
+  const voltar=`<button class="drawer-voltar" type="button" onclick="fecharProduto()">← Voltar</button>`;
+  if(!travado) return `<div class="drawer-foot"><button class="btn-primary" style="margin:0" onclick="${onAdd}">${add}</button>${voltar}</div>`;
+  const gratis=!estaLogado() || (!trialJaUsado() && plano()!=="assinante");
+  const txt=acessoPremium()?"Ver onde está mais barato":(gratis?"Ver onde está mais barato — grátis":"Assine e veja onde está mais barato");
+  return `<div class="drawer-foot">
+    <button class="btn-primary dr-cta" type="button" onclick="abrirCadeado(event,this)">${ic("lock")} ${txt}</button>
+    <div class="dr-foot-row"><button class="drawer-sec" type="button" onclick="${onAdd}">${add}</button>${voltar}</div></div>`;
 }
 function drSetPeriodo(d){ DRAWER.periodo=d; document.querySelectorAll("#drPer .tab").forEach((b,i)=>b.classList.toggle("on",PERIODOS[i].d===d)); drRenderChart(); }
 function drSetMercado(m){ DRAWER.mercado=m; document.querySelectorAll("#drMkts .tab").forEach(b=>b.classList.toggle("on",b.dataset.m===m)); drRenderChart(); }
@@ -1627,7 +1710,7 @@ function drRenderChart(){
   const host=$("#drChart"); if(!host) return;
   if(DRAWER.mercado==="__todos__"){ drRenderTodos(host); return; }   // comparar todos os mercados de uma vez
   const pts=_janela(_serie(DRAWER.mercado),DRAWER.periodo);
-  if(pts.length<2){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há preços suficientes de <b>${esc(DRAWER.mercado||"")}</b> nesse período.<br>O histórico cresce conforme o app coleta a cada dia.</div></div>`; return; }
+  if(pts.length<2){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há preços suficientes${DRAWER.mercado?` de <b>${esc(DRAWER.mercado)}</b>`:""} nesse período.<br>O histórico cresce conforme o app coleta a cada dia.</div></div>`; return; }
   const precos=pts.map(p=>p.preco), mn=Math.min(...precos), mx=Math.max(...precos), rg=(mx-mn)||1;
   const W=1000,H=130,pad=10,st=(W-2*pad)/(pts.length-1);
   const xy=pts.map((p,i)=>[pad+i*st, H-pad-((p.preco-mn)/rg)*(H-2*pad)]);
@@ -1655,7 +1738,7 @@ function drRenderChart(){
     const show=()=>{ const i=+dot.dataset.i, p=pts[i], rect=wrap.getBoundingClientRect();
       const cx=dot.getBoundingClientRect().left-rect.left+ (dot.getBoundingClientRect().width/2);
       const cy=dot.getBoundingClientRect().top-rect.top;
-      tip.innerHTML=`<div class="d">${dataCurta(p.coletado_em)}</div><div>${esc(DRAWER.mercado)}</div><div class="p num">${brl(p.preco)}</div>`;
+      tip.innerHTML=`<div class="d">${dataCurta(p.coletado_em)}</div><div>${DRAWER.mercado?esc(DRAWER.mercado):"menor preço do dia"}</div><div class="p num">${brl(p.preco)}</div>`;
       tip.style.left=cx+"px"; tip.style.top=cy+"px"; tip.hidden=false; };
     dot.addEventListener("mouseenter",show); dot.addEventListener("click",show);
     dot.addEventListener("mouseleave",()=>{ tip.hidden=true; });
@@ -1751,9 +1834,9 @@ function cardProduto(p){
   const price=`<div class="prod-price">
       <span class="lbl-menor">menor preço</span>
       <div class="prod-preco num">${brl(p.menor_preco)}</div>
-      ${best?(acessoPremium()
+      ${marcaConferencia(best)||""}${best?((acessoPremium()&&best.mercado)
         ? `<div class="prod-mkt">${badgeMini({nome:best.mercado,cor_badge:best.cor_badge})} ${esc(best.mercado)}</div>`
-        : `<div class="prod-mkt oculto">${ic("lock")} <span>ver o mercado</span></div>`):""}
+        : `<button type="button" class="prod-mkt oculto" onclick="abrirCadeado(event,this)">${ic("lock")} <span>ver o mercado</span></button>`):""}
       ${economiaChip(rk)}${faixaPrecos(rk)}
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}</div>
     </div>`;
@@ -1761,7 +1844,7 @@ function cardProduto(p){
     ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')">Comparar<span class="cmp-mais">&nbsp;preços</span> ${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
   return `<article class="prod${rk.length?" clicavel":""}"${rk.length?` onclick="cardAbre(event,this)"`:""}>
-    <div class="prod-top">${thumb(p.imagem_url,p.nome)}
+    <div class="prod-top">${thumb(p.imagem_url,p.nome,p.ean)}
       <div class="prod-info"><h3 class="prod-nome">${esc(p.nome)}</h3>
         ${emb?`<div class="prod-meta">${esc(emb)}</div>`:""}${price}</div></div>
     <div class="prod-foot">${compare}${add}</div>
@@ -1774,7 +1857,7 @@ function render(lista,contexto){
 }
 async function loadCategoria(slug,nome){ catAtiva=slug; marcarNav();
   saida.innerHTML=esqueleto(6); ctx.textContent="";
-  try{ const d=await fetch(`${API}/categoria/${slug}?limite=60`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/categoria/${slug}?limite=60`).then(r=>r.json());
     render(d.produtos,`${d.produtos.length} produtos em ${d.categoria.nome}`);
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar.</p>`; } }
 let BUSCA_Q="", BUSCA_TIPOS=[], BUSCA_LOG_T=null;
@@ -1787,7 +1870,7 @@ function barraTipos(ativo){ // "Todos · Longa vida · Condensado · Em pó…" 
 async function loadBusca(q,tipo){ catAtiva=null; marcarNav(); clearTimeout(BUSCA_LOG_T);
   if(q.length<2){ saida.innerHTML=""; ctx.textContent=""; return; }
   saida.innerHTML=esqueleto(6);
-  try{ const d=await fetch(`${API}/buscar?q=${encodeURIComponent(q)}${tipo?`&tipo=${encodeURIComponent(tipo)}`:""}`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/buscar?q=${encodeURIComponent(q)}${tipo?`&tipo=${encodeURIComponent(tipo)}`:""}`).then(r=>r.json());
     const per=d.pereciveis||[], res=d.resultados||[];
     if(!tipo){ BUSCA_Q=q; BUSCA_TIPOS=d.tipos||[]; } // botões vêm da busca sem filtro
     // conta a busca pro painel só quando a pessoa PAROU de digitar (sem os pedaços "co", "coc")
@@ -1854,14 +1937,14 @@ function cardOferta(o){
   const de=o.preco_de?`<div class="per-de num">${brl(o.preco_de)}</div>`:"";
   return `<div class="per-card">${thumb(o.imagem_url,o.nome)}
     <div class="per-main"><div class="prod-nome">${esc(o.nome)}</div>
-      <div class="per-loja">${badgeMini({nome:o.mercado,cor_badge:o.cor_badge})}<span class="nm">${esc(o.mercado)}</span>${verLink(o.url,o.mercado)}</div>
+      <div class="per-loja">${o.mercado?`${badgeMini({nome:o.mercado,cor_badge:o.cor_badge})}<span class="nm">${esc(o.mercado)}</span>${verLink(o.url,o.mercado)}`:`<button type="button" class="mkt-oculto" onclick="abrirCadeado(event,this)">${ic("lock")} ver o mercado</button>`}</div>
       ${badgesPromo(o)}</div>
     <div class="per-right">${de}<div class="per-preco num">${brl(o.preco)}${uni}</div></div>
   </div>`;
 }
 async function loadOfertas(){ catAtiva="fresco:ofertas"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
   saida.innerHTML=esqueleto(6); ctx.textContent="";
-  try{ const d=await fetch(`${API}/ofertas`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/ofertas`).then(r=>r.json()); confereServidor(d);
     const its=d.itens||[];
     ctx.textContent=`${its.length} item(ns) em desconto no site`;
     if(!its.length){ saida.innerHTML=`<p class="state"><span class="big">${ic("cat_oferta")}</span>Nenhuma oferta coletada ainda. O app puxa os descontos do site a cada coleta.</p>`; return; }
@@ -1873,9 +1956,9 @@ async function loadOfertas(){ catAtiva="fresco:ofertas"; marcarNav(); $("#q").va
 let CLUBE_STATE={mercados:[],itens:[],sel:null};
 async function loadClube(){ catAtiva="fresco:clube"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
   saida.innerHTML=esqueleto(6); ctx.textContent="";
-  try{ const d=await fetch(`${API}/clube`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/clube`).then(r=>r.json()); confereServidor(d);
     const mkts=d.mercados||[];
-    CLUBE_STATE={mercados:mkts, itens:d.itens||[], sel:mkts[0]?mkts[0].mercado_slug:null};
+    CLUBE_STATE={mercados:mkts, itens:d.itens||[], sel:mkts[0]?mkts[0].mercado_slug:null, bloqueado:!!d.bloqueado, n:d.n||0};
     renderClube();
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar o clube.</p>`; } }
 function setClubeMercado(slug){ CLUBE_STATE.sel=slug; renderClube(); }
@@ -1883,6 +1966,14 @@ function renderClube(){
   const {mercados,itens,sel}=CLUBE_STATE;
   if(!mercados.length){ ctx.textContent="";
     saida.innerHTML=`<p class="state"><span class="big">${ic("crown")}</span>Nenhuma oferta de clube coletada ainda.<br>São os preços que exigem cartão/programa do mercado (ex.: Viva, Fidelidade).</p>`; return; }
+  if(CLUBE_STATE.bloqueado){   // sem PouPou+: só quem tem programa e quantas ofertas (o preço de clube costuma ser o menor)
+    ctx.textContent=`${CLUBE_STATE.n} oferta(s) de clube hoje`;
+    const chipsT=mercados.map(m=>`<button type="button" class="clube-chip" onclick="abrirCadeado(event,this)">${badgeMini(m)}<span class="cm">${esc(m.mercado)}</span><span class="cp">🪪 ${esc(m.programa)}</span><span class="cn">${m.n}</span></button>`).join("");
+    saida.innerHTML=`<div class="sec-title">${ic("crown")} Ofertas de clube <span class="muted">preços que exigem o programa do mercado</span></div>
+      <p class="per-nota">São os preços só pra membros (ex.: Viva, Fidelidade) — muitas vezes o menor preço do produto.</p>
+      <div class="clube-mkts">${chipsT}</div>
+      ${bloqueado("", `Veja as ${CLUBE_STATE.n} ofertas de clube`, "O PouPou+ mostra cada oferta de clube com o preço e o mercado, pra você aproveitar o cartão que já tem.")}`;
+    return; }
   const chips=mercados.map(m=>`<button type="button" class="clube-chip ${sel===m.mercado_slug?"on":""}" onclick="setClubeMercado('${m.mercado_slug}')">
       ${badgeMini(m)}<span class="cm">${esc(m.mercado)}</span><span class="cp">🪪 ${esc(m.programa)}</span><span class="cn">${m.n}</span></button>`).join("");
   const cur=mercados.find(m=>m.mercado_slug===sel);
@@ -1898,7 +1989,7 @@ function renderClube(){
 let BASICA_ITENS=[];
 async function loadCestaBasica(){ catAtiva="fresco:basica"; marcarNav(); $("#q").value=""; $("#btnCesta").setAttribute("aria-pressed","false");
   saida.innerHTML=`<p class="state">Montando a cesta básica…</p>`; ctx.textContent="";
-  try{ const d=await fetch(`${API}/cesta-basica`).then(r=>r.json());
+  try{ const d=await fetchAuth(`${API}/cesta-basica`).then(r=>r.json());
     BASICA_ITENS=d.itens||[];
     ctx.textContent=`${BASICA_ITENS.length} itens essenciais`;
     if(!BASICA_ITENS.length){ saida.innerHTML=`<p class="state"><span class="big">${ic("cart")}</span>Ainda montando a cesta básica.</p>`; return; }
@@ -1908,7 +1999,7 @@ async function loadCestaBasica(){ catAtiva="fresco:basica"; marcarNav(); $("#q")
       <div class="grid">${BASICA_ITENS.map(cardProduto).join("")}</div>`;
   }catch(e){ saida.innerHTML=`<p class="state">Erro ao carregar a cesta básica.</p>`; } }
 async function addCestaBasica(btn){
-  if(!estaLogado()){ abrirLogin(()=>addCestaBasica(btn)); return; }
+  if(!estaLogado()){ abrirCadastro(()=>addCestaBasica(btn)); return; }
   if(!BASICA_ITENS.length) return;
   btn.disabled=true; btn.textContent="Adicionando…";
   for(const p of BASICA_ITENS){ if(await listaSet(p.ean,{quantidade:1,comprado:false})) CESTA_EANS.add(p.ean); }
@@ -1961,7 +2052,7 @@ async function listaSet(ean,campos){
 async function listaDel(ean){ if(sb&&SESSAO) await sb.from("lista").delete().eq("user_id",SESSAO.user.id).eq("ean",ean); }
 
 async function addCesta(ean,btn){
-  if(!estaLogado()){ abrirLogin(()=>addCesta(ean,btn)); return; }   // feira exige conta (força cadastro)
+  if(!estaLogado()){ abrirCadastro(()=>addCesta(ean,btn)); return; }   // feira exige conta (força cadastro)
   const ok=await listaSet(ean,{quantidade:1,comprado:false});
   if(ok){ CESTA_EANS.add(ean); if(btn){ btn.textContent="✓"; btn.classList.add("in"); } atualizarBadge(); }
   else if(btn){ btn.textContent="!"; }
@@ -1986,7 +2077,7 @@ async function esvaziarLista(){
   CESTA_EANS=new Set(); atualizarBadge(); loadCesta();
 }
 async function addFrescoBtn(btn){
-  if(!estaLogado()){ abrirLogin(()=>addFrescoBtn(btn)); return; }
+  if(!estaLogado()){ abrirCadastro(()=>addFrescoBtn(btn)); return; }
   const chave=btn.dataset.chave, nome=btn.dataset.nome;
   const ok=await listaSet("f:"+chave,{nome,quantidade:1,comprado:false});
   if(ok){ CESTA_EANS.add("f:"+chave); btn.textContent="✓ na lista"; btn.classList.add("in"); atualizarBadge(); }
@@ -2053,15 +2144,15 @@ function cardItemCesta(it){
   const uni=it.rotulo?" "+it.rotulo.replace(/R\$/,"").trim():"";
   const m=it.melhor, preco=m?brl(m.preco)+uni:"—";
   // grátis vê o menor PREÇO, mas não em QUAL mercado (o "onde" é o que vale)
-  const merc=m?(acessoPremium()
+  const merc=m?((acessoPremium()&&m.mercado)
     ? `${esc(m.mercado)} ${m.url?verLink(m.url,m.mercado):""}`
-    : `<span class="mkt-oculto">${ic("lock")} ver o mercado</span>`):"sem preço";
+    : `<button type="button" class="mkt-oculto" onclick="abrirCadeado(event,this)">${ic("lock")} ver o mercado</button>`):"sem preço";
   const queda=(it.economia_dias_item>0&&it.preco_ref_dias)?`<span class="queda">↓ caiu de ${brl(it.preco_ref_dias)}</span>`:"";
   const alertaOn=it.disparado;
   const tagFresco=it.tipo==="fresco"?`<span class="li-tag">fresco · por peso</span>`:"";
   return `<div class="li ${it.comprado?"done":""}" data-ean="${esc(it.ean)}">
     <input class="chk" type="checkbox" ${it.comprado?"checked":""} aria-label="Marcar ${esc(it.nome)} como já comprado" onchange="toggleComprado('${it.ean}',this.checked,this)">
-    ${thumb(it.imagem_url,it.nome)}
+    ${thumb(it.imagem_url,it.nome,it.ean)}
     <div class="li-body">
       <div class="li-nome">${esc(it.nome)} ${tagFresco}</div>
       <div class="li-menor num">menor preço <b>${preco}</b> · ${merc} ${queda}</div>
@@ -2095,12 +2186,12 @@ async function loadCesta(){
   try{
     const favs=favMercados(), modo=listaModo();
     const qs=(modo==="meus"&&favs.length)?`?mercados=${encodeURIComponent(favs.join(","))}`:"";
-    const d=await fetchAuth(`${API}/cesta${qs}`).then(r=>r.json());
+    const d=await fetchAuth(`${API}/cesta${qs}`).then(r=>r.json()); confereServidor(d);
     CESTA_EANS=new Set((d.itens||[]).map(i=>i.ean));
     if(!d.n_itens){ ctx.textContent="";
       saida.innerHTML=estaLogado()
         ? `<p class="state"><span class="big">${ic("cart")}</span>Sua feira está vazia.<br>Busque produtos e toque em <b>+</b> para montar sua lista.</p>`
-        : `<p class="state"><span class="big">${ic("user")}</span>Entre pra montar sua feira e ver quanto dá pra economizar.<br><button class="btn-primary" style="margin-top:14px;width:auto;padding:0 20px" onclick="abrirLogin(()=>loadCesta())">Entrar / criar conta</button></p>`;
+        : `<p class="state"><span class="big">${ic("user")}</span>Crie sua conta grátis pra montar sua feira e ver quanto dá pra economizar.<br><button class="btn-primary" style="margin-top:14px;width:auto;padding:0 20px" onclick="abrirCadastro(()=>loadCesta())">Criar conta grátis</button><br><button class="btn-ghost" type="button" style="margin-top:8px;width:auto;padding:0 18px" onclick="abrirLogin(()=>loadCesta(),'entrar')">Já tenho conta · Entrar</button></p>`;
       return; }
     ctx.textContent="";
     const banner=d.n_alertas>0?`<div class="alerta-banner">${ic("bell")} ${d.n_alertas} item(ns) no preço-alvo ou abaixo</div>`:"";
@@ -2114,13 +2205,13 @@ async function loadCesta(){
         <div class="eco-lbl">Você pode economizar</div>
         <div class="eco-num num">${brl(heroVal)}${pctEco>0?`<span class="eco-pct">até ${pctEco}%</span>`:""}</div>
         <div class="eco-sub">Comprando cada produto pelo menor preço em vez do mais caro${(eMerc>0&&eDias>0)?`, e aproveitando ${brl(eDias)} em quedas recentes`:""}.</div>
-        ${prem?ecoDetalhe(d):`<div class="pw-inline">${ic("lock")} No PouPou+ você vê item a item de onde vem essa economia</div>`}
+        ${prem?ecoDetalhe(d):`<button type="button" class="pw-inline" onclick="abrirCadeado(event,this)">${ic("lock")} No PouPou+ você vê item a item de onde vem essa economia</button>`}
       </div>`:"";
     // 1 loja vs otimizada — os TOTAIS agregados ficam LIVRES (grátis entende o valor)
     const mm=d.melhor_mercado, poupa=d.economia_dividido_vs_loja;
     let vs="";
     if(mm){
-      const mmNome=prem?`${badgeMini(mm)} ${esc(mm.nome)}`:`<span class="mkt-oculto">${ic("lock")} a loja mais barata</span>`;
+      const mmNome=prem?`${badgeMini(mm)} ${esc(mm.nome)}`:`<button type="button" class="mkt-oculto" onclick="abrirCadeado(event,this)">${ic("lock")} a loja mais barata</button>`;
       const umaLoja=`<div class="vs-card"><div class="vs-tag">${mm.completo?"Compra em 1 mercado":"Feira quase toda numa loja"}</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.completo_total!=null?mm.completo_total:mm.total)}</div><div class="vs-sub">${mm.completo?`os ${d.n_itens} itens numa loja só`:`tem ${mm.cobertura}/${d.n_itens} · +${mm.faltam} estimado pela média`}</div></div>`;
       const otim=`<div class="vs-card best"><div class="vs-tag">Compra otimizada</div><div class="vs-mkt">${d.mix.n_mercados} mercados</div><div class="vs-val num">${brl(d.mix.total)}</div><div class="vs-sub">${(poupa!=null&&poupa>0)?`economia de <b style="color:var(--green-dark)">${brl(poupa)}</b>`:"pegando cada item no menor preço"}</div></div>`;
       vs=`<div class="vs">${umaLoja}<div class="vs-mid">vs</div>${otim}</div>`;
@@ -2143,8 +2234,8 @@ async function loadCesta(){
         `Você já vê <b>quanto</b> dá pra economizar e a loja única mais barata. O PouPou+ mostra <b>em qual mercado</b> pegar cada item e <b>qual</b> sai mais barato no total.`);
     }
     // toggle "Meus mercados / Todos" (só aparece se a pessoa tem favoritos)
-    const semMeus=(modo==="meus"&&favs.length&&!(d.mercados||[]).some(m=>m.viavel));
-    const modoToggle=favs.length?`<div class="lista-modo"><div class="lm-seg">
+    const semMeus=prem&&(modo==="meus"&&favs.length&&!(d.mercados||[]).some(m=>m.viavel));
+    const modoToggle=(favs.length&&prem)?`<div class="lista-modo"><div class="lm-seg">
         <button type="button" class="${modo==='meus'?'on':''}" onclick="setListaModo('meus')">${ic('star')} Meus mercados</button>
         <button type="button" class="${modo==='todos'?'on':''}" onclick="setListaModo('todos')">Todos os mercados</button>
       </div>${modo==='meus'?`<div class="lm-hint">Comparando só os ${favs.length} mercado${favs.length>1?"s":""} que você marcou como seus.</div>`:""}</div>`:"";
@@ -2173,7 +2264,16 @@ async function atualizarBadge(){
 let MERCADOS=[];                       // lista completa vinda de /mercados
 const FAV_KEY="mb_mercados_fav";       // favoritos ainda em localStorage (sync p/ conta vem depois)
 const TRIAL_DIAS=3, TRIAL_DIAS_INDICADO=7;   // trial normal x trial de quem chegou por indicação
-const PRECO_MENSAL="R$ 9,90", PRECO_DE="R$ 29,90", PRECO_ANUAL="R$ 99,90";
+const PRECO_MENSAL="R$ 9,90", PRECO_ANUAL="R$ 99,90";
+// comparações VERDADEIRAS (sem "preço de" que nunca foi cobrado: risco no Procon com anúncio)
+const PRECO_ANUAL_MES="R$ 8,33", PRECO_DIA="R$ 0,33";   // 99,90 ÷ 12 e 9,90 ÷ 30
+const FOLGA_CARTAO_MS=3*864e5;   // igual ao FOLGA_CARTAO do servidor (ver assinanteAtivo)
+// data de validade: com o ano quando não é este ano (no plano anual, "16/11" parecia hoje)
+const dataAte=iso=>{ const d=new Date(iso); return d.getFullYear()===new Date().getFullYear()?dataCurta(d):d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}); };
+// cartão autorizado no MP cuja RENOVAÇÃO não passou: já tinha pago e venceu (passou da folga)
+function cartaoRenovacaoFalhou(){
+  if(!(PERFIL.mp_preapproval_id&&PERFIL.mp_status==="authorized")||plano()!=="assinante"||!PERFIL.plano_expira_em) return false;
+  return new Date(PERFIL.plano_expira_em).getTime()+FOLGA_CARTAO_MS<=Date.now(); }
 
 // ---- Supabase (cadastro real). URL + anon são PÚBLICOS; a service_role NUNCA vem pro front. ----
 const SUPABASE_URL="https://ijtnozcomqzxfaidurso.supabase.co";
@@ -2215,11 +2315,24 @@ function trialAtivo(){ return plano()==="trial" && diasRestantesTrial()>0; }
 function assinanteAtivo(){
   if(plano()!=="assinante") return false;
   if(!PERFIL.plano_expira_em) return true;                 // compat: assinante legado sem data
-  return new Date(PERFIL.plano_expira_em).getTime() > Date.now();
+  // cartão ativo: o MP cobra no mesmo dia de cada mês e cada cobrança libera 30 dias, então há
+  // folga de 3 dias (igual ao servidor) pra quem paga não ver o cadeado no dia da cobrança
+  const folga = PERFIL.mp_status==="authorized" ? FOLGA_CARTAO_MS : 0;
+  return new Date(PERFIL.plano_expira_em).getTime() + folga > Date.now();
 }
 function acessoPremium(){ return assinanteAtivo() || trialAtivo(); }
 function trialJaUsado(){ return !!PERFIL.trial_usado; }
-function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("pro",acessoPremium()); }
+function atualizarContaUI(){ const b=$("#btnConta"); if(b) b.classList.toggle("pro",acessoPremium()); atualizarHeroCTA(); }
+// "Testar grátis por N dias" no topo: só pra quem ainda não tem conta (some ao entrar, volta ao sair)
+function atualizarHeroCTA(){
+  const box=$("#heroCta"); if(!box) return;
+  document.documentElement.removeAttribute("data-conta");
+  box.hidden=estaLogado();
+  if(box.hidden) return;
+  $("#heroCtaBtn").textContent=`Testar grátis por ${trialDiasOferta()} dias`;
+  $("#heroCtaFine").textContent=`Sem cartão · Depois ${PRECO_MENSAL}/mês · Cancele quando quiser`;
+}
+function heroCtaClique(){ window.__heroPend=0; if(estaLogado()) desbloquear(); else abrirCadastro(()=>{ if(!acessoPremium()) desbloquear(); }); }
 
 // Perfil (plano/trial) na conta do Supabase. O cache atualiza na hora; o banco em seguida.
 async function carregarPerfil(){
@@ -2244,45 +2357,118 @@ async function iniciarTrial(){
 
 /* CLÍMAX: clique em "ver onde comprar". Sem conta -> login. Com conta e trial disponível ->
    começa o trial de 3 dias (server-side). Trial já usado/expirado -> tela de assinatura. */
+let _desbloqueando=false;
+// o servidor mandou a tela trancada pra quem é PouPou+ (token não confirmado a tempo): 1ª vez
+// renova a sessão e busca de novo; se repetir, avisa em vez de ficar em volta
+let _telaDesatualizada=false, _sessaoRenovada=false, _renovadaEm=0;
+// telas que recebem "premium" do servidor (ofertas, clube, lista) usam a mesma marca
+function confereServidor(d){ if(!d||d.premium===undefined||!estaLogado()) return;
+  if(acessoPremium() && d.premium===false) _telaDesatualizada=true; else if(d.premium){ _telaDesatualizada=false; _sessaoRenovada=false; } }
+function marcaConferencia(best){ if(!best||!estaLogado()) return;
+  if(acessoPremium() && !best.mercado) _telaDesatualizada=true; else if(best.mercado){ _telaDesatualizada=false; _sessaoRenovada=false; } }
 async function desbloquear(btn){
-  if(!estaLogado()){ abrirLogin(()=>desbloquear()); return; }
-  if(acessoPremium()){ reabrir(); return; }
-  if(!trialJaUsado()){
-    if(btn){ btn.disabled=true; btn.dataset.txt=btn.innerHTML; btn.innerHTML="Aguarde…"; }
-    const ok=await iniciarTrial();
-    if(ok){ toast(`Acesso completo liberado por ${trialLen()} dias 🎉`); reabrir(); return; }
-    if(btn){ btn.disabled=false; btn.innerHTML=btn.dataset.txt||btn.innerHTML; }  // falhou: restaura o botão
+  // visitante -> cadastro (aba "Criar conta"); criar a conta já liga o teste e reabre com os mercados
+  if(!estaLogado()){ abrirCadastro(()=>{ if(!acessoPremium()) desbloquear(); }); return; }
+  if(_desbloqueando) return;   // ainda ligando o teste (toque duplo) -> ignora
+  if(acessoPremium()){
+    if(_telaDesatualizada){
+      if(_sessaoRenovada && Date.now()-_renovadaEm<15000){ toast("Não conseguimos confirmar sua assinatura agora — tente de novo em instantes."); return; }
+      _sessaoRenovada=true; _renovadaEm=Date.now();
+      try{ if(sb) await sb.auth.refreshSession(); }catch(e){} await carregarPerfil(); atualizarContaUI();
+    }
+    reabrir(); return; }
+  if(!trialJaUsado() && plano()!=="assinante"){   // assinante vencido não tem teste (o servidor só responde "já")
+    _desbloqueando=true;   // toque duplo = 2 chamadas ao /trial/iniciar
+    try{
+      if(btn){ btn.disabled=true; btn.dataset.txt=btn.innerHTML; btn.innerHTML="Aguarde…"; }
+      await iniciarTrial();   // já recarrega o perfil: decide pelo acesso, não pelo "ok"
+      if(acessoPremium()){ toast(`Acesso completo liberado por ${trialLen()} dias 🎉`); reabrir(); return; }
+      if(btn){ btn.disabled=false; btn.innerHTML=btn.dataset.txt||btn.innerHTML; }  // falhou: restaura o botão
+    }finally{ _desbloqueando=false; }
   }
+  // o perfil guardado pode estar velho (app aberto há dias, Pix pago em outro aparelho, cartão
+  // renovado): relê antes de mandar a pessoa assinar de novo
+  try{ await carregarPerfil(); atualizarContaUI(); }catch(e){}
+  if(acessoPremium()){ reabrir(); return; }
+  if($("#drawerOv")) fecharProduto();   // senão a tela de assinatura abre escondida atrás da gaveta
   loadPerfil("assinar");
 }
-/* re-renderiza a vista aberta (drawer/lista/listagem/perfil) já com os mercados liberados */
+// todo cadeado (card, gaveta, lista, ofertas, clube) leva ao cadastro ou à assinatura
+function abrirCadeado(ev,el){ if(ev) ev.stopPropagation(); desbloquear(el); }
+// troca a gaveta aberta pela versão nova SÓ depois que os dados chegam (sem sumir/piscar; se a
+// rede falhar, a gaveta antiga continua)
+async function recarregarGaveta(ean){
+  try{
+    const [prod,hist]=await Promise.all([
+      fetchAuth(`${API}/produto/${encodeURIComponent(ean)}`).then(r=>r.json()),
+      fetchAuth(`${API}/historico/${encodeURIComponent(ean)}`).then(r=>r.json())
+    ]);
+    if(!$("#drawerOv") || !DRAWER || DRAWER.ean!==ean) return;   // a pessoa fechou ou trocou de produto
+    const cheap=(prod.ranking||[])[0]?.mercado||null;
+    fecharProduto(null,true);
+    DRAWER={ean,hist,periodo:30,mercado:cheap,cheap,prod};
+    renderDrawer(prod);
+  }catch(e){ /* mantém a gaveta como está */ }
+}
+// depois de criar a conta: liga o teste grátis na hora (o título do cadastro promete os dias)
+async function liberarTesteSeDisponivel(){
+  if(!estaLogado()||acessoPremium()||trialJaUsado()||plano()==="assinante") return false;
+  if(_desbloqueando) return false; _desbloqueando=true;   // mesma trava do desbloquear (toque duplo)
+  try{
+    if(lsGet("mb_ref","")) await talvezVincularIndicacao();   // indicado: vincula antes (7 dias)
+    await iniciarTrial();
+    if(acessoPremium()){ toast(`Pronto! ${trialLen()} dias grátis liberados 🎉`); reabrir(); return true; }
+    return false;
+  }finally{ _desbloqueando=false; }
+}
+/* re-renderiza a vista aberta (drawer/lista/listagem/perfil) já com os mercados liberados.
+   Busca de novo no servidor: o que estava na tela veio SEM a loja (trava no servidor). */
 function reabrir(){
-  if($("#drawerOv") && DRAWER && DRAWER.prod){ fecharProduto(null,true); renderDrawer(DRAWER.prod); return; }
+  HIST_CACHE={};
+  if($("#drawerOv") && DRAWER && DRAWER.prod && DRAWER.ean) recarregarGaveta(DRAWER.ean);
   if($("#btnCesta").getAttribute("aria-pressed")==="true"){ loadCesta(); return; }
   if(document.querySelector(".pf2")){ loadPerfil(); return; }   // tela de conta: re-renderiza com o novo status
+  if(catAtiva==="fresco:basica"){ loadCestaBasica(); return; }
+  if(catAtiva==="fresco:ofertas"){ loadOfertas(); return; }
+  if(catAtiva==="fresco:clube"){ loadClube(); return; }
+  if(!catAtiva){ const q=($("#q").value||"").trim(); if(q.length>=2){ loadBusca(q); return; } }
   if(catAtiva && catAtiva.indexOf("fresco")!==0){ const c=categorias.find(x=>x.slug===catAtiva); if(c) loadCategoria(c.slug,c.nome); }
 }
 // Cobrança REAL: cria o pagamento no Mercado Pago e redireciona pro checkout (init_point).
 //   metodo='cartao' -> assinatura recorrente (renova sozinho); 'pix' -> avulso (libera N dias).
 async function assinarAgora(plano, metodo){
-  if(!estaLogado()){ abrirLogin(()=>assinarAgora(plano,metodo)); return; }
+  if(!estaLogado()){ abrirLogin(()=>assinarAgora(plano,metodo),"entrar"); return; }
   plano=(plano==="anual")?"anual":"mensal"; metodo=(metodo==="cartao")?"cartao":"pix";
   const btns=[...document.querySelectorAll(".btn-pay")]; btns.forEach(b=>b.disabled=true);
   const solta=()=>btns.forEach(b=>b.disabled=false);
   try{
     const r=await fetchAuth(`${API}/assinatura/criar`,{method:"POST",
       headers:{"Content-Type":"application/json"}, body:JSON.stringify({plano,metodo})});
-    if(!r.ok){ toast(r.status===503?"Pagamento ainda não configurado":"Não foi possível iniciar o pagamento"); solta(); return; }
+    if(!r.ok){ const e=await r.json().catch(()=>({}));
+      if(r.status===409){   // já tem assinatura no cartão: relê a conta (o servidor pode ter acabado
+        // de confirmar com o MP) e redesenha, pra aparecer o aviso com o "cancelar"; texto longo fica mais
+        try{ await carregarPerfil(); atualizarContaUI(); loadPerfil(); }catch(_){}
+        toast(e.detail||"Você já tem assinatura no cartão.",9000); solta(); return; }
+      toast(r.status===503?"Pagamento ainda não configurado":"Não foi possível iniciar o pagamento"); solta(); return; }
     const d=await r.json();
     if(d.init_point){ window.location.href=d.init_point; }   // vai pro checkout do Mercado Pago
     else{ toast("Não foi possível iniciar o pagamento"); solta(); }
   }catch(e){ toast("Erro ao iniciar o pagamento"); solta(); }
 }
 async function cancelarAssinatura(){
-  if(!confirm("Cancelar a renovação automática? Seu acesso continua até o fim do período já pago.")) return;
+  const exp=PERFIL.plano_expira_em?new Date(PERFIL.plano_expira_em):null;
+  const msg=!assinanteAtivo()
+    ? (cartaoRenovacaoFalhou()
+        ? "Cancelar a assinatura antiga no cartão? Ela para de tentar cobrar e você pode assinar com outro cartão ou pagar no Pix."
+        : "Cancelar esta assinatura no cartão? Nenhuma cobrança nova será feita nela.")
+    : (!exp||exp.getTime()>Date.now()) ? `Cancelar a renovação automática? Seu acesso continua${exp?` até ${dataAte(exp)}`:""}.`
+    : `Seu período pago terminou em ${dataAte(exp)}. Se cancelar agora, o PouPou+ acaba na hora. Cancelar mesmo assim?`;
+  if(!confirm(msg)) return;
   try{
     const r=await fetchAuth(`${API}/assinatura/cancelar`,{method:"POST"});
-    if(r.ok){ toast("Renovação cancelada — acesso mantido até o vencimento."); await carregarPerfil(); loadPerfil(); }
+    if(r.ok){ await carregarPerfil(); atualizarContaUI();
+      toast(assinanteAtivo()&&exp?`Renovação cancelada — acesso mantido até ${dataAte(exp)}.`:"Assinatura no cartão cancelada.");
+      loadPerfil(); }
     else{ const d=await r.json().catch(()=>({})); toast(d.detail||"Não foi possível cancelar"); }
   }catch(e){ toast("Erro ao cancelar"); }
 }
@@ -2306,20 +2492,34 @@ async function tratarRetornoPagamento(){
 }
 
 /* ------- login no clímax (modal; NÃO é a primeira tela) ------- */
-let _authCb=null, _authModo="entrar";
-function abrirLogin(cb){ _authCb=(typeof cb==="function")?cb:null; _authModo="entrar"; renderLogin(); $("#loginModal").classList.add("show"); }
-function fecharLogin(){ $("#loginModal").classList.remove("show"); _authCb=null; }
-function authTab(m){ _authModo=m; renderLogin(); }
-function loginGoogle(){ if(!sb){ return; } lsSet("mb_oauth_pending","1"); sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:location.origin}}); }
+let _authCb=null, _authModo="entrar", _authVolta=null;
+// modo: "entrar" (padrão) ou "criar". Botões de CADASTRO usam abrirCadastro() -> já abre em "Criar conta".
+function abrirLogin(cb,modo){ _authCb=(typeof cb==="function")?cb:null; _authModo=(modo==="criar")?"criar":"entrar";
+  _authVolta=document.activeElement; renderLogin(); $("#loginModal").classList.add("show");
+  const t=$("#authTit"); if(t) t.focus({preventScroll:true}); }
+function abrirCadastro(cb){ abrirLogin(cb,"criar"); }
+function fecharLogin(){ $("#loginModal").classList.remove("show"); _authCb=null;
+  if(_authVolta && document.contains(_authVolta)){ try{ _authVolta.focus({preventScroll:true}); }catch(e){} } _authVolta=null; }
+// troca de aba SEM apagar o que já foi digitado
+function authTab(m){ const em=$("#aEmail"), se=$("#aSenha"), ev=em?em.value:"", sv=se?se.value:"";
+  _authModo=m; renderLogin(); if($("#aEmail")) $("#aEmail").value=ev; if($("#aSenha")) $("#aSenha").value=sv; }
+// o Google bloqueia login dentro do navegador do Instagram/Facebook (erro 403): lá, só e-mail
+function navegadorInterno(){ return /Instagram|FBAN|FBAV|FB_IAB|FBIOS|Line\/|MicroMessenger/i.test(navigator.userAgent||""); }
+function loginGoogle(){ if(!sb){ return; } lsSet("mb_oauth_pending","1");
+  lsSet("mb_pos_login", _authModo==="criar"?"teste":"");   // na volta do Google: liga o teste da conta nova
+  sb.auth.signInWithOAuth({provider:"google", options:{redirectTo:location.origin}}); }
+addEventListener("keydown",e=>{ if(e.key==="Escape" && $("#loginModal").classList.contains("show")) fecharLogin(); });
 function renderLogin(){
-  const criar=_authModo==="criar";
+  const criar=_authModo==="criar", inApp=navegadorInterno();
+  $("#loginModal").setAttribute("aria-label", criar?"Criar conta no PouPou":"Entrar no PouPou");
+  const google=`<button type="button" class="auth-google" onclick="loginGoogle()"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.5 34.5 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.6 5.6C41.4 36.9 44 31 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg> Continuar com Google</button>
+    <div class="auth-ou"><span>ou com e-mail</span></div>`;
   $("#loginBox").innerHTML=`
     <button class="modal-x" type="button" onclick="fecharLogin()" aria-label="Fechar">✕</button>
     <div class="auth-brand"><h2>Pou<span class="p2">Pou</span></h2></div>
-    <p class="auth-sub">${criar?"Crie sua conta pra desbloquear onde economizar":"Entre pra ver onde comprar mais barato"}</p>
-    <div class="auth-tabs"><button type="button" aria-selected="${!criar}" onclick="authTab('entrar')">Entrar</button><button type="button" aria-selected="${criar}" onclick="authTab('criar')">Criar conta</button></div>
-    <button type="button" class="auth-google" onclick="loginGoogle()"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14.3-5.5l-6.6-5.6C29.5 34.5 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.6 5.1C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.6 5.6C41.4 36.9 44 31 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg> Continuar com Google</button>
-    <div class="auth-ou"><span>ou com e-mail</span></div>
+    <p class="auth-tit" id="authTit" tabindex="-1">${criar?`Crie sua conta grátis — ${trialDiasOferta()} dias para testar, sem cartão`:"Entre pra ver onde comprar mais barato"}</p>
+    <div class="auth-tabs" role="tablist"><button type="button" role="tab" aria-selected="${!criar}" onclick="authTab('entrar')">Entrar</button><button type="button" role="tab" aria-selected="${criar}" onclick="authTab('criar')">Criar conta</button></div>
+    ${inApp?"":google}
     <form onsubmit="return authSubmit(event)">
       ${criar?`<div class="auth-field"><label for="aNome">Nome</label><input id="aNome" name="nome" type="text" autocomplete="name" placeholder="Como te chamamos…"></div>`:""}
       <div class="auth-field"><label for="aEmail">E-mail</label><input id="aEmail" type="email" autocomplete="email" placeholder="voce@email.com" required></div>
@@ -2327,6 +2527,7 @@ function renderLogin(){
       <p class="auth-err" id="authErr" aria-live="polite"></p>
       <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${trialDiasOferta()} dias`:"Entrar"}</button>
     </form>
+    ${inApp?`<p class="auth-inapp">Quer entrar com o Google? Abra o PouPou no navegador (menu ⋮ → <b>Abrir no navegador</b>). Aqui dentro, use seu e-mail.</p>`:""}
     <p class="auth-note">Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
 }
 async function authSubmit(ev){ ev.preventDefault();
@@ -2340,20 +2541,30 @@ async function authSubmit(ev){ ev.preventDefault();
   const reset=()=>{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.txt||"Enviar"; } };
   try{
     let res=criar
-      ? await sb.auth.signUp({email, password:senha, options:{data:{nome:nome||email.split("@")[0]}}})
+      ? await sb.auth.signUp({email, password:senha, options:{data:{nome:nome||email.split("@")[0], ...dadosOrigem()}}})
       : await sb.auth.signInWithPassword({email, password:senha});
-    if(res.error){ err.textContent=traduzErroAuth(res.error.message); reset(); return false; }
-    if(criar && !res.data.session){   // cadastrou sem sessão -> entra na hora (a conta é auto-confirmada)
+    // conta que JÁ existe na aba "Criar conta": o Supabase não dá erro, devolve um usuário sem
+    // identidades e sem sessão. Aí tenta entrar com a senha digitada e segue como LOGIN.
+    const jaTinha=criar && !res.error && res.data && res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length===0;
+    const _jaTemMsg=m=>m.includes("already registered")||m.includes("already been registered")||m.includes("user already");
+    if(res.error && !(criar && _jaTemMsg((res.error.message||"").toLowerCase()))){ err.textContent=traduzErroAuth(res.error.message); reset(); return false; }
+    const jaExiste=jaTinha || (criar && !!res.error);   // (guardado antes de trocar res pelo login)
+    if(criar && (jaExiste || !res.data.session)){   // cadastrou sem sessão -> entra na hora (a conta é auto-confirmada)
       const si=await sb.auth.signInWithPassword({email, password:senha});
       if(si.data && si.data.session){ res=si; }
+      else if(jaExiste){
+        authTab("entrar"); const e2=$("#authErr"); if(e2) e2.textContent="Você já tem conta com esse e-mail — confira a senha pra entrar.";
+        const s2=$("#aSenha"); if(s2){ s2.value=""; s2.focus(); } return false; }
       else { err.textContent="Conta criada! Confirme o link no seu e-mail e depois entre."; reset(); return false; }
     }
+    const contaNova=criar && !jaExiste;
     SESSAO=res.data.session;
+    lsSet("mb_pos_login","");          // entrou por e-mail: nada pendente da volta do Google
     await carregarPerfil();
     const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
     fecharLogin(); atualizarContaUI(); atualizarBadge();   // carrega a feira do usuário
-    if(criar) abrirOnboarding(cb);    // conta nova -> personaliza (escolher mercados) antes de seguir
-    else if(cb) cb();
+    if(contaNova) abrirOnboarding(async()=>{ await liberarTesteSeDisponivel(); if(cb) cb(); });   // conta nova -> mercados -> teste liberado -> segue
+    else { if(acessoPremium()) reabrir(); if(cb) cb(); }   // quem já paga/está no teste vê os mercados na hora
   }catch(e){ err.textContent="Erro de conexão. Tente de novo."; reset(); }
   return false;
 }
@@ -2366,7 +2577,7 @@ function traduzErroAuth(m){
   if(m.includes("rate limit")||m.includes("too many")||m.includes("seconds")) return "Muitas tentativas. Espere um minutinho.";
   return "Não deu pra entrar agora. Tente de novo.";
 }
-async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; CESTA_EANS=new Set(); setFavMercados([]); atualizarContaUI(); atualizarBadge(); loadPerfil(); }
+async function sair(){ if(sb){ try{ await sb.auth.signOut(); }catch(e){} } SESSAO=null; PERFIL={plano:"gratis",trial_ini:null,trial_usado:false,nome:null}; CESTA_EANS=new Set(); HIST_CACHE={}; setFavMercados([]); atualizarContaUI(); atualizarBadge(); loadPerfil(); }
 
 /* ------- onboarding de personalização (aparece 1x, logo após CRIAR a conta) -------
    Deixa a pessoa escolher os mercados que usa; viram favoritos (destaque na comparação
@@ -2472,16 +2683,17 @@ function seloFav(m){ return ehFav(m)?` <span class="fav-star" title="Seu mercado
 
 /* embrulha o conteúdo real (borrado) com o cadeado + CTA de desbloquear */
 function bloqueado(inner,titulo,sub){
-  const virgem=!trialJaUsado();
-  const cta=virgem?`Liberar grátis por ${trialDiasOferta()} dias`:"Assine e desbloqueie";
-  return `<div class="paywall">
-    <div class="pw-blur">${inner||""}</div>
-    <div class="pw-over">
+  const virgem=!estaLogado() || (!trialJaUsado() && plano()!=="assinante");
+  const cta=acessoPremium()?"Ver agora":virgem?`Liberar grátis por ${trialDiasOferta()} dias`:"Assine e desbloqueie";
+  const solo=!String(inner||"").trim();
+  return `<div class="paywall${solo?" pw-solo":""}">
+    ${solo?"":`<div class="pw-blur" inert>${inner}</div>`}
+    <div class="pw-over" onclick="abrirCadeado(event)">
       <div class="pw-lock">${ic("lock")}</div>
       <div class="pw-tit">${titulo}</div>
       ${sub?`<div class="pw-sub">${sub}</div>`:""}
-      <button class="pw-cta" type="button" onclick="desbloquear(this)">${ic("crown")} ${cta}</button>
-      ${virgem?`<div class="pw-fine">${trialDiasOferta()} dias grátis · sem cartão · cancele quando quiser</div>`:`<div class="pw-fine">a partir de ${PRECO_MENSAL}/mês</div>`}
+      <button class="pw-cta" type="button" onclick="abrirCadeado(event,this)">${ic("crown")} ${cta}</button>
+      ${acessoPremium()?"":virgem?`<div class="pw-fine">${trialDiasOferta()} dias grátis · sem cartão · cancele quando quiser</div>`:`<div class="pw-fine">a partir de ${PRECO_MENSAL}/mês</div>`}
     </div>
   </div>`;
 }
@@ -2505,11 +2717,12 @@ function loadPerfil(secao, manterPlanos){
   if(!u){
     saida.innerHTML=`<div class="pf2">
       <div class="pf2-head"><span class="pf2-avatar">${ic("user")}</span>
-        <div class="pf2-id"><div class="pf2-name">Visitante</div><div class="pf2-mail">Entre pra ver onde economizar na sua feira</div></div></div>
+        <div class="pf2-id"><div class="pf2-name">Visitante</div><div class="pf2-mail">Crie sua conta grátis pra ver onde economizar</div></div></div>
       <div class="pf2-plus"><div class="pf2-plus-h"><span class="pf2-plus-t">${ic("crown")} PouPou+</span></div>
         <p class="pf2-plus-sub">Crie sua conta e comece com <b>${trialDiasOferta()} dias grátis</b> — sem cartão.</p>
         ${benef}
-        <div class="pf2-plus-actions"><button class="btn-primary pf2-cta" type="button" onclick="abrirLogin(()=>loadPerfil())">Entrar / criar conta</button></div>
+        <div class="pf2-plus-actions"><button class="btn-primary pf2-cta" type="button" onclick="abrirCadastro(()=>loadPerfil())">Criar conta grátis</button>
+          <button class="btn-ghost" type="button" style="margin-top:8px" onclick="abrirLogin(()=>loadPerfil(),'entrar')">Já tenho conta · Entrar</button></div>
       </div></div>`;
     return;
   }
@@ -2518,7 +2731,7 @@ function loadPerfil(secao, manterPlanos){
   const selMensal = PLANO_SEL!=="anual", diasSel = selMensal ? "30 dias" : "365 dias";
   const seletor = `<div class="plano-sel">
       <button type="button" class="ps ${selMensal?'on':''}" onclick="setPlanoSel('mensal')"><span>Mensal</span><b>${PRECO_MENSAL}<i>/mês</i></b></button>
-      <button type="button" class="ps ${selMensal?'':'on'}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">2 meses grátis</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
+      <button type="button" class="ps ${selMensal?'':'on'}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">${PRECO_ANUAL_MES}/mês</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
     </div>`;
   const payBtns = `
       <button class="btn-primary btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','cartao')">${ic("crown")} Assinar no cartão — renova sozinho</button>
@@ -2539,11 +2752,11 @@ function loadPerfil(secao, manterPlanos){
   let plus;
   if(assinante){
     // ASSINANTE: card sóbrio de gestão (revelação progressiva do pagamento)
-    const recorrente = PERFIL.mp_preapproval_id && PERFIL.mp_status!=="cancelled";
+    const recorrente = PERFIL.mp_preapproval_id && PERFIL.mp_status==="authorized";
     const exp = PERFIL.plano_expira_em ? new Date(PERFIL.plano_expira_em) : null;
     const dias = exp ? Math.max(0, Math.ceil((exp.getTime()-Date.now())/864e5)) : null;
     const plusBody = recorrente
-      ? `<p class="pf2-plus-sub">Renova automático${dias!=null?` — próxima cobrança em ~<b>${dias} dia(s)</b>`:""}. Obrigado por apoiar 💚</p>`
+      ? `<p class="pf2-plus-sub">Renova automático no cartão${exp?(dias>0?` · acesso garantido até <b>${dataAte(exp)}</b>`:" · a próxima cobrança está a caminho"):""}. Obrigado por apoiar 💚</p>`
       : (dias!=null ? `<p class="pf2-plus-sub">Acesso ativo — vence em <b>${dias} dia(s)</b>.</p>` : `<p class="pf2-plus-sub">Tudo liberado. Obrigado por apoiar 💚</p>`);
     const plusReveal = recorrente
       ? `<button class="btn-ghost" type="button" onclick="cancelarAssinatura()">Cancelar renovação automática</button>`
@@ -2557,31 +2770,38 @@ function loadPerfil(secao, manterPlanos){
       </div>`;
   } else {
     // NÃO-ASSINANTE: promoção CHAMATIVA (é a hora de converter)
-    const trialAvail = !trialJaUsado() && !emTrial;
-    const _num=s=>parseFloat(String(s).replace(/[^\d,]/g,"").replace(",","."))||0;
-    const off=Math.round((1-_num(PRECO_MENSAL)/_num(PRECO_DE))*100);
+    const trialAvail = !trialJaUsado() && !emTrial && plano()!=="assinante";
     const nMk = (MERCADOS && MERCADOS.length) || 11;
     const pill = emTrial
       ? `<span class="pr-pill urg">Seu teste termina em ${diasRestantesTrial()} dia(s)</span>`
-      : (trialAvail ? `<span class="pr-pill">${trialDiasOferta()} dias grátis</span>` : `<span class="pr-pill">Oferta de lançamento</span>`);
+      : (trialAvail ? `<span class="pr-pill">${trialDiasOferta()} dias grátis</span>` : `<span class="pr-pill">Sem fidelidade</span>`);
     const titulo = emTrial ? "Continue economizando em toda feira." : "Pare de pagar mais caro na feira.";
     const sub = emTrial
       ? `Garanta o PouPou+ e siga vendo onde cada item sai mais barato nos ${nMk} mercados.`
       : `Veja em qual dos ${nMk} mercados cada item sai mais barato e monte a rota que faz sua feira render.`;
     const cta = trialAvail
       ? `<button class="pr-btn" type="button" onclick="desbloquear(this)">Começar ${trialDiasOferta()} dias grátis</button>`
-      : `<button class="pr-btn" type="button" onclick="pfPlanos(this)">Assinar por ${PRECO_MENSAL}/mês</button>`;
+      : `<button class="pr-btn" type="button" onclick="pfPlanos(this,true)">Assinar por ${PRECO_MENSAL}/mês</button>`;
     const micro = trialAvail ? "Sem cartão de crédito · sem compromisso" : "Pix ou cartão · cancele a renovação quando quiser";
+    // cartão autorizado no MP mas sem período pago: ou a RENOVAÇÃO foi recusada (já pagou antes e
+    // venceu) ou a 1ª cobrança ainda está sendo processada. Explica e deixa cancelar — senão a
+    // pessoa ficava presa (o servidor não abre uma 2ª assinatura). No teste grátis, nada.
+    const cartaoAut = !!(PERFIL.mp_preapproval_id && PERFIL.mp_status==="authorized");
+    const linkCancela = t=>`<button type="button" class="pr-link" onclick="cancelarAssinatura()">${t}</button>`;
+    const avisoCartao = (!cartaoAut || emTrial) ? ""
+      : cartaoRenovacaoFalhou()
+        ? `<div class="pr-aviso">A renovação do seu cartão não passou — o Mercado Pago tenta de novo nos próximos dias. Pra usar outro cartão, ${linkCancela("cancele a assinatura antiga")}, ou pague no Pix.</div>`
+        : `<div class="pr-aviso">Seu cartão foi autorizado e o Mercado Pago está processando a 1ª cobrança (pode levar alguns minutos). Se ela for recusada, ${linkCancela("cancele esta assinatura")} e tente outro cartão.</div>`;
     plus=`<div class="pf2-plus promo pr">
         <div class="pr-glow" aria-hidden="true"></div>
         <div class="pr-top"><span class="pr-marca">${ic("crown")} PouPou<em>+</em></span>${pill}</div>
         <h3 class="pr-t">${titulo}</h3>
         <p class="pr-s" data-k="ecohook">${sub}</p>
         <div class="pr-oferta">
-          <div class="pr-de">De <span class="old">${PRECO_DE}</span>${off>0?`<span class="off">-${off}%</span>`:""}</div>
+          <div class="pr-de">Sai a ${PRECO_DIA} por dia</div>
           <div class="pr-preco"><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span></div>
-          <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · 2 meses grátis</div>
-          ${cta}
+          <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · sai ${PRECO_ANUAL_MES}/mês</div>
+          ${avisoCartao}${cta}
           <p class="pr-micro">${micro}</p>
         </div>
         <div class="benef-t">O que você desbloqueia</div>${benef}
@@ -2666,9 +2886,9 @@ function loadPerfil(secao, manterPlanos){
   if(secao==="assinar"){ const c=saida.querySelector(".pf2-plus"); if(c) c.scrollIntoView({behavior:"smooth",block:"center"}); }
 }
 /* revelação progressiva dos preços/pagamento no card PouPou+ */
-function pfPlanos(btn){
+function pfPlanos(btn,abrir){
   const box=document.getElementById("pf2Planos"); if(!box) return;
-  PF_PLANOS_ABERTO=box.hasAttribute("hidden");
+  PF_PLANOS_ABERTO=abrir?true:box.hasAttribute("hidden");
   if(PF_PLANOS_ABERTO){ box.removeAttribute("hidden"); if(btn)btn.setAttribute("aria-expanded","true"); box.scrollIntoView({behavior:"smooth",block:"nearest"}); }
   else{ box.setAttribute("hidden",""); if(btn)btn.setAttribute("aria-expanded","false"); }
 }
@@ -2691,12 +2911,42 @@ async function carregarResumoPerfil(){
 
 /* ===== Indique e ganhe (programa de indicação) ===== */
 /* Captura o ?ref=CODE do link e guarda pra vincular após a pessoa entrar. Limpa a URL. */
+// 1ª visita vinda de anúncio: guarda utm_* no aparelho (a 1ª origem vale; não sobrescreve)
+function capturarUTM(){
+  try{
+    if(lsGet("mb_utm","")) return;
+    const q=new URLSearchParams(location.search), o={};
+    ["utm_source","utm_medium","utm_campaign","utm_content","utm_term"].forEach(k=>{ const v=(q.get(k)||"").slice(0,100); if(v) o[k]=v; });
+    if(Object.keys(o).length){ o.em=new Date().toISOString(); lsSet("mb_utm", JSON.stringify(o)); }
+  }catch(e){}
+}
+// origem do anúncio que vai pro CADASTRO (user_metadata do Supabase: utm_source, utm_campaign…):
+// com isso dá pra contar, no banco, quantas contas e assinaturas vieram de cada anúncio
+function dadosOrigem(){
+  try{ const o=JSON.parse(lsGet("mb_utm","")||"null"); if(!o||typeof o!=="object") return {};
+    const d={}; ["utm_source","utm_medium","utm_campaign","utm_content","utm_term"].forEach(k=>{ if(o[k]) d[k]=String(o[k]).slice(0,100); });
+    if(Object.keys(d).length&&o.em) d.utm_em=String(o.em).slice(0,30);
+    return d; }catch(e){ return {}; }
+}
+// conta NOVA que entrou pelo Google (o cadastro por e-mail já manda no signUp): grava a origem 1x
+async function salvarOrigemContaNova(){
+  try{ const u=SESSAO&&SESSAO.user; if(!sb||!u) return;
+    const md=u.user_metadata||{}; if(md.utm_source||md.utm_medium||md.utm_campaign||md.utm_content||md.utm_term) return;
+    // só a conta que ESTE login criou (horários do servidor): conta que já existia antes do
+    // clique no anúncio não ganha a origem dele
+    const criada=Date.parse(u.created_at||""), entrou=Date.parse(u.last_sign_in_at||"");
+    if(!criada||!entrou||Math.abs(entrou-criada)>5*60e3||Date.now()-criada>864e5) return;
+    const d=dadosOrigem(); if(Object.keys(d).length) await sb.auth.updateUser({data:d});
+  }catch(e){}
+}
 function capturarRefLink(){
   try{
     const u=new URL(location.href);
     let code=(u.searchParams.get("ref")||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);
-    if(code){ lsSet("mb_ref", code); u.searchParams.delete("ref");
-      history.replaceState(null,"", u.pathname+(u.search||"")+u.hash); }
+    if(code){ lsSet("mb_ref", code);
+      // no navegador do Instagram/Facebook o link fica com o ?ref: a dica "Abrir no navegador"
+      // abre a URL atual em outro armazenamento, e sem o código o indicado perdia os 7 dias
+      if(!navegadorInterno()){ u.searchParams.delete("ref"); history.replaceState(null,"", u.pathname+(u.search||"")+u.hash); } }
   }catch(e){}
 }
 /* Vincula o usuário logado ao padrinho (uma vez só). O servidor valida e veta auto/assinante. */
@@ -2709,7 +2959,7 @@ async function talvezVincularIndicacao(){
     if(r.ok){
       const d=await r.json().catch(()=>({}));
       lsSet("mb_ref","");
-      if(d && d.ok && !d.ja && !d.motivo){ toast("🎁 Convite aplicado! Assine o PouPou+ e ganhe dias extras."); }
+      if(d && d.ok && !d.ja && !d.motivo){ toast("🎁 Convite aplicado!"); }
     }else if(r.status===400){ lsSet("mb_ref",""); }   // código inválido: não insiste
   }catch(e){}   // rede: mantém o código pra tentar de novo depois
 }
@@ -2879,7 +3129,9 @@ $("#q").addEventListener("input",e=>{ clearTimeout(t); const q=e.target.value.tr
 $("#btnCesta").addEventListener("click",loadCesta);
 
 (async function init(){
+  try{ history.scrollRestoration="manual"; }catch(e){}   // a gaveta usa o histórico; o "voltar" não deve rolar a página
   capturarRefLink();   // guarda o ?ref=CODE do link de indicação (e limpa a URL)
+  capturarUTM();       // guarda de qual anúncio a pessoa veio na 1ª visita (pra medir a campanha)
   setTemaBtn();
   // restaura a sessão salva (login persiste entre visitas) e carrega o perfil/plano da conta
   let oauthRetorno=false;
@@ -2893,6 +3145,9 @@ $("#btnCesta").addEventListener("click",loadCesta);
   registrarAcesso();   // 1 registro por aparelho por dia (painel /gestao)
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
   atualizarContaUI();
+  // tocou no "Testar grátis" antes do app carregar: abre agora (sem esperar as listas), e só
+  // se a pessoa ainda não abriu o cadastro por conta própria
+  if(window.__heroPend){ window.__heroPend=0; if(!$("#loginModal").classList.contains("show")) heroCtaClique(); }
   atualizarBadge();
   try{ const mk=await fetch(`${API}/mercados`).then(r=>r.json());
     MERCADOS=mk.mercados||[];
@@ -2902,7 +3157,12 @@ $("#btnCesta").addEventListener("click",loadCesta);
   }catch(e){}
   // usuário NOVO que entrou com Google -> mostra o onboarding (CEP + mercados da região),
   // igual ao cadastro por e-mail (que já dispara em authSubmit). Só na volta do login Google.
-  if(oauthRetorno && SESSAO && precisaOnboarding()){ abrirOnboarding(); }
+  const posLogin=lsGet("mb_pos_login",""); if(posLogin) lsSet("mb_pos_login","");
+  if(oauthRetorno && SESSAO){
+    salvarOrigemContaNova();   // conta nova do Google: grava de qual anúncio ela veio
+    const seguir=()=>{ if(posLogin==="teste") liberarTesteSeDisponivel(); };
+    if(precisaOnboarding()) abrirOnboarding(seguir); else seguir();
+  }
   try{ const d=await fetch(`${API}/categorias`).then(r=>r.json());
     categorias=d.categorias; renderCats();
     const p=categorias.find(c=>c.disponivel); if(p) loadCategoria(p.slug,p.nome);
@@ -2962,7 +3222,7 @@ addEventListener("beforeinstallprompt",e=>{
   mostrarInstalarPWA();
 });
 function mostrarInstalarPWA(){
-  if(document.getElementById("pwaBar")) return;
+  if(document.getElementById("pwaBar") || document.getElementById("pushAsk")) return;
   const bar=document.createElement("div"); bar.id="pwaBar"; bar.className="pwa-bar";
   bar.innerHTML=`<span class="pwa-ic">${ic("cart")}</span>`+
     `<span class="pwa-tx">Instale o <b>PouPou</b> na sua tela inicial</span>`+
@@ -2991,9 +3251,10 @@ async function pushInscrito(){
 }
 async function ativarPush(){
   if(!pushSuportado()){ toast("Seu navegador não suporta notificações."); return false; }
-  if(!estaLogado()){ toast("Entre pra ativar notificações."); abrirLogin(()=>loadPerfil()); return false; }
+  if(!estaLogado()){ toast("Entre pra ativar notificações."); abrirLogin(()=>loadPerfil(),"entrar"); return false; }
   let perm=Notification.permission;
   if(perm!=="granted"){ perm=await Notification.requestPermission(); }
+  if(perm==="default"){ toast("Tudo bem — dá pra ativar depois em Minha conta."); return false; }
   if(perm!=="granted"){ toast("Permissão de notificação negada — libere nas configurações do navegador."); return false; }
   try{
     const reg=await navigator.serviceWorker.ready;
@@ -3041,7 +3302,9 @@ function pedirPushBanner(){
     `<button class="pwa-inst" type="button">Ativar</button>`+
     `<button class="pwa-x" type="button" aria-label="Agora não">✕</button>`;
   document.body.appendChild(bar);
-  bar.querySelector(".pwa-inst").onclick=async()=>{ const ok=await ativarPush(); if(ok) bar.remove(); };
+  // "Ativar" também conta: fechar a janelinha do navegador sem escolher deixava a permissão
+  // "default" e o aviso voltava em toda abertura
+  bar.querySelector(".pwa-inst").onclick=async()=>{ lsSet("mb_push_ask_dismiss", String(Date.now())); await ativarPush(); bar.remove(); };
   bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_push_ask_dismiss", String(Date.now())); bar.remove(); };
 }
 function talvezPedirPush(){

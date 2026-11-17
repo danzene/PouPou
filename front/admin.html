@@ -388,7 +388,7 @@ function avisos(){
   }
   const din=D.dinheiro;
   if(din&&din.vencendo&&din.vencendo.length){
-    const pag=din.vencendo.filter(v=>v.mp_status==="approved"||v.mp_status==="authorized");
+    const pag=din.vencendo.filter(v=>v.mp_status==="approved"||v.mp_status==="authorized"||v.nao_renova);
     const semRenov=pag.filter(v=>!v.recorrente).length;
     if(pag.length) out.push({n:"warn",t:`${pag.length} assinatura(s) vencem em até 7 dias`,s:semRenov?`${semRenov} não renova(m) sozinha(s) — vale um lembrete.`:"Todas renovam sozinhas no cartão.",aba:"dinheiro"});
   }
@@ -478,9 +478,10 @@ async function verDia(dia){
 function situacao(u){
   const exp=u.plano_expira_em?new Date(u.plano_expira_em):null, agora=Date.now();
   if(u.plano==="assinante"){
-    const ativo=!exp||exp.getTime()>agora;
+    const ativo=!exp||exp.getTime()+(u.mp_status==="authorized"?3*864e5:0)>agora;   // folga do cartão (igual ao servidor)
     if(!ativo) return {k:"gratis",tg:`<span class="tg c">assinatura vencida</span>`};
     if(u.pagante) return {k:"pagando",tg:`<span class="tg v">pagando</span>`};
+    if(u.pagou) return {k:"pagando",tg:`<span class="tg a">pagou · não renova</span>`};   // pagou o período de agora
     return {k:"cortesia",tg:`<span class="tg a">cortesia</span>`};
   }
   if(u.plano==="trial"){
@@ -550,8 +551,8 @@ function telaDinheiro(){
   const graf=meses.length?`<div class="card graf"><div class="bars din">${meses.map(m=>`<div class="c" title="${esc(mesNome(m.mes))}: ${brl(m.valor)} em ${m.n} pagamento(s)"><span class="vl num">${brl(m.valor)}</span><span class="a" style="height:${Math.max(3,Math.round(80*m.valor/max))}%"></span></div>`).join("")}</div>
     <div class="eixo din">${meses.map(m=>`<span>${mesNome(m.mes)}</span>`).join("")}</div></div>`:`<div class="card vazio">Nenhum pagamento ainda.</div>`;
   const pessoa=(x,dir)=>`<div class="it"><div class="tx"><b>${esc(x.email||"—")}</b><small>${x.plano?`plano ${esc(x.plano)}`:"sem pagamento registrado"}${x.expira_em?` · vale até ${dataBR(x.expira_em)}`:""}</small></div><div class="dir">${dir||""}</div></div>`;
-  const venc=listaMais("venc",d.vencendo||[],x=>pessoa(x,x.recorrente?`<span class="tg v">renova sozinho</span>`:(x.mp_status==="approved"?`<span class="tg a">não renova sozinho</span>`:`<span class="tg c">cortesia</span>`)));
-  const pag=listaMais("pag",d.pagantes||[],x=>pessoa(x,x.recorrente?`<span class="tg v">cartão recorrente</span>`:`<span class="tg c">pagamento avulso</span>`));
+  const venc=listaMais("venc",d.vencendo||[],x=>pessoa(x,x.recorrente?`<span class="tg v">renova sozinho</span>`:((x.mp_status==="approved"||x.nao_renova)?`<span class="tg a">não renova sozinho</span>`:`<span class="tg c">cortesia</span>`)));
+  const pag=listaMais("pag",d.pagantes||[],x=>pessoa(x,x.recorrente?`<span class="tg v">cartão recorrente</span>`:(x.nao_renova?`<span class="tg a">cancelou a renovação</span>`:`<span class="tg c">pagamento avulso</span>`)));
   const cort=listaMais("cort",d.cortesia||[],x=>pessoa(x,`<span class="tg a">cortesia</span>`));
   const canc=listaMais("canc",d.cancelados||[],x=>pessoa(x,`<span class="tg r">cancelou</span>`));
   const ult=listaMais("ult",d.ultimos||[],p=>`<div class="it"><div class="tx"><b>${esc(p.email||"—")}</b><small>${dataBR(p.quando)} às ${hora(p.quando)} · plano ${esc(p.plano||"—")}</small></div><div class="dir"><b class="num">${brl(p.valor)}</b></div></div>`);

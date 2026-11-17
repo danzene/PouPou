@@ -2089,19 +2089,16 @@ def _sem_cartao_ativo(uid) -> None:
                          "WHERE id=? AND mp_preapproval_id=?", (agora, uid, pid))
         # período PAGO (igual ao assinanteAtivo do app): teste grátis não conta
         com_acesso = r["plano"] == "assinante" and _premium(conn, uid)
-        ja_pagou = r["plano"] == "assinante" and r["plano_expira_em"] is not None
     finally:
         conn.close()
     if com_acesso:
         raise HTTPException(status_code=409, detail="Você já tem assinatura no cartão ativa — ela renova sozinha.")
-    if ja_pagou:   # já foi cobrada antes e venceu: a renovação está sendo recusada
-        raise HTTPException(status_code=409, detail=(
-            "A renovação do seu cartão não passou e o Mercado Pago ainda está tentando. Pra usar "
-            "outro cartão, cancele a assinatura antiga aqui na sua conta, ou pague no Pix."))
+    # texto neutro: daqui não dá pra saber se ESTA assinatura já cobrou (1ª cobrança em
+    # processamento x renovação recusada), e o "cancelar" da conta cancela justamente ela
     raise HTTPException(status_code=409, detail=(
-        "Seu cartão já foi autorizado e o Mercado Pago está processando a primeira cobrança "
-        "(pode levar alguns minutos). Se ela for recusada, cancele esta assinatura aqui na sua "
-        "conta e tente outro cartão."))
+        "Sua assinatura no cartão está ativa no Mercado Pago, mas a cobrança ainda não entrou "
+        "(pode estar em processamento ou ter sido recusada). Pra usar outro cartão ou pagar no "
+        "Pix, cancele antes esta assinatura aqui na sua conta."))
 
 
 def _criar_preapproval(uid, plano_id, email) -> dict:

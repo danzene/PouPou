@@ -2270,10 +2270,7 @@ const PRECO_ANUAL_MES="R$ 8,33", PRECO_DIA="R$ 0,33";   // 99,90 ÷ 12 e 9,90 ÷
 const FOLGA_CARTAO_MS=3*864e5;   // igual ao FOLGA_CARTAO do servidor (ver assinanteAtivo)
 // data de validade: com o ano quando não é este ano (no plano anual, "16/11" parecia hoje)
 const dataAte=iso=>{ const d=new Date(iso); return d.getFullYear()===new Date().getFullYear()?dataCurta(d):d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}); };
-// cartão autorizado no MP cuja RENOVAÇÃO não passou: já tinha pago e venceu (passou da folga)
-function cartaoRenovacaoFalhou(){
-  if(!(PERFIL.mp_preapproval_id&&PERFIL.mp_status==="authorized")||plano()!=="assinante"||!PERFIL.plano_expira_em) return false;
-  return new Date(PERFIL.plano_expira_em).getTime()+FOLGA_CARTAO_MS<=Date.now(); }
+
 
 // ---- Supabase (cadastro real). URL + anon são PÚBLICOS; a service_role NUNCA vem pro front. ----
 const SUPABASE_URL="https://ijtnozcomqzxfaidurso.supabase.co";
@@ -2458,9 +2455,7 @@ async function assinarAgora(plano, metodo){
 async function cancelarAssinatura(){
   const exp=PERFIL.plano_expira_em?new Date(PERFIL.plano_expira_em):null;
   const msg=!assinanteAtivo()
-    ? (cartaoRenovacaoFalhou()
-        ? "Cancelar a assinatura antiga no cartão? Ela para de tentar cobrar e você pode assinar com outro cartão ou pagar no Pix."
-        : "Cancelar esta assinatura no cartão? Nenhuma cobrança nova será feita nela.")
+    ? "Cancelar esta assinatura no cartão? Nenhuma cobrança nova será feita nela, e você pode assinar com outro cartão ou pagar no Pix."
     : (!exp||exp.getTime()>Date.now()) ? `Cancelar a renovação automática? Seu acesso continua${exp?` até ${dataAte(exp)}`:""}.`
     : `Seu período pago terminou em ${dataAte(exp)}. Se cancelar agora, o PouPou+ acaba na hora. Cancelar mesmo assim?`;
   if(!confirm(msg)) return;
@@ -2783,15 +2778,11 @@ function loadPerfil(secao, manterPlanos){
       ? `<button class="pr-btn" type="button" onclick="desbloquear(this)">Começar ${trialDiasOferta()} dias grátis</button>`
       : `<button class="pr-btn" type="button" onclick="pfPlanos(this,true)">Assinar por ${PRECO_MENSAL}/mês</button>`;
     const micro = trialAvail ? "Sem cartão de crédito · sem compromisso" : "Pix ou cartão · cancele a renovação quando quiser";
-    // cartão autorizado no MP mas sem período pago: ou a RENOVAÇÃO foi recusada (já pagou antes e
-    // venceu) ou a 1ª cobrança ainda está sendo processada. Explica e deixa cancelar — senão a
-    // pessoa ficava presa (o servidor não abre uma 2ª assinatura). No teste grátis, nada.
-    const cartaoAut = !!(PERFIL.mp_preapproval_id && PERFIL.mp_status==="authorized");
-    const linkCancela = t=>`<button type="button" class="pr-link" onclick="cancelarAssinatura()">${t}</button>`;
-    const avisoCartao = (!cartaoAut || emTrial) ? ""
-      : cartaoRenovacaoFalhou()
-        ? `<div class="pr-aviso">A renovação do seu cartão não passou — o Mercado Pago tenta de novo nos próximos dias. Pra usar outro cartão, ${linkCancela("cancele a assinatura antiga")}, ou pague no Pix.</div>`
-        : `<div class="pr-aviso">Seu cartão foi autorizado e o Mercado Pago está processando a 1ª cobrança (pode levar alguns minutos). Se ela for recusada, ${linkCancela("cancele esta assinatura")} e tente outro cartão.</div>`;
+    // cartão autorizado no MP mas sem período pago (1ª cobrança em processamento OU renovação
+    // recusada — daqui não dá pra saber qual): texto neutro e o "cancelar" desta assinatura, senão
+    // a pessoa ficava presa (o servidor não abre uma 2ª). Vale também no teste grátis.
+    const avisoCartao = (PERFIL.mp_preapproval_id && PERFIL.mp_status==="authorized")
+      ? `<div class="pr-aviso">A cobrança do seu cartão ainda não entrou (pode estar em processamento ou ter sido recusada — o Mercado Pago tenta de novo). Pra usar outro cartão ou pagar no Pix, <button type="button" class="pr-link" onclick="cancelarAssinatura()">cancele antes esta assinatura</button>.</div>` : "";
     plus=`<div class="pf2-plus promo pr">
         <div class="pr-glow" aria-hidden="true"></div>
         <div class="pr-top"><span class="pr-marca">${ic("crown")} PouPou<em>+</em></span>${pill}</div>

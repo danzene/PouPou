@@ -227,6 +227,25 @@
   .toast.show{ opacity:1; transform:translateX(-50%); }
   .sk{ background:linear-gradient(90deg,var(--surface-2),var(--surface),var(--surface-2)); background-size:200% 100%; animation:sk 1.2s infinite; border-radius:var(--r-card); height:96px; }
   @keyframes sk{ to{ background-position:-200% 0; } }
+
+  /* anúncios */
+  .funil{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; padding:14px 12px; }
+  .funil .p{ text-align:center; min-width:0; }
+  .funil .p b{ display:block; font-family:var(--disp); font-size:26px; font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+  .funil .p small{ display:block; font-size:12.5px; color:var(--mut); margin-top:2px; }
+  .funil .p .tx{ display:block; font-size:11.5px; color:var(--green-dark); margin-top:3px; }
+  button.it{ width:100%; border:none; border-top:1px solid var(--line); background:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+  button.it:first-child{ border-top:none; } button.it:hover{ background:var(--surface-2); }
+  .tabwrap{ overflow-x:auto; }
+  .tab{ width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  .tab th, .tab td{ padding:9px 12px; text-align:right; white-space:nowrap; border-top:1px solid var(--line); }
+  .tab th:first-child, .tab td:first-child{ text-align:left; }
+  .tab thead th{ border-top:none; font-size:12.5px; color:var(--mut); font-weight:600; }
+  .tab td small{ color:var(--mut); }
+  #semAnun{ scroll-margin-top:110px; }
+  details.ajuda{ margin:14px 2px 0; font-size:13px; color:var(--mut); }
+  details.ajuda summary{ cursor:pointer; font-weight:600; color:var(--ink); }
+  details.ajuda code{ display:block; margin:6px 0 10px; padding:8px 10px; background:var(--surface-2); border-radius:8px; overflow-wrap:anywhere; font-size:12px; color:var(--ink); }
   @media (max-width:560px){
     .who{ display:none; }
     .abas{ gap:0; }
@@ -234,7 +253,9 @@
     .aba .ico{ font-size:19px; }
     .aba .bol{ position:absolute; top:4px; left:calc(50% + 6px); }
     .cli .l2{ padding-left:0; gap:6px; } .cli .l2 .btn.sm{ padding:0 10px; } select.sel{ padding:0 6px; }
+    .funil{ grid-template-columns:repeat(3,minmax(0,1fr)); row-gap:14px; } .funil .p b{ font-size:22px; }
   }
+  #semAnun .periodo, #semAnun select.sel{ max-width:100%; min-width:0; }
   @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
 </style>
 </head>
@@ -307,6 +328,7 @@ const IC={
   estrela:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   lua:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   sol:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
+  anuncios:'<path d="M3 10.5v3A1.5 1.5 0 0 0 4.5 15H7l6 4.5v-15L7 9H4.5A1.5 1.5 0 0 0 3 10.5z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a7.5 7.5 0 0 1 0 11"/>',
   presente:'<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5V21h14v-8.5M12 8.5V21"/><path d="M12 8.5C10 4 6.5 5 7.5 7.5c.6 1.3 4.5 1 4.5 1s3.9.3 4.5-1C17.5 5 14 4 12 8.5z"/>',
 };
 const ic=(n)=>`<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24">${IC[n]||""}</svg></span>`;
@@ -365,13 +387,13 @@ function abrirPainel(metricas){
 async function carregar(){
   const b=$("#btnAtualizar"); b.classList.add("gira"); b.disabled=true;
   if(!D.coleta) $("#painel").innerHTML=`<div class="kpis">${'<div class="sk"></div>'.repeat(4)}</div>`;
-  const [met,col,usu,mkt,ace,din,bus,ind,his]=await Promise.all([
+  const [met,col,usu,mkt,ace,din,bus,ind,his,anu]=await Promise.all([
     D.metricas&&D._primeira!==false?Promise.resolve(D.metricas):getJ("/admin/metricas"),
     getJ("/admin/coleta"), getJ("/admin/usuarios"), getJ("/admin/mercados"),
     getJ("/admin/acessos?dias=30"), getJ("/admin/dinheiro"), getJ(`/admin/buscas?dias=${DIAS_BUSCA}`),
-    getJ("/admin/indicacoes"), getJ("/admin/coleta/historico?dias=14")]);
+    getJ("/admin/indicacoes"), getJ("/admin/coleta/historico?dias=14"), getJ(`/admin/anuncios?semanas=${SEMANAS_ANUN}`)]);
   D={metricas:met||D.metricas, coleta:col, usuarios:usu, mercados:mkt, acessos:ace, dinheiro:din,
-     buscas:bus, indicacoes:ind, historico:his, _primeira:false};
+     buscas:bus, indicacoes:ind, historico:his, anuncios:anu, _primeira:false};
   b.classList.remove("gira"); b.disabled=false;
   desenhar();
 }
@@ -398,14 +420,14 @@ function avisos(){
 }
 
 /* ---------- abas ---------- */
-const ABAS=[{id:"resumo",nome:"Resumo"},{id:"clientes",nome:"Clientes"},{id:"dinheiro",nome:"Dinheiro"},{id:"buscas",nome:"Buscas"},{id:"mercados",nome:"Mercados"}];
+const ABAS=[{id:"resumo",nome:"Resumo"},{id:"clientes",nome:"Clientes"},{id:"dinheiro",nome:"Dinheiro"},{id:"anuncios",nome:"Anúncios"},{id:"buscas",nome:"Buscas"},{id:"mercados",nome:"Mercados"}];
 function irAba(id){ ABA=id; lsSet("gestao_aba",id); history.replaceState(null,"","#"+id); desenhar(); window.scrollTo({top:0}); }
 function desenhar(){
   const av=avisos(), ruins=av.filter(a=>a.n==="bad").length;
   const bolMerc=av.filter(a=>a.aba==="mercados"&&a.n==="bad").length;
   $("#abas").innerHTML=ABAS.map(a=>{ const bol=a.id==="mercados"&&bolMerc?`<span class="bol">${bolMerc}</span>`:"";
     return `<button class="aba ${ABA===a.id?"on":""}" role="tab" aria-selected="${ABA===a.id}" type="button" onclick="irAba('${a.id}')">${ic(a.id)}${a.nome}${bol}</button>`; }).join("");
-  const f={resumo:telaResumo,clientes:telaClientes,dinheiro:telaDinheiro,buscas:telaBuscas,mercados:telaMercados}[ABA];
+  const f={resumo:telaResumo,clientes:telaClientes,dinheiro:telaDinheiro,anuncios:telaAnuncios,buscas:telaBuscas,mercados:telaMercados}[ABA];
   $("#painel").innerHTML=f(av);
   if(ABA==="resumo"&&D.acessos&&D.acessos.serie&&D.acessos.serie.length) verDia(DIA_SEL||D.acessos.serie[D.acessos.serie.length-1].dia);
   if(ABA==="clientes"){ const i=$("#buscaCli"); if(i&&BUSCA_CLI){ i.value=BUSCA_CLI; } }
@@ -572,6 +594,55 @@ function telaDinheiro(){
       <div><h2 class="h2">Cortesia</h2><div class="card">${cort||`<div class="vazio">Ninguém com cortesia.</div>`}</div></div>
       <div><h2 class="h2">Cancelaram</h2><div class="card">${canc||`<div class="vazio">Ninguém cancelou.</div>`}</div></div>
     </div>`;
+}
+
+/* ===== ANÚNCIOS ===== */
+let SEMANAS_ANUN=8, ANUN_SEL=0;   // ANUN_SEL: 0 = todos os anúncios, 1 = tudo, 2.. = grupos[i-2]
+async function trocarSemanas(n){ SEMANAS_ANUN=n; ANUN_SEL=0; D.anuncios=await getJ(`/admin/anuncios?semanas=${n}`); desenhar(); }
+function selAnuncio(i,rolar){ ANUN_SEL=Math.max(0,parseInt(i,10)||0); desenhar(); if(rolar){ const el=$("#semAnun"); if(el) el.scrollIntoView({block:"start"}); } }
+const pctDe=(a,b)=>b?`${Math.round(100*a/b)}%`:"—";
+const TAG_ORIGEM={google_sem_utm:`<span class="tg c">sem utm</span>`,meta_sem_utm:`<span class="tg c">sem utm</span>`,
+  indicacao:`<span class="tg v">indicação</span>`,sem_origem:`<span class="tg c">orgânico</span>`,teste:`<span class="tg a">teste</span>`};
+function telaAnuncios(){
+  const a=D.anuncios; if(!a) return `<div class="card vazio">Não consegui carregar os anúncios.</div>`;
+  const per=[4,8,12].map(n=>`<button class="chip ${SEMANAS_ANUN===n?"on":""}" type="button" onclick="trocarSemanas(${n})">${n} semanas</button>`).join("");
+  const t=a.anuncios||{}, fo=a.fora||{}, gs=a.grupos||[];
+  const passos=[["visitas","Visitas","aparelhos que chegaram"],["contas","Contas criadas"],["testes","Testes ligados"],["checkouts","Abriram o pagamento"],["pagas","Assinaturas pagas"]];
+  const funil=`<div class="card funil">${passos.map(([k,n,s],i)=>`<div class="p"><b class="num">${num(t[k])}</b><small>${n}</small><span class="tx">${i?`${pctDe(t[k],t[passos[i-1][0]])} da etapa anterior`:s}</span></div>`).join("")}</div>`;
+  const opcoes=[{titulo:"Todos os anúncios",r:t},{titulo:"Tudo (inclui indicação e sem origem)",r:a.tudo||{}},...gs.map(g=>({titulo:g.titulo,r:g}))];
+  if(ANUN_SEL>=opcoes.length) ANUN_SEL=0;
+  const sel=opcoes[ANUN_SEL].r, nPag=sel.pagas||0;
+  const linha=(g,i)=>{ const sub=g.tipo==="anuncio"?[g.fonte,g.campanha].filter(Boolean).join(" · "):"";
+    const tx=`${g.visitas?`${num(g.visitas)} visitas → `:""}${num(g.contas)} contas → ${num(g.testes)} testes → ${num(g.checkouts)} abriram o pagamento`;
+    return `<button class="it" type="button" onclick="selAnuncio(${i+2},true)"><span class="tx"><b>${esc(g.titulo)}${TAG_ORIGEM[g.tipo]||""}</b>${sub?`<small>${esc(sub)}</small>`:""}<small>${tx}</small></span><span class="dir"><b class="num">${num(g.pagas)}</b>paga(s)</span></button>`; };
+  const lista=listaMais("anun",gs,linha,10);
+  const semanas=(sel.por_semana||[]).map((s,i)=>`<tr><td>${diaCurto(s.semana)}${i===0?" <small>(esta)</small>":""}</td><td>${num(s.visitas)}</td><td>${num(s.contas)}</td><td>${num(s.testes)}</td><td>${num(s.checkouts)}</td><td><b>${num(s.pagas)}</b></td></tr>`).join("");
+  const item=(n,v,tot)=>`<div class="it"><div class="tx"><b>${n}</b><div class="barra"><i style="width:${tot?Math.round(100*v/tot):0}%"></i></div></div><div class="dir"><b class="num">${num(v)}</b></div></div>`;
+  const f=sel.formas||{}, pl=sel.planos||{}, c=a.cancelamentos||{};
+  const formas=[["cartao","Cartão (renova sozinho)"],["pix","Pix"],["outro","Outro meio (cartão à vista, saldo)"]].map(([k,n])=>item(n,f[k]||0,nPag)).join("");
+  const planos=[["mensal","Mensal"],["anual","Anual"]].map(([k,n])=>item(n,pl[k]||0,nPag)).join("");
+  const semPag=`<div class="vazio">Nenhuma assinatura paga nesse período.</div>`;
+  const cancel=`<div class="pad"><div class="kpi" style="padding:0"><div class="v num">${num(c.n)}</div><div class="s">${num(c.pelo_app)} pelo app · ${num(c.no_mp)} no Mercado Pago (pela pessoa ou cobrança recusada)</div>${c.pix_venceram?`<div class="s">+ ${num(c.pix_venceram)} no Pix que venceram sem renovar</div>`:""}</div></div>`;
+  const desde=a.desde?`anotando a origem desde ${diaCurto(a.desde)}`:"a origem começa a ser anotada na publicação";
+  return `
+    <h2 class="h2">Anúncios <span class="m">${desde}</span><span class="periodo">${per}</span></h2>
+    <h2 class="h2">Funil dos anúncios <span class="m">últimas ${(a.semanas||[]).length} semanas · aparelhos e pessoas diferentes</span></h2>
+    ${funil}
+    <p class="aviso-info">Fora dos anúncios (indicação ou sem origem): ${num(fo.contas)} conta(s) · ${num(fo.testes)} teste(s) · ${num(fo.pagas)} assinatura(s) paga(s).${t.receita?` 1ª cobrança vinda de anúncio: ${brl(t.receita)}.`:""}</p>
+    <h2 class="h2">Por anúncio <span class="m">toque para ver semana a semana</span></h2>
+    <div class="card">${lista||`<div class="vazio">Ninguém chegou por anúncio nesse período.</div>`}</div>
+    <h2 class="h2" id="semAnun">Semana a semana <span class="periodo"><select class="sel" aria-label="Escolher anúncio" onchange="selAnuncio(this.value)">${opcoes.map((o,i)=>`<option value="${i}" ${i===ANUN_SEL?"selected":""}>${esc(o.titulo)}</option>`).join("")}</select></span></h2>
+    <div class="card tabwrap"><table class="tab"><thead><tr><th>Semana de</th><th>Visitas</th><th>Contas</th><th>Testes</th><th>Abriram pgto</th><th>Pagas</th></tr></thead><tbody>${semanas}</tbody></table></div>
+    <div class="grid2">
+      <div><h2 class="h2">Como pagaram <span class="m">${esc(opcoes[ANUN_SEL].titulo)}</span></h2><div class="card">${nPag?formas:semPag}</div></div>
+      <div><h2 class="h2">Plano</h2><div class="card">${nPag?planos:semPag}</div></div>
+      <div><h2 class="h2">Cancelamentos em ${esc(mesNome(c.mes||"2000-01"))}</h2><div class="card">${cancel}</div></div>
+    </div>
+    <p class="aviso-info">Cada etapa conta na semana em que aconteceu (segunda a domingo, horário de Brasília). A origem de uma pessoa é o 1º anúncio que trouxe o aparelho dela antes de criar a conta. “Assinatura paga” é só a 1ª cobrança aprovada (renovação não conta). Contas de administrador e links com “teste” na utm ficam fora dos totais.</p>
+    <details class="ajuda"><summary>Como marcar o link do anúncio</summary>
+      <p>Instagram/Facebook — no anúncio, em “Parâmetros de URL”:</p><code>utm_source=meta&amp;utm_medium=pago&amp;utm_campaign={{campaign.name}}&amp;utm_content={{ad.name}}</code>
+      <p>Google Ads — em “Sufixo do URL final” (deixe a codificação automática ligada, ela põe o gclid):</p><code>utm_source=google&amp;utm_medium=cpc&amp;utm_campaign=nome-da-campanha&amp;utm_content=nome-do-anuncio&amp;utm_term={keyword}</code>
+      <p>Use um utm_content diferente em cada anúncio, sem acento. É ele que aparece aqui como nome do anúncio.</p></details>`;
 }
 
 /* ===== BUSCAS ===== */

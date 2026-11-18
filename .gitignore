@@ -16,3 +16,10 @@ android/app/build/
 android/*.aab
 android/*.apk
 android/*.idsig
+
+# arquivos locais (não vão pro Git)
+.env.txt
+logs/
+pautas/
+pautas_do_dia.bat
+pautas_do_dia.py

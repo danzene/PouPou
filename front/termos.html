@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<script>(function(){try{var t=localStorage.getItem("mb-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+<title>Termos de Uso — PouPou</title>
+<meta name="description" content="As regras de uso do PouPou: conta, teste grátis, assinatura PouPou+, cancelamento e devolução.">
+<meta name="theme-color" content="#0fa968">
+<link rel="icon" href="/icons/icon-v2-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f7f6; --surface:#ffffff; --surface-2:#eef4ef; --ink:#14201a; --mut:#5b6b63; --line:#e1e8e4;
+    --green:#0fa968; --green-press:#0b8f57; --green-dark:#0a7247; --green-light:#e7f5ed; --on-green:#ffffff;
+    --warn-bg:#fff7e0; --warn-ink:#7a5a00; --warn-line:#f0d98a;
+    --mark-bg:#ffe45c; --mark-ink:#2b2100;
+    --fase-bg:#e3ecff; --fase-ink:#1f4fb8;
+    --disp:"Bricolage Grotesque",system-ui,sans-serif; --body:"Hanken Grotesk",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b1310; --surface:#121c17; --surface-2:#1d2721; --ink:#e8f0eb; --mut:#9db0a6; --line:#22322a;
+      --green:#39c78b; --green-press:#2fb87e; --green-dark:#66d9a4; --green-light:#122c20; --on-green:#04140d;
+      --warn-bg:#2a2410; --warn-ink:#f1d27a; --warn-line:#4a3d14;
+      --mark-bg:#ffe45c; --mark-ink:#2b2100;
+      --fase-bg:#1b2b4d; --fase-ink:#a9c4ff;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b1310; --surface:#121c17; --surface-2:#1d2721; --ink:#e8f0eb; --mut:#9db0a6; --line:#22322a;
+    --green:#39c78b; --green-press:#2fb87e; --green-dark:#66d9a4; --green-light:#122c20; --on-green:#04140d;
+    --warn-bg:#2a2410; --warn-ink:#f1d27a; --warn-line:#4a3d14;
+    --mark-bg:#ffe45c; --mark-ink:#2b2100;
+    --fase-bg:#1b2b4d; --fase-ink:#a9c4ff;
+  }
+  *{ box-sizing:border-box; }
+  html{ background:var(--bg); }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow-wrap:break-word; }
+  .wrap{ max-width:760px; margin:0 auto; padding:20px 16px 48px; }
+  .topo{ display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .topo a.marca{ display:flex; align-items:center; gap:10px; color:var(--ink); text-decoration:none; }
+  .topo img{ width:40px; height:40px; border-radius:11px; }
+  .topo b{ font-family:var(--disp); font-size:21px; font-weight:800; letter-spacing:-.02em; }
+  .topo .voltar{ margin-left:auto; font-size:14px; font-weight:700; color:var(--green-dark); text-decoration:none;
+    background:var(--green-light); padding:7px 12px; border-radius:999px; white-space:nowrap; }
+  h1{ font-family:var(--disp); font-size:28px; line-height:1.15; font-weight:800; letter-spacing:-.02em; margin:0 0 6px; }
+  h2{ font-family:var(--disp); font-size:21px; line-height:1.25; font-weight:800; letter-spacing:-.01em; margin:34px 0 10px; }
+  h3{ font-family:var(--disp); font-size:17.5px; line-height:1.3; font-weight:700; margin:24px 0 8px; }
+  h4{ font-size:16px; font-weight:700; margin:20px 0 8px; }
+  p{ margin:0 0 12px; }
+  ul,ol{ margin:0 0 14px; padding-left:22px; }
+  li{ margin:0 0 6px; }
+  li ul,li ol{ margin:6px 0 0; }
+  strong{ font-weight:700; }
+  a{ color:var(--green-dark); font-weight:600; }
+  code{ font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.86em; background:var(--surface-2);
+    border:1px solid var(--line); border-radius:6px; padding:1px 5px; word-break:break-all; }
+  hr{ border:0; border-top:1px solid var(--line); margin:28px 0; }
+  .quadro{ background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--green);
+    border-radius:12px; padding:12px 14px 2px; margin:0 0 14px; }
+  .rascunho .quadro{ background:var(--warn-bg); color:var(--warn-ink); border:1px solid var(--warn-line);
+    border-left:4px solid var(--warn-ink); }
+  mark.pend{ background:var(--mark-bg); color:var(--mark-ink); border-radius:4px; padding:0 3px;
+    -webkit-box-decoration-break:clone; box-decoration-break:clone; }
+  .fase{ display:inline-block; font-size:12px; font-weight:700; line-height:1.5; background:var(--fase-bg); color:var(--fase-ink);
+    border-radius:999px; padding:0 7px; vertical-align:1px; }
+  .tabela{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 0 16px; border:1px solid var(--line); border-radius:12px;
+    background:var(--surface); }
+  table{ border-collapse:collapse; width:100%; font-size:14.5px; line-height:1.45; }
+  th,td{ text-align:left; vertical-align:top; padding:9px 11px; border-bottom:1px solid var(--line); }
+  th{ background:var(--surface-2); font-weight:700; }
+  tbody tr:last-child td{ border-bottom:0; }
+  .tabela.larga table{ min-width:760px; }
+  section#cookies{ scroll-margin-top:16px; }
+  footer{ margin-top:36px; padding-top:18px; border-top:1px solid var(--line); text-align:center; color:var(--mut); font-size:14px; }
+  footer a{ display:inline-block; margin:0 8px 6px; }
+  :focus-visible{ outline:3px solid var(--green); outline-offset:2px; }
+  @media (max-width:480px){ h1{ font-size:25px; } h2{ font-size:19.5px; } table{ font-size:13.5px; } }
+  @media print{ .topo .voltar, footer{ display:none; } .tabela{ overflow:visible; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="topo">
+    <a class="marca" href="/"><img src="/icons/icon-v2-192.png" alt=""><b>PouPou</b></a>
+    <a class="voltar" href="/">Voltar ao app</a>
+  </div>
+  <h1>Termos de Uso do PouPou</h1>
+<p><strong>Versão 1. Vale a partir de 18 de novembro de 2026.</strong></p>
+<h2>Resumo rápido</h2>
+<ul><li>O PouPou compara preços de supermercados. <strong>Ele não vende produtos.</strong></li><li>Os preços vêm dos sites dos mercados e podem mudar. O preço que vale é o do mercado na hora da compra.</li><li>Criar conta é grátis e dá direito a um teste do PouPou+ de 3 dias (7 dias com convite), <strong>sem cartão</strong>. No fim do teste, nada é cobrado.</li><li>PouPou+: <strong>R$ 9,90 por mês</strong> ou <strong>R$ 99,90 por ano</strong>.</li><li>No cartão, a assinatura <strong>renova sozinha até você cancelar</strong>. No Pix, cada pagamento vale por um período e não renova.</li><li>Você cancela a renovação no próprio app, sem precisar falar com ninguém.</li><li>Desistiu em até 7 dias depois de assinar? Devolvemos o valor (veja o item 8).</li></ul>
+<h2>1. Quem somos</h2>
+<p>O PouPou é oferecido por <strong>Daniel Justino de Brito (MEI)</strong>, CNPJ <strong>32.293.577/0001-25</strong>, com endereço na <strong>Rua Irmãos Elias David, 401, Campinas/SP, CEP 13060-431</strong> e e-mail <strong>poupouaplicativo@gmail.com</strong>. Nestes Termos, "PouPou", "nós" e "a gente" querem dizer esse fornecedor. "Você" é quem usa o app.</p>
+<h2>2. O que é o PouPou</h2>
+<p>O PouPou é um app que funciona no navegador e pode ser instalado na tela inicial do celular. Ele mostra e compara os preços de supermercados de Campinas e região. Em alguns mercados, o preço mostrado é o de uma loja específica, às vezes de outra cidade (item 9).</p>
+<p>Com o PouPou você pode:</p>
+<ul><li>buscar produtos e comparar preços entre mercados;</li><li>montar uma lista de compras e criar alertas de preço;</li><li>escolher os seus mercados favoritos;</li><li>com o PouPou+, ver em qual mercado cada item sai mais barato e o que comprar em cada um.</li></ul>
+<p><strong>O PouPou não é loja, não vende produtos e não faz entregas.</strong> Quem vende é cada mercado, com as regras dele.</p>
+<h2>3. Aceite e idade mínima</h2>
+<ul><li>Ao usar o PouPou, você concorda com estes Termos. Ao criar a conta (com e-mail ou com o Google), você confirma que tem 18 anos ou mais, aceita estes Termos e confirma que leu a nossa <a href="/privacidade"><strong>Política de Privacidade</strong></a>.</li><li><strong>Para criar conta e assinar, você precisa ter 18 anos ou mais.</strong></li><li>Se não concordar com estes Termos, não use o PouPou.</li><li>Você pode salvar ou imprimir estes Termos quando quiser, nesta página. As versões anteriores ficam disponíveis: é só pedir pelo e-mail poupouaplicativo@gmail.com.</li></ul>
+<h2>4. Sua conta</h2>
+<ul><li>Você cria a conta com e-mail e senha ou entrando com o Google.</li><li>Use informações verdadeiras e um e-mail que seja seu. É por ele que identificamos a sua conta quando você fala com a gente.</li><li>Guarde sua senha e não a compartilhe. Se achar que alguém está usando a sua conta, avise a gente.</li><li>A conta é pessoal. Você pode usá-la em mais de um aparelho.</li><li><strong>Uma conta por pessoa.</strong> Não vale criar outras contas para repetir o teste grátis ou para ganhar bônus de indicação.</li><li>Você pode sair da conta quando quiser. Para apagar a conta, veja a <a href="/privacidade">Política de Privacidade</a> (item 8). <strong>Apagar a conta não devolve, sozinho, o que você já pagou. As devoluções seguem o item 8.</strong></li></ul>
+<h2>5. O que é grátis e o que é PouPou+</h2>
+<p><strong>Grátis, sem pagar nada:</strong></p>
+<ul><li>buscar produtos e ver os preços encontrados e o menor preço. Nos produtos embalados, o app não diz em qual mercado está o menor preço;</li><li>nos frescos (carnes, peixes, frutas, verduras, frios, pães e ovos), ver também o mercado;</li><li>com uma conta grátis: montar a lista de compras, ver o total e criar alertas de preço;</li><li>escolher seus mercados favoritos (até sem conta).</li></ul>
+<p><strong>PouPou+ (no teste grátis ou assinando):</strong></p>
+<ul><li>em qual mercado cada item sai mais barato;</li><li>o ranking dos mercados para a sua lista;</li><li>a rota: o que comprar em cada mercado para gastar menos;</li><li>o preço em cada mercado e o histórico de preço de cada mercado;</li><li>ofertas e preços de clube com o nome do mercado;</li><li>o filtro "Meus mercados" na comparação.</li></ul>
+<p><strong>Alertas de preço e mercados favoritos são grátis</strong>, mesmo que apareçam na lista de vantagens do PouPou+ dentro do app. Se a lista do PouPou+ mudar, seguimos o item 14.</p>
+<h2>6. Teste grátis</h2>
+<ul><li><strong>Duração:</strong> 3 dias corridos (72 horas). Quem chega pelo link de convite de um amigo ganha 7 dias (veja o item 11).</li><li><strong>Sem cartão e sem pagar nada.</strong></li><li><strong>Quando começa:</strong> logo depois que você cria a conta pelo botão de cadastro, ao sair da tela de boas-vindas. Se você entrou de outro jeito, o teste começa quando você toca em um cadeado do PouPou+ ou em "Começar dias grátis" / "Testar grátis".</li><li><strong>Durante o teste</strong>, você tem tudo do PouPou+.</li><li><strong>Um teste por conta.</strong> Quem já teve PouPou+ (pago, ganho na indicação ou dado por nós) não tem teste.</li><li><strong>No fim do teste, nada é cobrado.</strong> O que é do PouPou+ volta a ficar trancado. Sua conta, sua lista e seus favoritos continuam. Se quiser continuar com o PouPou+, é só assinar.</li></ul>
+<h2>7. Assinatura PouPou+</h2>
+<h3>7.1 Planos e preços</h3>
+<div class="tabela"><table><thead><tr><th>Plano</th><th>Preço</th><th>O que cada pagamento libera</th></tr></thead><tbody><tr><td>Mensal</td><td>R$ 9,90</td><td>30 dias de PouPou+</td></tr><tr><td>Anual</td><td>R$ 99,90 (sai a R$ 8,33 por mês)</td><td>365 dias de PouPou+</td></tr></tbody></table></div>
+<p>O preço mostrado é o preço final. O PouPou não cobra nenhuma taxa a mais. Se a página do Mercado Pago oferecer parcelamento com juros, esses juros são do Mercado Pago ou do banco, não do PouPou.</p>
+<h3>7.2 Formas de pagamento</h3>
+<p>O pagamento é feito sempre na página do <strong>Mercado Pago</strong>. O PouPou não vê o número completo do seu cartão nem o código de segurança. Há duas formas:</p>
+<ul><li><strong>"Assinar no cartão":</strong> assinatura que <strong>renova sozinha</strong> (item 7.4).</li><li><strong>"Pagar no Pix":</strong> pagamento único, que <strong>não renova</strong> (item 7.5).</li></ul>
+<p>Na fatura do cartão, a cobrança aparece como <strong>PouPou+</strong>.</p>
+<h3>7.3 Quando o acesso começa</h3>
+<p>O PouPou+ é liberado quando o Mercado Pago confirma o pagamento. Costuma levar poucos instantes. O Pix pode levar alguns minutos. Se demorar mais de 1 hora, fale com a gente.</p>
+<p>Quando o pagamento é confirmado, o app avisa e libera o PouPou+. Em Minha conta você vê o seu plano. Estes Termos ficam sempre nesta página, para salvar ou imprimir.</p>
+<h3>7.4 Assinatura no cartão: renova sozinha</h3>
+<ul><li>Ao escolher "Assinar no cartão", <strong>você autoriza o Mercado Pago a cobrar o valor do plano no seu cartão de forma repetida:</strong><ul><li><strong>plano mensal: R$ 9,90 todo mês;</strong></li><li><strong>plano anual: R$ 99,90 a cada 12 meses;</strong></li><li>sempre contando a partir da data da primeira cobrança.</li></ul></li><li><strong>A cobrança se repete até você cancelar</strong> (item 7.7).</li><li>Cada cobrança aprovada libera mais 30 dias (mensal) ou 365 dias (anual).</li><li>Enquanto a assinatura no cartão estiver ativa, o seu acesso continua por até 3 dias depois do fim de cada período. Isso cobre o dia da próxima cobrança, para você não ver o cadeado por causa de um atraso.</li><li>Se o cartão recusar a cobrança, o Mercado Pago pode tentar de novo. Se nenhuma tentativa der certo, o PouPou+ fica trancado até um novo pagamento.</li></ul>
+<h3>7.5 Pix: pagamento único</h3>
+<ul><li>Em "Pagar no Pix", você paga uma vez: R$ 9,90 libera 30 dias, e R$ 99,90 libera 365 dias.</li><li><strong>Não renova sozinho</strong> e não precisa cancelar. Quando acabar, você paga de novo se quiser continuar.</li><li>A página do Mercado Pago que abre nesse botão pode mostrar também outras formas de pagamento à vista, como cartão. Qualquer uma delas vale como pagamento único: libera o período pago e não renova.</li></ul>
+<h3>7.6 Pagar de novo ou trocar de plano</h3>
+<ul><li>Se você já tem dias pagos ou ganhos na indicação, os dias novos são somados ao fim deles.</li><li><strong>Se você estiver no teste grátis, o teste acaba quando o pagamento é confirmado, e os dias pagos começam a contar nessa hora.</strong></li><li>O app não deixa abrir duas assinaturas no cartão ao mesmo tempo, para você não pagar em dobro. Para trocar o plano do cartão (por exemplo, do mensal para o anual), cancele a renovação e depois assine o novo plano ou pague no Pix. Os dias que você já pagou continuam valendo.</li></ul>
+<h3>7.7 Como cancelar a renovação</h3>
+<p>Você cancela <strong>sozinho, no app, quando quiser, sem precisar falar com ninguém:</strong></p>
+<p><strong>Toque no ícone de pessoa, no alto da tela (Minha conta) → Gerenciar assinatura → Cancelar renovação automática. Na pergunta que aparece, toque em OK.</strong></p>
+<p>Também dá para cancelar na sua conta do Mercado Pago.</p>
+<p>Depois de cancelar:</p>
+<ul><li>não há cobrança nova. Se uma cobrança já estava em andamento quando você cancelou, os dias dela ficam com você;</li><li>não há multa;</li><li>você continua com o PouPou+ até o fim do período que já pagou.</li></ul>
+<p><strong>Cancelar a renovação não devolve o valor do período que já está em andamento.</strong> Para receber o dinheiro de volta, veja o item 8.</p>
+<h3>7.8 O que acontece no fim do período</h3>
+<p>Quando o período pago acaba e não há nova cobrança, o que é do PouPou+ volta a ficar trancado. Sua conta, sua lista e seus favoritos continuam. Você pode assinar de novo quando quiser.</p>
+<h3>7.9 Mudança de preço</h3>
+<p>Podemos mudar os preços dos planos. Se isso acontecer:</p>
+<ul><li>avisamos nesta página e pelo e-mail da sua conta com pelo menos 30 dias de antecedência;</li><li><strong>quem assina no cartão só paga o novo preço se concordar com ele (por exemplo, fazendo uma nova assinatura). Se não concordar, a renovação é cancelada, sem custo, e você continua com o PouPou+ até o fim do período pago;</strong></li><li>o período que você já pagou não muda.</li></ul>
+<h3>7.10 Comprovante e nota fiscal</h3>
+<p>O Mercado Pago envia o comprovante de cada pagamento. Quando aplicável, a nota fiscal é emitida conforme a legislação.</p>
+<h2>8. Direito de arrependimento e devoluções</h2>
+<h3>8.1 Desistiu em até 7 dias? Devolvemos tudo</h3>
+<ul><li>Se você desistir <strong>em até 7 dias</strong> depois de contratar, devolvemos <strong>o valor total</strong>, mesmo que você já tenha usado o PouPou+ nesses dias (Código de Defesa do Consumidor, art. 49).</li><li>"Contratar" é: a primeira cobrança de uma assinatura no cartão, ou cada pagamento no Pix.</li><li>Nas renovações automáticas do cartão, você pode cancelar a qualquer momento, sem multa (item 7.7).</li><li><strong>Como pedir:</strong> pelo e-mail <strong>poupouaplicativo@gmail.com</strong>, de preferência a partir do e-mail da sua conta. Respondemos confirmando que recebemos o pedido.</li><li>No mesmo dia, pedimos ao Mercado Pago que devolva o valor. No Pix, o dinheiro volta para a conta que pagou. No cartão, a cobrança é cancelada ou estornada; dependendo do banco, o estorno pode aparecer só na fatura seguinte.</li><li>Com a devolução, o acesso liberado por aquele pagamento acaba e, no cartão, a renovação automática é cancelada.</li></ul>
+<h3>8.2 Outras devoluções</h3>
+<ul><li><strong>Cobrança em dobro ou por erro nosso:</strong> devolvemos o valor cobrado a mais.</li><li><strong>Falha nossa:</strong> se o PouPou+ ficar fora do ar ou com defeito por nossa culpa, você escolhe: dias extras, desconto proporcional ou a devolução do valor pago (Código de Defesa do Consumidor, art. 20).</li><li><strong>Esqueceu de cancelar o plano anual?</strong> Se pedir em até 7 dias depois de uma renovação automática do plano anual, devolvemos o valor dessa renovação.</li><li>Fora desses casos, cancelar a renovação no meio do período não gera devolução proporcional: você continua com o PouPou+ até o fim do período que já pagou.</li></ul>
+<h2>9. Os preços dos mercados são informativos</h2>
+<ul><li><strong>De onde vêm:</strong> dos sites e das lojas online dos próprios mercados. O PouPou coleta esses preços sozinho, todos os dias. Com o PouPou+, o app mostra quando cada preço foi coletado.</li><li><strong>São preços online.</strong> O preço na loja física pode ser diferente.</li><li><strong>De qual loja:</strong> em alguns mercados, o preço é o de uma loja específica, às vezes de outra cidade. Em outros, é o preço padrão do site. Ele pode ser diferente na loja onde você compra.</li><li><strong>Preço de clube ou de fidelidade</strong> aparece marcado e só vale para quem participa do programa do mercado.</li><li><strong>Frescos</strong> (carnes, peixes, frutas, verduras, frios, pães e ovos) não têm código de barras igual em todo lugar. Por isso são comparados pelo nome, e o preço pode variar conforme o peso ou o corte.</li><li><strong>Podem mudar a qualquer hora.</strong> Promoções acabam, estoques mudam e a coleta pode ter erros. <strong>O preço que vale é o que o mercado cobra na hora da compra.</strong></li><li>A economia que o app mostra é uma estimativa feita com esses preços. A economia de verdade depende do que você compra e de onde.</li><li><strong>O PouPou não vende produtos e não responde pelo preço cobrado, pelo estoque, pela qualidade nem pela entrega dos produtos. Isso é com cada mercado.</strong></li><li>As marcas, os nomes, os logotipos e as fotos dos mercados e dos produtos são dos seus donos e aparecem no app só para identificar cada produto e cada mercado.</li></ul>
+<h2>10. Alertas, notificações e avisos</h2>
+<ul><li><strong>Alertas de preço:</strong> você escolhe um preço-alvo para um item da sua lista. Quando o menor preço encontrado fica abaixo desse alvo, o alerta aparece na sua lista, dentro do app. Hoje o app não manda aviso de queda de preço para o celular.</li><li><strong>Notificações no celular:</strong> só se você ligar. Você desliga quando quiser em Minha conta (com login) ou nas configurações do navegador.</li><li><strong>Avisos importantes</strong>, como mudanças nestes Termos ou problemas com a sua assinatura, aparecem no app ou são enviados para o e-mail da sua conta.</li><li>Não mandamos propaganda por e-mail sem a sua permissão.</li></ul>
+<h2>11. Indique e Ganhe</h2>
+<h3>Como funciona</h3>
+<ul><li>Toda conta tem um código de convite de 6 letras e números. O seu link aparece em <strong>Minha conta → Indique e ganhe</strong> e tem este formato: poupouapp.com.br/?ref=SEUCODIGO.</li><li><strong>O seu amigo:</strong> se ele abrir o seu link e entrar na conta, o teste grátis dele é de <strong>7 dias em vez de 3</strong>. Isso só vale se o convite for aplicado antes de o teste dele começar. Por isso, ele deve criar a conta no mesmo celular e navegador em que abriu o link.</li><li><strong>Você:</strong> a cada <strong>2 amigos</strong> indicados que tiverem o <strong>primeiro pagamento aprovado</strong> do PouPou+ (qualquer plano, no cartão ou no Pix), você ganha <strong>1 mês (30 dias) de PouPou+</strong>. Não há limite.</li><li>Os 30 dias são somados ao fim dos seus dias pagos. Se você estiver no teste ou sem acesso, eles começam na hora.</li><li><strong>Se você assina no cartão, os 30 dias ganhos não suspendem a cobrança. Ela continua na data de sempre, e os dias ganhos ficam somados ao fim do seu período.</strong></li><li>Se você tiver ligado as notificações, avisamos no celular quando você ganhar.</li><li>No app, você vê quantos amigos entraram pelo seu link e quantos assinaram. Você não vê o nome nem o e-mail deles.</li></ul>
+<h3>Regras</h3>
+<ul><li>Cada pessoa só pode ser indicada uma vez. Depois de aplicado, o convite não muda.</li><li>Não vale usar o próprio código.</li><li>Não vale para quem já teve PouPou+ (pago, ganho na indicação ou dado por nós).</li><li>Se o seu amigo já tiver usado o teste grátis, ele não ganha outro teste. Mas, se ele assinar depois, a indicação conta para você.</li><li>Só conta o primeiro pagamento de cada amigo. As renovações dele não contam de novo.</li><li><strong>Não vale criar contas falsas, indicar a si mesmo com outro e-mail ou fazer qualquer coisa para enganar o programa. Nesses casos, podemos cancelar os dias ganhos e suspender as contas envolvidas.</strong></li><li><strong>Se o pagamento do amigo for devolvido (por exemplo, no direito de arrependimento) ou contestado, podemos desconsiderar essa indicação e retirar os dias ganhos por ela.</strong></li><li>Os dias ganhos não valem dinheiro e não podem ser trocados nem passados para outra pessoa.</li><li>Podemos mudar ou encerrar o programa, avisando nesta página e pelo e-mail da sua conta com pelo menos 15 dias de antecedência. Os dias que você já ganhou continuam valendo.</li></ul>
+<h2>12. Uso permitido</h2>
+<p>Você pode usar o PouPou para as suas compras e da sua família. Não é permitido:</p>
+<ul><li>copiar em massa os preços ou outros conteúdos do PouPou com robôs ou programas, nem revender esses dados;</li><li>tentar entrar na conta de outra pessoa ou em partes do sistema que não são suas;</li><li>tentar burlar o cadeado do PouPou+, o teste grátis ou as regras de pagamento;</li><li>atacar, sobrecarregar ou atrapalhar o funcionamento do app;</li><li>usar o PouPou para qualquer coisa ilegal ou para enganar outras pessoas.</li></ul>
+<h2>13. De quem é a marca e o app</h2>
+<p>O nome PouPou, a marca, o visual do app, os textos, o código e a organização das informações pertencem a <strong>Daniel Justino de Brito</strong>. Enquanto você seguir estes Termos, você pode usar o PouPou para uso pessoal. Isso não passa a você nenhum direito sobre a marca ou o app. As marcas e as fotos dos mercados e dos produtos são dos seus donos (item 9).</p>
+<h2>14. Funcionamento do serviço</h2>
+<ul><li>Trabalhamos para o PouPou funcionar o tempo todo, mas ele pode ficar fora do ar por manutenção, por falhas ou por problemas em serviços de que ele depende. Se a falha for nossa, vale o item 8.2.</li><li>Os mercados comparados podem mudar com o tempo. Um mercado pode sair do app, por exemplo, se o site dele mudar ou deixar de mostrar os preços.</li><li>Podemos mudar e melhorar recursos. <strong>Não tiramos uma parte importante do PouPou+ durante o período que você já pagou sem oferecer a devolução proporcional.</strong></li></ul>
+<h2>15. Responsabilidade</h2>
+<ul><li>Respondemos pelo serviço do PouPou como manda o Código de Defesa do Consumidor.</li><li><strong>Não respondemos por aquilo que é responsabilidade só de outras pessoas ou empresas</strong>, como:<ul><li>o preço cobrado, o estoque, a qualidade e a entrega dos produtos, que são dos mercados (item 9);</li><li>falhas da sua internet ou do seu aparelho;</li><li>o uso da sua conta por alguém a quem você passou a senha.</li></ul></li><li><strong>Nada nestes Termos tira ou diminui direitos que o Código de Defesa do Consumidor garante a você.</strong></li></ul>
+<h2>16. Suspensão e encerramento</h2>
+<ul><li><strong>Por você:</strong> você pode parar de usar o PouPou quando quiser, cancelar a renovação (item 7.7) e pedir para apagar a conta (<a href="/privacidade">Política de Privacidade</a>).</li><li><strong>Por nós:</strong> <strong>se você descumprir estes Termos (por exemplo, com fraude, ataques ou contas falsas), podemos suspender ou encerrar a sua conta.</strong> Sempre que possível, avisamos antes e damos a chance de você explicar. Em caso de encerramento sem fraude comprovada, devolvemos o valor proporcional dos dias pagos e não usados.</li><li><strong>Fim do PouPou:</strong> se um dia encerrarmos o serviço, avisamos com pelo menos 30 dias de antecedência, paramos as cobranças e devolvemos o valor proporcional dos dias pagos e não usados.</li><li>Depois do encerramento, os seus dados seguem o que diz a Política de Privacidade.</li></ul>
+<h2>17. Mudanças nestes Termos</h2>
+<ul><li>Podemos atualizar estes Termos. A versão e a data ficam no topo, e as versões anteriores ficam disponíveis por pedido no e-mail poupouaplicativo@gmail.com.</li><li>Se a mudança for importante, avisamos nesta página e pelo e-mail da sua conta com pelo menos 15 dias de antecedência.</li><li><strong>Se não concordar com uma mudança importante,</strong> você pode cancelar a renovação e pedir para apagar a conta, sem custo, e continua com o PouPou+ até o fim do período pago.</li><li>As mudanças não valem para o período que você já pagou, a não ser que sejam a seu favor ou exigidas por lei.</li><li>Mudança de preço segue o item 7.9.</li></ul>
+<h2>18. Leis e onde resolver problemas</h2>
+<p>Estes Termos seguem as leis do Brasil, como o Código de Defesa do Consumidor, o Marco Civil da Internet e a Lei Geral de Proteção de Dados. Se tiver um problema, fale com a gente primeiro: a maioria se resolve rápido. Se precisar ir à Justiça, você pode entrar com a ação na cidade onde mora (Código de Defesa do Consumidor, art. 101, I). Você também pode procurar o Procon.</p>
+<h2>19. Contato</h2>
+<ul><li>E-mail de atendimento: <strong>poupouaplicativo@gmail.com</strong>. Respondemos em até 5 dias.</li><li>Assuntos de dados pessoais: veja a <a href="/privacidade">Política de Privacidade</a>.</li><li>Responsável: <strong>Daniel Justino de Brito (MEI)</strong>, CNPJ <strong>32.293.577/0001-25</strong></li><li>Endereço: <strong>Rua Irmãos Elias David, 401, Campinas/SP, CEP 13060-431</strong></li></ul>
+
+  <footer>
+    <p style="margin:0 0 10px">Daniel Justino de Brito (MEI) · CNPJ 32.293.577/0001-25 · Rua Irmãos Elias David, 401, Campinas/SP, CEP 13060-431 · <a href="mailto:poupouaplicativo@gmail.com">poupouaplicativo@gmail.com</a></p>
+    <a href="/">Voltar ao PouPou</a><a href="/termos">Termos de Uso</a><a href="/privacidade">Política de Privacidade</a><a href="/privacidade#cookies">Cookies</a>
+  </footer>
+</main>
+</body>
+</html>

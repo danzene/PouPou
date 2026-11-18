@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
+<meta name="facebook-domain-verification" content="5j1bxr4uecrpm8wcjmll9esaqeb30l" />
 <script>(function(){try{var t=localStorage.getItem("mb-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t;}catch(e){}try{var h=document.documentElement,q=location.search+location.hash;if(localStorage.getItem("sb-ijtnozcomqzxfaidurso-auth-token")||localStorage.getItem("mb_oauth_pending")==="1"||/[?&#](code|access_token)=/.test(q))h.dataset.conta="1";if(/[?&]ref=/.test(location.search)||localStorage.getItem("mb_ref"))h.dataset.indicado="1";}catch(e){}window.heroCtaClique=function(){window.__heroPend=1;};})();</script>
 <title>PouPou — Compare, escolha e economize nas compras</title>
 <!-- PWA: instalável (tela inicial, tela cheia como app) -->
@@ -713,6 +714,35 @@
   .pwa-bar .pwa-inst:hover{ background:var(--green-press); }
   .pwa-bar .pwa-x{ flex:0 0 auto; background:none; border:none; color:var(--faint); font-size:18px; cursor:pointer; line-height:1;
     min-width:44px; min-height:44px; display:grid; place-items:center; margin:-8px -8px -8px -4px; border-radius:10px; }
+
+  /* aviso de cookies: barra no rodapé, não trava o app. "Aceitar" e "Recusar" com o MESMO destaque. */
+  .ck-bar{ position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:70; margin:0 auto; max-width:560px;
+    background:var(--surface); color:var(--ink); border:1px solid var(--line-2); border-radius:16px; padding:14px 14px 12px;
+    box-shadow:0 18px 40px -16px rgba(0,0,0,.45); animation:pwaUp .25s ease; }
+  .ck-tit{ margin:0 0 4px; font-family:var(--disp); font-size:15.5px; font-weight:700; letter-spacing:-.01em; }
+  .ck-tit:focus{ outline:none; } .ck-tit:focus-visible{ outline:3px solid var(--focus); outline-offset:2px; }
+  .ck-tx{ margin:0; font-size:13.5px; line-height:1.4; color:var(--mut); }
+  .ck-tx a{ font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+  .ck-atual{ margin:8px 0 0; font-size:13px; color:var(--ink); }
+  .ck-acts{ display:flex; gap:10px; margin-top:12px; }
+  .ck-btn{ flex:1 1 0; min-width:0; height:44px; border-radius:var(--r-btn); border:1.5px solid var(--ink); background:var(--surface);
+    color:var(--ink); font-family:var(--body); font-size:15px; font-weight:700; cursor:pointer; }
+  .ck-btn:hover{ background:var(--surface-2); } .ck-btn:active{ transform:scale(.98); }
+  .ck-fechar{ display:block; margin:8px auto 0; background:none; border:none; color:var(--mut); font-family:var(--body); font-size:13px;
+    text-decoration:underline; min-height:36px; cursor:pointer; }
+  /* com o aviso aberto: o fim da página sobe (nada de pagamento escondido atrás dele) e os outros avisos saem do caminho */
+  body.ck-on{ padding-bottom:var(--ck-h,0px); }
+  body.ck-on .cesta-fixa{ bottom:var(--ck-h,0px); }
+  body.ck-on .aviso-versao{ bottom:calc(var(--ck-h,0px) + 8px); }
+  body.ck-on .toast{ bottom:calc(var(--ck-h,0px) + 14px); }
+  body.ck-on .pwa-bar{ display:none; }
+  body:has(#drawerOv) .ck-bar{ display:none; }   /* a gaveta tem os botões dela embaixo */
+  body.gaveta-aberta .ck-bar{ display:none; }    /* o mesmo pra aparelho sem :has (iOS < 15.4) */
+  /* Privacidade · Termos · Cookies (conta e cadastro) */
+  .legal{ display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-top:14px; font-size:13px; color:var(--faint); }
+  .legal a, .legal button{ color:var(--mut); font:inherit; background:none; border:none; padding:6px 2px; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+  .auth-legal{ text-align:center; font-size:12px; color:var(--mut); margin:10px 0 0; line-height:1.45; }
+  .auth-legal a{ text-decoration:underline; text-underline-offset:2px; }
 
   @media (max-width:760px){
     .pf2-grid{ flex-direction:column; }
@@ -1603,7 +1633,7 @@ async function addFrescoDrawer(chave,nome,btn){
     atualizarBadge();
     // reflete no card lá atrás, se ainda estiver na tela
     const sel=(window.CSS&&CSS.escape)?CSS.escape(chave):chave;
-    document.querySelectorAll(`.btn-add[data-chave="${sel}"]`).forEach(b=>{ b.textContent="✓"; b.classList.add("in"); });
+    document.querySelectorAll(`.btn-add[data-chave="${sel}"]`).forEach(b=>_estadoBtnAdd(b,true));
   } else if(btn){ btn.textContent="!"; }
 }
 async function abrirProduto(ean){
@@ -1622,13 +1652,14 @@ async function abrirProduto(ean){
   }catch(e){ /* ignora */ }
 }
 function fecharProduto(ev,manterHist){ if(ev&&ev.target!==ev.currentTarget) return;
-  const ov=$("#drawerOv"); if(ov) ov.remove(); document.removeEventListener("keydown",_escFecha);
+  const ov=$("#drawerOv"); if(ov) ov.remove(); document.body.classList.remove("gaveta-aberta"); document.removeEventListener("keydown",_escFecha);
   // fechou pelo botão/fundo/Esc: desfaz o estado que a gaveta empilhou no histórico
   if(!manterHist && history.state&&history.state.gaveta){ _ignorarPop=true; history.back(); } }
 // botão "voltar" do celular fecha a gaveta em vez de sair do app (o mais intuitivo pra quem
 // não acha o Fechar). Abrir a gaveta empilha {gaveta:1}; o voltar desempilha e fecha.
 let _ignorarPop=false;
-function _gavetaAbriu(){ if(!(history.state&&history.state.gaveta)){ try{ history.pushState({gaveta:1},""); }catch(e){} } }
+function _gavetaAbriu(){ document.body.classList.add("gaveta-aberta");   // aparelho sem :has (iOS < 15.4): esconde o aviso de cookies
+  if(!(history.state&&history.state.gaveta)){ try{ history.pushState({gaveta:1},""); }catch(e){} } }
 addEventListener("popstate",()=>{ if(_ignorarPop){ _ignorarPop=false; return; } fecharProduto(null,true); });
 // card inteiro abre a comparação (menos o "+" e links): alvo grande pra quem tem dificuldade
 function cardAbre(ev,card){ if(ev.target.closest("button, a, input, label")) return;
@@ -1830,7 +1861,7 @@ function cardProduto(p){
   const naCesta=CESTA_EANS.has(p.ean);
   const best=rk[0];
   const rid="rk"+String(p.ean).replace(/\W/g,"");
-  const add=`<button class="btn-add ${naCesta?"in":""}" type="button" aria-label="Adicionar ${esc(p.nome)} à lista" title="Adicionar à lista" onclick="addCesta('${p.ean}',this)">${naCesta?"✓":"+"}</button>`;
+  const add=`<button class="btn-add ${naCesta?"in":""}" type="button" aria-pressed="${naCesta}" aria-label="${naCesta?`Tirar ${esc(p.nome)} da lista`:`Adicionar ${esc(p.nome)} à lista`}" title="${naCesta?"Tirar da lista":"Adicionar à lista"}" data-ean="${esc(p.ean)}" data-nome="${esc(p.nome)}" onclick="alternarCesta('${p.ean}',this)">${naCesta?"✓":"+"}</button>`;
   const price=`<div class="prod-price">
       <span class="lbl-menor">menor preço</span>
       <div class="prod-preco num">${brl(p.menor_preco)}</div>
@@ -1913,7 +1944,7 @@ function cardPerecivel(g,ord,modo){
   const rk=g.precos||[], best=rk[0];
   const uG=uniRot(g.rotulo,g.unidade);
   const naLista=g.chave&&CESTA_EANS.has("f:"+g.chave);
-  const add=`<button class="btn-add ${naLista?"in":""}" type="button" aria-label="Adicionar ${esc(g.nome)} à lista" title="Adicionar à lista" data-chave="${esc(g.chave)}" data-nome="${esc(g.nome)}" onclick="addFrescoBtn(this)">${naLista?"✓":"+"}</button>`;
+  const add=`<button class="btn-add ${naLista?"in":""}" type="button" aria-pressed="${naLista}" aria-label="${naLista?`Tirar ${esc(g.nome)} da lista`:`Adicionar ${esc(g.nome)} à lista`}" title="${naLista?"Tirar da lista":"Adicionar à lista"}" data-chave="${esc(g.chave)}" data-nome="${esc(g.nome)}" onclick="addFrescoBtn(this)">${naLista?"✓":"+"}</button>`;
   const precoMain=bandeja?brl(g.menor_pacote):`${brl(g.menor_preco)}${uG}`;
   const meta=bandeja?"bandeja · pacote":(g.unidade?`vendido por ${esc(g.unidade)}`:"por peso");
   const price=`<div class="prod-price">
@@ -2049,13 +2080,40 @@ async function listaSet(ean,campos){
   if(error) console.warn("lista upsert:",error.message);
   return !error;
 }
-async function listaDel(ean){ if(sb&&SESSAO) await sb.from("lista").delete().eq("user_id",SESSAO.user.id).eq("ean",ean); }
+async function listaDel(ean){ if(!sb||!SESSAO) return false;
+  const {error}=await sb.from("lista").delete().eq("user_id",SESSAO.user.id).eq("ean",ean);
+  if(error) console.warn("lista delete:",error.message);
+  return !error; }
 
+// visual do "+"/"✓" do card (e o que o leitor de tela fala)
+function _estadoBtnAdd(btn,dentro){ if(!btn) return;
+  btn.textContent=dentro?"✓":"+"; btn.classList.toggle("in",dentro); btn.setAttribute("aria-pressed",String(dentro));
+  const nome=btn.dataset.nome||""; btn.setAttribute("aria-label",dentro?`Tirar ${nome} da lista`:`Adicionar ${nome} à lista`);
+  btn.title=dentro?"Tirar da lista":"Adicionar à lista"; }
+// botão da gaveta ("Adicionar à lista" / "✓ já está na lista"): só adiciona
 async function addCesta(ean,btn){
   if(!estaLogado()){ abrirCadastro(()=>addCesta(ean,btn)); return; }   // feira exige conta (força cadastro)
-  const ok=await listaSet(ean,{quantidade:1,comprado:false});
-  if(ok){ CESTA_EANS.add(ean); if(btn){ btn.textContent="✓"; btn.classList.add("in"); } atualizarBadge(); }
+  const ok=CESTA_EANS.has(ean) || await listaSet(ean,{quantidade:1,comprado:false});   // já está: não zera a quantidade
+  if(ok){ CESTA_EANS.add(ean);
+    if(btn){ if(btn.classList.contains("btn-add")) _estadoBtnAdd(btn,true); else btn.textContent="✓ já está na lista"; }
+    document.querySelectorAll(`.btn-add[data-ean="${ean}"]`).forEach(b=>_estadoBtnAdd(b,true));   // card lá atrás
+    atualizarBadge(); }
   else if(btn){ btn.textContent="!"; }
+}
+// "+"/"✓" do card: toca uma vez, entra na lista; toca no ✓ de novo, sai. Vale o que a pessoa
+// está VENDO no botão (não uma lista guardada que pode estar velha).
+async function alternarCesta(ean,btn){
+  if(!estaLogado()){ abrirCadastro(()=>alternarCesta(ean,btn)); return; }   // feira exige conta (força cadastro)
+  if(btn&&btn.dataset.ocupado) return;   // toque duplo
+  if(btn) btn.dataset.ocupado="1";
+  try{
+    if(btn?btn.classList.contains("in"):CESTA_EANS.has(ean)){
+      if(await listaDel(ean)){ CESTA_EANS.delete(ean); _estadoBtnAdd(btn,false); atualizarBadge(); toast("Tirei da sua lista"); }
+      else toast("Não consegui tirar da lista. Tente de novo.");
+      return; }
+    if(await listaSet(ean,{quantidade:1,comprado:false})){ CESTA_EANS.add(ean); _estadoBtnAdd(btn,true); atualizarBadge(); }
+    else if(btn){ btn.textContent="!"; }
+  }finally{ if(btn) delete btn.dataset.ocupado; }
 }
 async function setQtd(ean,q){ q=parseInt(q,10); if(!q||q<1) q=1; if(q>999) q=999; await listaSet(ean,{quantidade:q}); loadCesta(); }
 async function setAlvo(ean,val){ const v=val===""?null:parseFloat(val); await listaSet(ean,{preco_alvo:(v==null||isNaN(v))?null:v}); loadCesta(); }
@@ -2076,12 +2134,20 @@ async function esvaziarLista(){
   try{ await sb.from("lista").delete().eq("user_id",SESSAO.user.id); }catch(e){}
   CESTA_EANS=new Set(); atualizarBadge(); loadCesta();
 }
+// "+"/"✓" do card de fresco: mesmo vai-e-volta do card de produto
 async function addFrescoBtn(btn){
   if(!estaLogado()){ abrirCadastro(()=>addFrescoBtn(btn)); return; }
-  const chave=btn.dataset.chave, nome=btn.dataset.nome;
-  const ok=await listaSet("f:"+chave,{nome,quantidade:1,comprado:false});
-  if(ok){ CESTA_EANS.add("f:"+chave); btn.textContent="✓ na lista"; btn.classList.add("in"); atualizarBadge(); }
-  else{ btn.textContent="!"; }
+  if(btn.dataset.ocupado) return;   // toque duplo
+  btn.dataset.ocupado="1";
+  const chave=btn.dataset.chave, nome=btn.dataset.nome, k="f:"+chave;
+  try{
+    if(btn.classList.contains("in")){
+      if(await listaDel(k)){ CESTA_EANS.delete(k); _estadoBtnAdd(btn,false); atualizarBadge(); toast("Tirei da sua lista"); }
+      else toast("Não consegui tirar da lista. Tente de novo.");
+      return; }
+    if(await listaSet(k,{nome,quantidade:1,comprado:false})){ CESTA_EANS.add(k); _estadoBtnAdd(btn,true); atualizarBadge(); }
+    else btn.textContent="!";
+  }finally{ delete btn.dataset.ocupado; }
 }
 function toggleAlerta(btn){ const ed=btn.nextElementSibling, open=ed.hasAttribute("hidden");
   ed.toggleAttribute("hidden",!open); btn.setAttribute("aria-expanded",String(open));
@@ -2286,14 +2352,20 @@ function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(un
 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-// acesso diário pro painel /gestao: id ALEATÓRIO do aparelho (sem nome/e-mail); se logado,
-// o servidor associa ao usuário. Falhar aqui nunca atrapalha o app.
+// acesso diário pro painel /gestao: id ALEATÓRIO do aparelho (sem nome/e-mail); se logado, o servidor
+// associa ao usuário. Vai junto de onde o aparelho veio (utm do 1º anúncio e o código do último
+// clique do Google/Meta, gclid/fbclid) pra aba Anúncios. Falhar aqui nunca atrapalha o app.
+let CLIQUE_AGORA=0;   // 1 = esta abertura veio de link de anúncio (utm/gclid/fbclid); vale só pro 1º registro
 function idVisitante(){ let v=lsGet("mb_vis","");
   if(!/^[A-Za-z0-9-]{8,64}$/.test(v)){ v=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12)); lsSet("mb_vis",v); }
   return v; }
 function registrarAcesso(){ try{ const h={"Content-Type":"application/json"};
   if(SESSAO&&SESSAO.access_token) h.Authorization="Bearer "+SESSAO.access_token;
-  fetch(`${API}/acesso`,{method:"POST",headers:h,body:JSON.stringify({visitante:idVisitante()}),keepalive:true}).catch(()=>{}); }catch(e){} }
+  const ck=lerConsent();   // a escolha de cookies DESTE aparelho: o servidor só grava gclid/fbclid com "aceito"
+  const corpo=Object.assign({visitante:idVisitante(), consent:ck?ck.escolha:null}, dadosOrigem(), dadosClique(), CLIQUE_AGORA?{clique:1}:{},
+    SESSAO?dadosMedicaoCheckout():{});   // com conta: fbp/fbc/_ga só se aceito (o servidor só avisa a Meta com eles)
+  fetch(`${API}/acesso`,{method:"POST",headers:h,body:JSON.stringify(corpo),keepalive:true})
+    .then(r=>{ if(r&&r.ok) CLIQUE_AGORA=0; }).catch(()=>{}); }catch(e){} }
 function usuario(){ return SESSAO?{email:SESSAO.user.email, nome:PERFIL.nome||(SESSAO.user.email||"").split("@")[0]}:null; }
 function estaLogado(){ return !!SESSAO; }
 function plano(){ return PERFIL.plano||"gratis"; }
@@ -2345,7 +2417,8 @@ function ehAdmin(){ return !!(PERFIL && PERFIL.is_admin); }
 async function iniciarTrial(){
   if(!sb||!SESSAO) return false;
   try{
-    const r=await fetchAuth(`${API}/trial/iniciar`,{method:"POST"}).then(x=>x.json());
+    const r=await fetchAuth(`${API}/trial/iniciar`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(dadosMedicaoCheckout())}).then(x=>x.json());   // a escolha de cookies deste aparelho
     await carregarPerfil();        // re-hidrata do servidor (fonte da verdade)
     atualizarContaUI();
     return !!(r&&r.ok);
@@ -2379,7 +2452,7 @@ async function desbloquear(btn){
     try{
       if(btn){ btn.disabled=true; btn.dataset.txt=btn.innerHTML; btn.innerHTML="Aguarde…"; }
       await iniciarTrial();   // já recarrega o perfil: decide pelo acesso, não pelo "ok"
-      if(acessoPremium()){ toast(`Acesso completo liberado por ${trialLen()} dias 🎉`); reabrir(); return; }
+      if(acessoPremium()){ medirTeste(); toast(`Acesso completo liberado por ${trialLen()} dias 🎉`); reabrir(); return; }
       if(btn){ btn.disabled=false; btn.innerHTML=btn.dataset.txt||btn.innerHTML; }  // falhou: restaura o botão
     }finally{ _desbloqueando=false; }
   }
@@ -2414,7 +2487,7 @@ async function liberarTesteSeDisponivel(){
   try{
     if(lsGet("mb_ref","")) await talvezVincularIndicacao();   // indicado: vincula antes (7 dias)
     await iniciarTrial();
-    if(acessoPremium()){ toast(`Pronto! ${trialLen()} dias grátis liberados 🎉`); reabrir(); return true; }
+    if(acessoPremium()){ medirTeste(); toast(`Pronto! ${trialLen()} dias grátis liberados 🎉`); reabrir(); return true; }
     return false;
   }finally{ _desbloqueando=false; }
 }
@@ -2440,7 +2513,7 @@ async function assinarAgora(plano, metodo){
   const solta=()=>btns.forEach(b=>b.disabled=false);
   try{
     const r=await fetchAuth(`${API}/assinatura/criar`,{method:"POST",
-      headers:{"Content-Type":"application/json"}, body:JSON.stringify({plano,metodo})});
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(Object.assign({plano,metodo}, dadosMedicaoCheckout()))});
     if(!r.ok){ const e=await r.json().catch(()=>({}));
       if(r.status===409){   // já tem assinatura no cartão: relê a conta (o servidor pode ter acabado
         // de confirmar com o MP) e redesenha, pra aparecer o aviso com o "cancelar"; texto longo fica mais
@@ -2448,7 +2521,9 @@ async function assinarAgora(plano, metodo){
         toast(e.detail||"Você já tem assinatura no cartão.",9000); solta(); return; }
       toast(r.status===503?"Pagamento ainda não configurado":"Não foi possível iniciar o pagamento"); solta(); return; }
     const d=await r.json();
-    if(d.init_point){ window.location.href=d.init_point; }   // vai pro checkout do Mercado Pago
+    if(d.init_point){   // vai pro checkout do Mercado Pago (antes, o aviso de "pagamento aberto": máx. 600 ms)
+      try{ await medirCheckout(plano, d.ref_id); }catch(_){}
+      window.location.href=d.init_point; }
     else{ toast("Não foi possível iniciar o pagamento"); solta(); }
   }catch(e){ toast("Erro ao iniciar o pagamento"); solta(); }
 }
@@ -2521,6 +2596,7 @@ function renderLogin(){
       <div class="auth-field"><label for="aSenha">Senha</label><input id="aSenha" type="password" autocomplete="${criar?"new-password":"current-password"}" placeholder="sua senha (mín. 6 caracteres)" required minlength="6"></div>
       <p class="auth-err" id="authErr" aria-live="polite"></p>
       <button class="auth-btn" type="submit">${criar?`Criar conta e liberar ${trialDiasOferta()} dias`:"Entrar"}</button>
+      ${criar?`<p class="auth-legal">Ao criar a conta, você aceita os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e confirma que leu a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</p>`:""}
     </form>
     ${inApp?`<p class="auth-inapp">Quer entrar com o Google? Abra o PouPou no navegador (menu ⋮ → <b>Abrir no navegador</b>). Aqui dentro, use seu e-mail.</p>`:""}
     <p class="auth-note">Não guardamos sua senha, e seu e-mail nunca é compartilhado.</p>`;
@@ -2536,7 +2612,7 @@ async function authSubmit(ev){ ev.preventDefault();
   const reset=()=>{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.txt||"Enviar"; } };
   try{
     let res=criar
-      ? await sb.auth.signUp({email, password:senha, options:{data:{nome:nome||email.split("@")[0], ...dadosOrigem()}}})
+      ? await sb.auth.signUp({email, password:senha, options:{data:{nome:nome||email.split("@")[0], ...dadosOrigem(), ...(lerConsent()?{consent:lerConsent()}:{})}}})
       : await sb.auth.signInWithPassword({email, password:senha});
     // conta que JÁ existe na aba "Criar conta": o Supabase não dá erro, devolve um usuário sem
     // identidades e sem sessão. Aí tenta entrar com a senha digitada e segue como LOGIN.
@@ -2558,6 +2634,7 @@ async function authSubmit(ev){ ev.preventDefault();
     await carregarPerfil();
     const cb=_authCb;                 // captura ANTES do fecharLogin (que zera _authCb)
     fecharLogin(); atualizarContaUI(); atualizarBadge();   // carrega a feira do usuário
+    if(contaNova) medirContaNova("email");
     if(contaNova) abrirOnboarding(async()=>{ await liberarTesteSeDisponivel(); if(cb) cb(); });   // conta nova -> mercados -> teste liberado -> segue
     else { if(acessoPremium()) reabrir(); if(cb) cb(); }   // quem já paga/está no teste vê os mercados na hora
   }catch(e){ err.textContent="Erro de conexão. Tente de novo."; reset(); }
@@ -2718,7 +2795,7 @@ function loadPerfil(secao, manterPlanos){
         ${benef}
         <div class="pf2-plus-actions"><button class="btn-primary pf2-cta" type="button" onclick="abrirCadastro(()=>loadPerfil())">Criar conta grátis</button>
           <button class="btn-ghost" type="button" style="margin-top:8px" onclick="abrirLogin(()=>loadPerfil(),'entrar')">Já tenho conta · Entrar</button></div>
-      </div></div>`;
+      </div>${linksLegais()}</div>`;
     return;
   }
 
@@ -2866,7 +2943,7 @@ function loadPerfil(secao, manterPlanos){
       </div></div></aside>`;
 
   const sair=`<div class="pf2-foot"><button class="pf2-logout" type="button" onclick="sair()">${ic("external")} Sair da conta</button>`+
-    `<a class="pf2-ajuda" href="/ajuda">O app não abre ou travou? Veja a ajuda</a></div>`;
+    `<a class="pf2-ajuda" href="/ajuda">O app não abre ou travou? Veja a ajuda</a>${linksLegais()}</div>`;
 
   saida.innerHTML=`<div class="pf2">${head}
       <div class="pf2-grid"><div class="pf2-main">${plus}${indica}${meus}${prefs}</div>${resumo}</div>
@@ -2929,6 +3006,193 @@ async function salvarOrigemContaNova(){
     if(!criada||!entrou||Math.abs(entrou-criada)>5*60e3||Date.now()-criada>864e5) return;
     const d=dadosOrigem(); if(Object.keys(d).length) await sb.auth.updateUser({data:d});
   }catch(e){}
+}
+// código do clique do anúncio (gclid = Google, fbclid = Instagram/Facebook): o ÚLTIMO clique vale. Guardado
+// inteiro (cortado não serve pra casar a conversão depois). Não vai pro cadastro (deixaria o login maior).
+// SÓ com "Aceitar" no aviso de cookies (Política de Privacidade): sem aceite o código nem é guardado
+// no aparelho nem vai pro servidor (fica só o "veio de anúncio", CLIQUE_AGORA, sem código nenhum).
+const RE_CLID=/^[A-Za-z0-9_.-]{6,500}$/;
+function cliquesDaUrl(){ const q=new URLSearchParams(location.search), c={};
+  ["gclid","fbclid"].forEach(k=>{ const v=q.get(k)||""; if(RE_CLID.test(v)) c[k]=v; }); return c; }
+// guarda o código do clique da URL atual (só com aceite). Chamada ao abrir e no "Aceitar" da mesma visita.
+function guardarCliqueDaUrl(){
+  try{ if(!consentAceito()) return; const c=cliquesDaUrl();
+    if(Object.keys(c).length){ c.em=new Date().toISOString(); lsSet("mb_clid", JSON.stringify(c)); } }catch(e){}
+}
+function capturarClique(){
+  try{
+    const q=new URLSearchParams(location.search), c=cliquesDaUrl();
+    guardarCliqueDaUrl();
+    CLIQUE_AGORA=(Object.keys(c).length || ["utm_source","utm_medium","utm_campaign","utm_content","utm_term"].some(k=>q.get(k)))?1:0;
+  }catch(e){}
+}
+function dadosClique(){
+  try{ if(!consentAceito()) return {};
+    const c=JSON.parse(lsGet("mb_clid","")||"null"); if(!c||typeof c!=="object") return {};
+    const d={}; ["gclid","fbclid"].forEach(k=>{ if(RE_CLID.test(c[k]||"")) d[k]=c[k]; }); return d; }catch(e){ return {}; }
+}
+
+/* ===== Cookies e medição de anúncios (Google e Meta) =====
+   Nada do Google nem da Meta carrega antes do "Aceitar" (modo básico). A escolha fica no aparelho
+   (mb_consent) e, com a conta aberta, uma cópia vai pra conta (o servidor só manda eventos de
+   quem aceitou). document.cookie aqui só LÊ _fbp/_fbc/_ga e APAGA esses cookies na recusa. */
+const CONSENT_V=1, CONSENT_VALIDADE=365*864e5;   // versão do texto do aviso; pergunta de novo depois de 12 meses
+const GTM_ID="GTM-T53RJ8LD", META_PIXEL="1624321239375976", GA4_ID="29JELR1XKT";
+const VALOR_PLANO={mensal:9.90, anual:99.90};    // mesmos valores de PRECO_MENSAL/PRECO_ANUAL
+let MEDICAO_LIGADA=false;
+function lerConsent(){
+  try{ const c=JSON.parse(lsGet("mb_consent","")||"null");
+    if(!c||c.v!==CONSENT_V||(c.escolha!=="aceito"&&c.escolha!=="recusado")) return null;
+    const em=Date.parse(c.em||""); if(!em||Date.now()-em>CONSENT_VALIDADE) return null;
+    return c; }catch(e){ return null; }
+}
+function consentAceito(){ const c=lerConsent(); return !!(c&&c.escolha==="aceito"); }
+// carrega a tag do Google (GTM) e o Pixel da Meta — só depois do "Aceitar"
+function ligarMedicao(){
+  if(MEDICAO_LIGADA||!consentAceito()) return; MEDICAO_LIGADA=true;
+  try{
+    window.dataLayer=window.dataLayer||[];
+    window.gtag=window.gtag||function(){ dataLayer.push(arguments); };
+    gtag("consent","default",{ad_storage:"granted",analytics_storage:"granted",ad_user_data:"granted",ad_personalization:"denied"});   // sem remarketing
+    gtag("js", new Date());
+    dataLayer.push({"gtm.start":Date.now(), event:"gtm.js"});
+    const s=document.createElement("script"); s.async=true; s.src="https://www.googletagmanager.com/gtm.js?id="+GTM_ID;
+    document.head.appendChild(s);
+  }catch(e){}
+  try{
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;
+      s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");
+    fbq("set","autoConfig",false,META_PIXEL);   // sem "eventos automáticos" (não lê botões nem textos da página)
+    fbq("init",META_PIXEL);                      // SEM correspondência avançada (nada de e-mail)
+    fbq("track","PageView");
+  }catch(e){}
+}
+// id do evento igual no navegador e no servidor (a Meta não conta 2x): sha256 da chave, 32 letras
+async function idEvento(chave){
+  try{ const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(chave));
+    return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,32); }catch(e){ return ""; }
+}
+// manda 1 evento pro Pixel e pro GA4 (só com "aceito"). ga.dados pode ter event_callback.
+async function medir(meta, ga, chave){
+  if(!consentAceito()) return;
+  ligarMedicao();
+  try{
+    const eid=chave?await idEvento(chave):"";
+    if(meta&&window.fbq){ if(eid) fbq("track",meta.nome,meta.dados||{},{eventID:eid}); else fbq("track",meta.nome,meta.dados||{}); }
+    if(ga&&window.gtag) gtag("event",ga.nome,ga.dados||{});
+  }catch(e){}
+}
+function medirContaNova(metodo){ const uid=SESSAO&&SESSAO.user&&SESSAO.user.id; if(!uid) return;
+  medir({nome:"CompleteRegistration"},{nome:"sign_up",dados:{method:metodo}},"conta_criada:"+uid); }
+// volta do Google com conta NOVA: mesma regra de salvarOrigemContaNova (horários do servidor)
+function contaCriadaAgora(u){ if(!u) return false;
+  const criada=Date.parse(u.created_at||""), entrou=Date.parse(u.last_sign_in_at||"");
+  return !!criada && !!entrou && Math.abs(entrou-criada)<=5*60e3 && Date.now()-criada<=864e5; }
+function medirTeste(){ const uid=SESSAO&&SESSAO.user&&SESSAO.user.id; if(!uid) return;
+  medir({nome:"StartTrial",dados:{value:0,currency:"BRL"}},{nome:"start_trial",dados:{}},"teste_iniciado:"+uid); }
+// pagamento aberto: manda e espera no máx. 600 ms antes de ir pro Mercado Pago (o envio não pode travar o pagamento)
+async function medirCheckout(plano, refId){
+  if(!consentAceito()) return;
+  const value=VALOR_PLANO[plano]||VALOR_PLANO.mensal;
+  const espera=ms=>new Promise(r=>setTimeout(r,ms));
+  let enviado; const gaFoi=new Promise(r=>{ enviado=r; });
+  const envio=medir({nome:"InitiateCheckout",dados:{value,currency:"BRL",content_name:plano}},
+    {nome:"begin_checkout",dados:{value,currency:"BRL",items:[{item_id:plano,item_name:"PouPou+ "+plano}],event_callback:()=>enviado(),event_timeout:550}},
+    refId?("checkout_aberto:"+refId):"");
+  await Promise.race([Promise.all([envio,gaFoi,espera(250)]), espera(600)]);
+}
+// cookies do Google/Meta (só lê)
+function lerCookie(nome){
+  try{ const p=document.cookie.split(";").map(s=>s.trim()).find(s=>s.indexOf(nome+"=")===0);
+    return p?decodeURIComponent(p.slice(nome.length+1)):""; }catch(e){ return ""; }
+}
+// vai junto do /assinatura/criar: a escolha e, SÓ se aceito, os códigos que ligam a compra ao anúncio
+function dadosMedicaoCheckout(){
+  const c=lerConsent(), d={consent:c?c.escolha:null};
+  if(!c||c.escolha!=="aceito") return d;
+  const fbp=lerCookie("_fbp"); if(/^fb\.\d\.\d+\.\d+$/.test(fbp)) d.fbp=fbp;
+  let fbc=lerCookie("_fbc");
+  if(!/^fb\.\d\.\d+\.[A-Za-z0-9_.-]+$/.test(fbc)){ fbc="";
+    try{ const k=JSON.parse(lsGet("mb_clid","")||"null");
+      if(k&&RE_CLID.test(k.fbclid||"")) fbc=`fb.1.${Date.parse(k.em||"")||Date.now()}.${k.fbclid}`; }catch(e){} }
+  if(fbc) d.fbc=fbc;
+  const ga=lerCookie("_ga").match(/^GA\d\.\d+\.(\d+\.\d+)$/); if(ga) d.ga_client_id=ga[1];
+  const gs=lerCookie("_ga_"+GA4_ID), p=gs.split(".");
+  let sid=p[0]==="GS1"?(p[2]||""):"";                                                      // GS1.1.<sessão>.<n>…
+  if(p[0]==="GS2"){ const m=p.slice(2).join(".").match(/(?:^|\$)s(\d+)/); sid=m?m[1]:""; }   // GS2.1.s<sessão>$o…
+  if(/^\d{6,}$/.test(sid)) d.ga_session_id=sid;
+  return d;
+}
+// recusar depois de aceitar: apaga _ga*, _gcl_*, _fbp e _fbc (domínio atual e os de cima)
+function nomesCookiesMedicao(){
+  try{ return document.cookie.split(";").map(s=>s.split("=")[0].trim()).filter(n=>/^(_ga|_gcl_)|^_fb[pc]$/.test(n)); }catch(e){ return []; }
+}
+function apagarCookiesMedicao(){
+  try{ const h=location.hostname, partes=h.split("."), doms=["",h,".poupouapp.com.br"];
+    for(let i=0;i<partes.length-1;i++) doms.push("."+partes.slice(i).join("."));
+    nomesCookiesMedicao().forEach(n=>doms.forEach(dm=>{
+      document.cookie=`${n}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`+(dm?`; domain=${dm}`:""); }));
+  }catch(e){}
+}
+// cópia da escolha na conta (prova do consentimento e regra do servidor); só se mudou e se é mais nova
+let _consentSync="";
+async function copiarConsentConta(){
+  try{ const c=lerConsent(), u=SESSAO&&SESSAO.user; if(!sb||!u||!c) return;
+    const na=(u.user_metadata||{}).consent||null;
+    if(na&&na.v===c.v&&na.escolha===c.escolha&&na.em===c.em) return;
+    if(na&&Date.parse(na.em||"")>Date.parse(c.em)) return;   // outro aparelho escolheu depois: vale a mais nova
+    const k=u.id+"|"+c.escolha+"|"+c.em; if(_consentSync===k) return; _consentSync=k;
+    const {error}=await sb.auth.updateUser({data:{consent:{v:c.v,escolha:c.escolha,em:c.em}}});
+    if(error) _consentSync="";
+  }catch(e){ _consentSync=""; }
+}
+async function escolherConsent(escolha){
+  escolha=(escolha==="aceito")?"aceito":"recusado";
+  const antes=lerConsent();
+  lsSet("mb_consent", JSON.stringify({v:CONSENT_V, escolha, em:new Date().toISOString()}));
+  fecharAvisoCookies();
+  const copia=copiarConsentConta();
+  if(escolha==="aceito"){ guardarCliqueDaUrl(); ligarMedicao(); toast("Pronto, escolha salva."); return; }
+  try{ localStorage.removeItem("mb_clid"); }catch(e){}   // recusou: apaga o código do clique guardado antes
+  if(MEDICAO_LIGADA || (antes&&antes.escolha==="aceito") || nomesCookiesMedicao().length){
+    apagarCookiesMedicao();
+    toast("Pronto. Desligando as ferramentas…");
+    await Promise.race([copia, new Promise(r=>setTimeout(r,1500))]);   // a cópia na conta vai antes de recarregar
+    location.reload(); return; }
+  toast("Pronto, escolha salva.");
+}
+// barra no rodapé (não trava o app). reabrir=true: veio do link "Cookies" e mostra a escolha atual
+let _ckVolta=null, _ckRO=null;
+function abrirAvisoCookies(reabrir){
+  const velho=$("#ckBar"); if(velho){ const t=$("#ckTit"); if(reabrir&&t) t.focus(); return; }
+  const c=reabrir?lerConsent():null;
+  const atual=c?`<p class="ck-atual">Sua escolha agora: <b>${c.escolha==="aceito"?"aceitou":"recusou"}</b> em ${new Date(c.em).toLocaleDateString("pt-BR")}.</p>`:"";
+  const bar=document.createElement("section"); bar.id="ckBar"; bar.className="ck-bar";
+  bar.setAttribute("role","region"); bar.setAttribute("aria-labelledby","ckTit");
+  bar.innerHTML=`<p class="ck-tit" id="ckTit" tabindex="-1">Cookies e privacidade</p>
+    <p class="ck-tx">O PouPou usa o armazenamento do aparelho para funcionar. Ferramentas do Google e da Meta, que medem nossos anúncios, só são ligadas se você aceitar. Se recusar, o app funciona igual. <a href="/privacidade#cookies">Saber mais</a></p>
+    ${atual}
+    <div class="ck-acts"><button type="button" class="ck-btn" onclick="escolherConsent('recusado')">Recusar</button><button type="button" class="ck-btn" onclick="escolherConsent('aceito')">Aceitar</button></div>
+    ${c?`<button type="button" class="ck-fechar" onclick="fecharAvisoCookies()">Fechar e manter a escolha</button>`:""}`;
+  document.body.appendChild(bar);
+  document.body.classList.add("ck-on");
+  const mede=()=>document.documentElement.style.setProperty("--ck-h",(bar.offsetHeight+12)+"px");
+  mede(); try{ _ckRO=new ResizeObserver(mede); _ckRO.observe(bar); }catch(e){ addEventListener("resize",mede); }
+  if(reabrir){ _ckVolta=document.activeElement; $("#ckTit").focus({preventScroll:true}); }
+}
+function fecharAvisoCookies(){
+  const bar=$("#ckBar"); if(!bar) return;
+  const dentro=bar.contains(document.activeElement);
+  try{ if(_ckRO) _ckRO.disconnect(); }catch(e){} _ckRO=null;
+  bar.remove(); document.body.classList.remove("ck-on"); document.documentElement.style.removeProperty("--ck-h");
+  if(dentro&&_ckVolta&&document.contains(_ckVolta)){ try{ _ckVolta.focus({preventScroll:true}); }catch(e){} }
+  _ckVolta=null;
+}
+// links do rodapé da conta: Privacidade · Termos · Cookies
+function linksLegais(){
+  return `<nav class="legal" aria-label="Privacidade e termos"><a href="/privacidade">Privacidade</a><span aria-hidden="true">·</span>`+
+    `<a href="/termos">Termos</a><span aria-hidden="true">·</span><button type="button" onclick="abrirAvisoCookies(true)">Cookies</button></nav>`;
 }
 function capturarRefLink(){
   try{
@@ -3123,6 +3387,8 @@ $("#btnCesta").addEventListener("click",loadCesta);
   try{ history.scrollRestoration="manual"; }catch(e){}   // a gaveta usa o histórico; o "voltar" não deve rolar a página
   capturarRefLink();   // guarda o ?ref=CODE do link de indicação (e limpa a URL)
   capturarUTM();       // guarda de qual anúncio a pessoa veio na 1ª visita (pra medir a campanha)
+  capturarClique();    // código do clique (gclid/fbclid) e se esta abertura veio de link de anúncio
+  if(lerConsent()) ligarMedicao(); else abrirAvisoCookies(false);   // Google/Meta só com "Aceitar"
   setTemaBtn();
   // restaura a sessão salva (login persiste entre visitas) e carrega o perfil/plano da conta
   let oauthRetorno=false;
@@ -3130,8 +3396,8 @@ $("#btnCesta").addEventListener("click",loadCesta);
     try{ const {data}=await sb.auth.getSession(); SESSAO=data.session||null; if(SESSAO) await carregarPerfil(); }catch(e){}
     oauthRetorno = lsGet("mb_oauth_pending","")==="1"; if(oauthRetorno) lsSet("mb_oauth_pending","");
     sb.auth.onAuthStateChange((_ev,sess)=>{ SESSAO=sess||null; atualizarContaUI(); if(sess) talvezVincularIndicacao();
-      if(_ev==="SIGNED_IN") registrarAcesso(); });   // entrou agora: o acesso do dia ganha o "quem"
-    if(SESSAO) talvezVincularIndicacao();   // sessão já ativa (ou volta do Google) com código pendente
+      if(_ev==="SIGNED_IN"){ registrarAcesso(); copiarConsentConta(); } });   // entrou agora: o acesso do dia ganha o "quem"; a escolha de cookies vai pra conta
+    if(SESSAO){ talvezVincularIndicacao(); copiarConsentConta(); }   // sessão já ativa (ou volta do Google) com código pendente
   }
   registrarAcesso();   // 1 registro por aparelho por dia (painel /gestao)
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
@@ -3151,6 +3417,7 @@ $("#btnCesta").addEventListener("click",loadCesta);
   const posLogin=lsGet("mb_pos_login",""); if(posLogin) lsSet("mb_pos_login","");
   if(oauthRetorno && SESSAO){
     salvarOrigemContaNova();   // conta nova do Google: grava de qual anúncio ela veio
+    if(contaCriadaAgora(SESSAO.user)) medirContaNova("google");
     const seguir=()=>{ if(posLogin==="teste") liberarTesteSeDisponivel(); };
     if(precisaOnboarding()) abrirOnboarding(seguir); else seguir();
   }

@@ -616,6 +616,397 @@ def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapprova
     return nova
 
 
+# ===== FUNIL DE CONVERSÃO (Fase A1: medição própria; Fase A3: aviso ao Meta/Google) ============
+# Cada etapa vira 1 linha em funil_eventos (chave única = idempotente) com a ORIGEM da pessoa copiada.
+# Regra de ouro: a anotação NUNCA atrapalha o cadastro, o teste nem o pagamento — todo o SQL dela roda
+# num SAVEPOINT dentro de try/except (um erro fora do savepoint, dentro da transação do webhook, faria o
+# COMMIT do pagamento virar ROLLBACK). O aviso ao Meta/Google (api/conversoes.py) só sai DEPOIS do
+# commit, só pra quem aceitou os cookies e só quando a linha do funil acabou de entrar.
+_UTM_CAMPOS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
+_ORIGEM_CAMPOS = _UTM_CAMPOS + ("utm_em", "gclid", "fbclid")
+_NAVEGADOR_CAMPOS = ("consentiu", "fbp", "fbc", "ga_client_id", "ga_session_id", "ip", "ua")
+_RE_CLID = re.compile(r"^[A-Za-z0-9_.\-]{6,500}$")   # gclid/fbclid inteiros (cortado não casa na A3)
+_RE_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+_RE_ROBO = re.compile(r"googlebot|adsbot|bingbot|facebookexternalhit|crawler|spider|slurp|duckduckbot|"
+                      r"yandex|baiduspider|petalbot|applebot|lighthouse|headlesschrome", re.I)
+_RE_FB_COOKIE = re.compile(r"^fb\.[0-9]\.[0-9]{9,16}\.[A-Za-z0-9_.\-]{1,600}$")   # _fbp / _fbc
+_RE_GA_CLIENT = re.compile(r"^[0-9]{1,20}\.[0-9]{1,20}$")                         # "x.y" do _ga
+_RE_GA_SESSAO = re.compile(r"^[0-9]{1,20}$")
+_CONTA_VISTA: set = set()   # uid já conferido nesta instância (não repete a consulta a cada abertura do app)
+
+
+def _sqlite(conn) -> bool:
+    return hasattr(conn, "create_function")   # só o sqlite3.Connection tem isso (igual a _conn())
+
+
+def _texto_origem(v, n=100):
+    """Texto de origem vindo do aparelho ou do cadastro: só string, sem caractere de controle, até n."""
+    if not isinstance(v, str):
+        return None
+    v = "".join(c for c in v if c.isprintable()).strip()[:n]
+    return v or None
+
+
+def _utm_do_cadastro(conta) -> dict:
+    """utm_* gravadas no cadastro (auth.users), já limpas. Vazio se não houver."""
+    conta = conta or {}
+    o = {k: _texto_origem(conta.get(k)) for k in _UTM_CAMPOS}
+    o["utm_em"] = _texto_origem(conta.get("utm_em"), 30) if any(o.values()) else None
+    return o
+
+
+def _origem_do_corpo(b: dict) -> dict:
+    """Origem que o app manda no /acesso: utm do 1º anúncio, último gclid/fbclid e clique=1 se esta
+    abertura veio de link de anúncio. Valor fora do formato vira vazio (nunca erro)."""
+    o = {k: _texto_origem(b.get(k)) for k in _UTM_CAMPOS}
+    o["utm_em"] = _texto_origem(b.get("utm_em"), 30) if any(o.values()) else None
+    # código do clique (gclid/fbclid) SÓ de quem tocou em "Aceitar" no aviso de cookies (Política de
+    # Privacidade): sem consent == "aceito" no corpo, o código é descartado aqui
+    aceitou = b.get("consent") == "aceito"
+    for k in ("gclid", "fbclid"):
+        v = b.get(k)
+        o[k] = v if aceitou and isinstance(v, str) and _RE_CLID.match(v) else None
+    o["clique"] = 1 if b.get("clique") in (1, True, "1") else 0
+    return o
+
+
+def _ip_do_pedido(request) -> str | None:
+    """IP de quem fez o pedido: o 1º do x-forwarded-for (a Vercel põe o do aparelho), senão a conexão."""
+    import ipaddress
+    try:
+        cand = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() \
+            or (request.headers.get("x-real-ip") or "").strip() \
+            or (request.client.host if request.client else "")
+        return str(ipaddress.ip_address(cand)) if cand else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _navegador_do_pedido(request, b: dict | None = None) -> dict:
+    """Dados do navegador pra A3: escolha dos cookies e, SÓ se 'aceito', fbp/fbc/ids do Google, IP e
+    navegador. Sem aceite, tudo vazio (nem IP nem navegador são guardados ou enviados)."""
+    b = b if isinstance(b, dict) else {}
+    esc = b.get("consent")
+    d = dict.fromkeys(_NAVEGADOR_CAMPOS)
+    d["consentiu"] = True if esc == "aceito" else (False if esc == "recusado" else None)
+    if esc != "aceito":
+        return d
+    try:
+        for k, rx in (("fbp", _RE_FB_COOKIE), ("fbc", _RE_FB_COOKIE), ("ga_client_id", _RE_GA_CLIENT),
+                      ("ga_session_id", _RE_GA_SESSAO)):
+            v = b.get(k)
+            v = str(v).strip() if isinstance(v, (str, int)) and not isinstance(v, bool) else ""
+            d[k] = v if rx.match(v) else None
+        d["ip"] = _ip_do_pedido(request) if request is not None else None
+        d["ua"] = _texto_origem(request.headers.get("user-agent"), 500) if request is not None else None
+    except Exception:  # noqa: BLE001
+        pass
+    return d
+
+
+def _event_id(chave: str) -> str:
+    """Id do evento pra A3: sha256 da chave (32 letras). O navegador calcula o mesmo e o Meta não conta 2x."""
+    return hashlib.sha256(chave.encode("utf-8")).hexdigest()[:32]
+
+
+def _mp_id(v):
+    return str(v)[:100] if v not in (None, "") else None
+
+
+def _dados_conta(conn, uid):
+    """Criação da conta, utm gravadas no cadastro e a escolha dos cookies (auth.users). À parte pra o
+    teste trocar: auth.users tem o schema escrito, então tabela temporária não a esconde."""
+    return conn.execute(
+        "SELECT created_at, raw_user_meta_data->>'utm_source' AS utm_source, "
+        "raw_user_meta_data->>'utm_medium' AS utm_medium, raw_user_meta_data->>'utm_campaign' AS utm_campaign, "
+        "raw_user_meta_data->>'utm_content' AS utm_content, raw_user_meta_data->>'utm_term' AS utm_term, "
+        "raw_user_meta_data->>'utm_em' AS utm_em, "
+        "raw_user_meta_data->'consent'->>'escolha' AS consent, "
+        "raw_user_meta_data->'consent'->>'em' AS consent_em FROM auth.users WHERE id = ?::uuid",
+        (uid,)).fetchone()
+
+
+def _origem_conta_nova(conn, uid, conta) -> dict:
+    """Origem de quem ACABOU de criar a conta: a do cadastro; se vier vazia (o Google grava depois, em
+    salvarOrigemContaNova), a que o aparelho dela mandou no /acesso. Clique: o mais recente dela."""
+    o = _utm_do_cadastro(conta)
+    if not any(o[k] for k in _UTM_CAMPOS):
+        r = conn.execute(
+            "SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_em FROM acessos "
+            "WHERE user_id = ? AND COALESCE(utm_source, utm_medium, utm_campaign, utm_content, utm_term) IS NOT NULL "
+            "ORDER BY dia, primeiro LIMIT 1", (uid,)).fetchone()
+        if r:
+            o = {k: r[k] for k in _UTM_CAMPOS + ("utm_em",)}
+    c = conn.execute(
+        "SELECT gclid, fbclid FROM acessos WHERE user_id = ? AND COALESCE(gclid, fbclid) IS NOT NULL "
+        "ORDER BY dia DESC, ultimo DESC LIMIT 1", (uid,)).fetchone()
+    o["gclid"], o["fbclid"] = (c["gclid"], c["fbclid"]) if c else (None, None)
+    return o
+
+
+def _origem_da_pessoa(conn, uid) -> dict:
+    """Origem copiada nas outras etapas: a 'foto' tirada quando a conta entrou no funil; sem ela (conta
+    de antes da A1), a do cadastro. Nunca mistura duas fontes."""
+    r = conn.execute("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_em, gclid, fbclid "
+                     "FROM funil_eventos WHERE chave = ?", (f"conta_criada:{uid}",)).fetchone()
+    if r:
+        return dict(r)
+    o = _utm_do_cadastro(_dados_conta(conn, uid))
+    o["gclid"] = o["fbclid"] = None
+    return o
+
+
+def _funil_registra(conn, etapa, uid, chave, *, origem=None, quando=None, plano=None, forma=None,
+                    com_cartao=None, valor=None, mp_pagamento_id=None, mp_assinatura_id=None,
+                    mp_preferencia_id=None, via=None, navegador=None) -> str | None:
+    """Anota 1 etapa. Idempotente pela chave. Roda num SAVEPOINT (ou numa transação curta, fora de uma)
+    e NUNCA levanta erro. Devolve 'nova' (a linha entrou agora), 'ja' (já estava lá) ou None (falhou).
+    navegador: dados da A3 (só na linha checkout_aberto e só de quem aceitou os cookies)."""
+    if _sqlite(conn) or etapa not in database.ETAPAS_FUNIL or not _RE_UUID.match(str(uid or "")):
+        return None
+    nav = navegador or {}
+    try:
+        with _transacao(conn):
+            o = origem if origem is not None else _origem_da_pessoa(conn, str(uid))
+            cur = conn.execute(
+                "INSERT INTO funil_eventos (event_id, chave, etapa, quando, user_id, plano, forma, com_cartao, "
+                "valor, mp_pagamento_id, mp_assinatura_id, mp_preferencia_id, via, utm_source, utm_medium, "
+                "utm_campaign, utm_content, utm_term, utm_em, gclid, fbclid, "
+                "consentiu, fbp, fbc, ga_client_id, ga_session_id, ip, ua) "
+                "VALUES (?, ?, ?, COALESCE(?::timestamptz, now()), ?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, "
+                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (chave) DO NOTHING",
+                (_event_id(chave), chave, etapa, quando, str(uid), plano, forma, com_cartao, valor,
+                 _mp_id(mp_pagamento_id), _mp_id(mp_assinatura_id), _mp_id(mp_preferencia_id), via,
+                 *(o.get(k) for k in _ORIGEM_CAMPOS), *(nav.get(k) for k in _NAVEGADOR_CAMPOS)))
+        return "nova" if getattr(cur, "rowcount", 0) == 1 else "ja"
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil %s %s: não anotado (%s)", etapa, chave, e)
+        return None
+
+
+def _escolha_conta(conta) -> tuple[str | None, datetime | None]:
+    """Escolha de cookies copiada na conta e quando foi feita. 'aceito' vale 12 meses (igual ao aparelho,
+    que pergunta de novo depois disso); 'recusado' vale sempre. Sem escolha válida -> (None, None)."""
+    try:
+        esc = (conta or {}).get("consent")
+        em = _dt_utc((conta or {}).get("consent_em"))
+    except Exception:  # noqa: BLE001
+        return None, None
+    if esc == "recusado":
+        return "recusado", em
+    if esc == "aceito" and em and em >= datetime.now(timezone.utc) - timedelta(days=365):
+        return "aceito", em
+    return None, None
+
+
+def _pode_avisar(conta, navegador=None) -> bool:
+    """Regra única do aceite pros avisos do servidor (conta, teste, pagamento aberto). O aparelho de
+    agora recusou -> não. A conta recusou -> não (na dúvida, vale a recusa). Aceitou neste aparelho, ou
+    (aparelho sem escolha) a conta aceitou há menos de 12 meses -> sim; aí sem IP/navegador, que só
+    vêm de um aparelho que aceitou (_navegador_do_pedido)."""
+    disp = (navegador or {}).get("consentiu")
+    esc, _ = _escolha_conta(conta)
+    if disp is False or esc == "recusado":
+        return False
+    return disp is True or esc == "aceito"
+
+
+def _avisa_meta(evento, chave, uid, navegador=None, custom_data=None, timeout=1.5) -> None:
+    """Aviso de conversão ao Meta (A3), DEPOIS do commit. Quem chama já conferiu o aceite.
+    timeout curto (1,5 s) por padrão: cadastro, teste e pagamento não podem esperar o Meta."""
+    try:
+        from api import conversoes
+        nav = navegador or {}
+        conversoes.enviar_meta(evento, _event_id(chave), time.time(),
+                               {"external_id": conversoes.external_id(uid), "fbp": nav.get("fbp"),
+                                "fbc": nav.get("fbc"), "client_ip_address": nav.get("ip"),
+                                "client_user_agent": nav.get("ua")}, custom_data, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("conversoes %s: %s", evento, e)
+
+
+def _funil_conta(conn, uid, via, navegador=None) -> None:
+    """'Conta criada' (CompleteRegistration): 1 linha por conta, só pra conta criada nas últimas 48 h
+    (as contas de antes da publicação não viram 'novas'). Horário = criação da conta. Se a linha
+    entrou agora e o aceite vale (_pode_avisar: escolha deste aparelho + a da conta), avisa o Meta
+    depois do commit. navegador: _navegador_do_pedido (IP/navegador só de aparelho que aceitou)."""
+    if not uid or uid in _CONTA_VISTA or _sqlite(conn):
+        return
+    ok = aceitou = False
+    res = None
+    try:
+        with _transacao(conn):
+            conta = _dados_conta(conn, uid)
+            criada = _dt_utc(conta["created_at"]) if conta else None
+            if not criada or criada < datetime.now(timezone.utc) - timedelta(hours=48):
+                ok = True   # conta antiga (ou não achada): nada a anotar
+            else:
+                aceitou = _pode_avisar(conta, navegador)
+                res = _funil_registra(conn, "conta_criada", uid, f"conta_criada:{uid}", quando=criada, via=via,
+                                      origem=_origem_conta_nova(conn, uid, conta))
+                ok = res is not None
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil conta_criada: %s", e)
+        ok, res = False, None
+    if ok:   # só guarda quando deu certo: se falhou, tenta de novo na próxima abertura
+        if len(_CONTA_VISTA) > 50000:
+            _CONTA_VISTA.clear()
+        _CONTA_VISTA.add(uid)
+    if res == "nova" and aceitou:
+        _avisa_meta("CompleteRegistration", f"conta_criada:{uid}", uid, navegador)
+
+
+def _consent_da_conta(conn, uid, navegador=None) -> bool:
+    """Pode avisar o Meta? Escolha deste aparelho (navegador) + a copiada pelo app em auth.users
+    (_pode_avisar). Erro = não."""
+    try:
+        conta = _dados_conta(conn, uid)
+        return bool(conta) and _pode_avisar(conta, navegador)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("conversoes consent: %s", e)
+        return False
+
+
+def _funil_teste(conn, uid, navegador=None) -> None:
+    """'Teste iniciado' (StartTrial). Garante antes a 'conta criada'. Nunca levanta erro."""
+    try:
+        _funil_conta(conn, uid, via="trial", navegador=navegador)
+        res = _funil_registra(conn, "teste_iniciado", uid, f"teste_iniciado:{uid}", com_cartao=False, via="trial")
+        if res == "nova" and _consent_da_conta(conn, uid, navegador):
+            _avisa_meta("StartTrial", f"teste_iniciado:{uid}", uid, navegador, {"value": 0, "currency": "BRL"})
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil teste_iniciado: %s", e)
+
+
+def _funil_novo(etapa, uid, ref, navegador=None, **dados) -> None:
+    """Pagamento aberto: anota numa conexão própria (assinatura_criar não tem uma aberta). Garante antes
+    a 'conta criada'. Os dados do navegador (A3) só vão na linha se a pessoa aceitou. Nunca levanta erro."""
+    try:
+        conn = _conn()
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil %s: sem conexão (%s)", etapa, e)
+        return
+    try:
+        nav = navegador or {}
+        _funil_conta(conn, uid, via="checkout", navegador=nav)   # recusa feita aqui também vale pro cadastro
+        chave = f"{etapa}:{ref or secrets.token_hex(8)}"
+        res = _funil_registra(conn, etapa, uid, chave, via="checkout", navegador=nav, **dados)
+        if res == "nova" and _consent_da_conta(conn, uid, nav):
+            _avisa_meta("InitiateCheckout", chave, uid, nav,
+                        {"value": dados.get("valor"), "currency": "BRL", "content_name": dados.get("plano")})
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil %s: %s", etapa, e)
+    finally:
+        conn.close()
+
+
+def _forma_pagamento(pay: dict, assinatura: bool) -> str:
+    """cartao = assinatura que renova sozinha; pix; outro = Checkout Pro pago com cartão à vista, saldo…"""
+    if assinatura:
+        return "cartao"
+    if pay.get("payment_method_id") == "pix" or pay.get("payment_type_id") == "bank_transfer":
+        return "pix"
+    return "outro"
+
+
+def _funil_pagamento(conn, uid, plano_id, pagamento_id, **dados) -> dict | None:
+    """'Assinatura paga' (Subscribe) = 1ª cobrança aprovada da PESSOA. É a 1ª se não existe OUTRA cobrança
+    aprovada dela em mp_eventos (o COALESCE junta as faturas antigas, gravadas pela id da fatura).
+    Renovação, 2ª compra no Pix e o 2º aviso da mesma cobrança não criam linha. Nunca levanta erro.
+    Devolve os dados da compra SÓ quando a linha entrou agora (pra avisar o Meta/Google depois do commit)."""
+    if _sqlite(conn) or not _RE_UUID.match(str(uid or "")):
+        return None
+    try:
+        with _transacao(conn):
+            outra = conn.execute(
+                "SELECT 1 FROM mp_eventos WHERE uid = ?::uuid AND status = 'approved' "
+                "AND COALESCE(raw->'payment'->>'id', payment_id) <> ? LIMIT 1",
+                (uid, str(pagamento_id))).fetchone()
+            if not outra:
+                res = _funil_registra(conn, "assinatura_paga", uid, f"assinatura_paga:{uid}", plano=plano_id,
+                                      mp_pagamento_id=pagamento_id, via="webhook", **dados)
+                if res == "nova":
+                    return {"uid": str(uid), "plano": plano_id, "valor": dados.get("valor")}
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil assinatura_paga: %s", e)
+    return None
+
+
+def _funil_limpa_navegador(conn, uid) -> None:
+    """Apaga IP, navegador e códigos do Google/Meta das linhas 'pagamento aberto' da pessoa (já usados
+    no aviso da compra) e de qualquer linha com mais de 90 dias. Fica só o consentiu. Nunca levanta erro."""
+    if _sqlite(conn):
+        return
+    try:
+        with _transacao(conn):
+            conn.execute(
+                "UPDATE funil_eventos SET fbp = NULL, fbc = NULL, ga_client_id = NULL, ga_session_id = NULL, "
+                "ip = NULL, ua = NULL WHERE COALESCE(fbp, fbc, ga_client_id, ga_session_id, ip, ua) IS NOT NULL "
+                "AND ((user_id = ?::uuid AND etapa = 'checkout_aberto') OR quando < now() - interval '90 days')",
+                (str(uid),))
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil limpa navegador: %s", e)
+
+
+def _avisa_compra(conn, compra) -> None:
+    """Compra (1ª cobrança) -> Meta Subscribe + GA4 purchase, DEPOIS do commit. Aceite: o da linha
+    'pagamento aberto' mais recente da pessoa (se ela escolheu ali) ou, sem escolha ali, o da conta.
+    Recusa na conta DEPOIS de abrir o pagamento (ou sem aceite na linha) barra o aviso.
+    Códigos do navegador, IP e navegador vêm dessa linha (o IP do aviso é o do Mercado Pago, não serve)
+    e são apagados depois (_funil_limpa_navegador). GA4 só com client_id. Nunca levanta erro."""
+    if not compra:
+        return
+    try:
+        uid = compra["uid"]
+        r = conn.execute(
+            "SELECT consentiu, fbp, fbc, ga_client_id, ga_session_id, ip, ua, quando FROM funil_eventos "
+            "WHERE user_id = ?::uuid AND etapa = 'checkout_aberto' ORDER BY quando DESC LIMIT 1",
+            (uid,)).fetchone()
+        nav = dict(r) if r else {}
+        if nav.get("consentiu") is False:
+            return
+        esc, em = _escolha_conta(_dados_conta(conn, uid))
+        if nav.get("consentiu") is True:
+            aberto = _dt_utc(nav.get("quando"))
+            if esc == "recusado" and not (em and aberto and em < aberto):
+                return   # recusou na conta depois de abrir o pagamento (ou sem data pra comparar)
+        else:
+            if esc != "aceito":
+                return
+            nav = {}   # aceite só na conta: sem dados de navegador guardados
+        valor = float(compra["valor"]) if compra.get("valor") is not None else None
+        chave = f"assinatura_paga:{uid}"
+        _avisa_meta("Subscribe", chave, uid, nav,
+                    {"value": valor, "currency": "BRL", "content_name": compra.get("plano")}, timeout=3)
+        if nav.get("ga_client_id"):
+            from api import conversoes
+            conversoes.enviar_ga4(nav["ga_client_id"], nav.get("ga_session_id"), [
+                {"name": "purchase", "params": {"transaction_id": _event_id(chave), "value": valor,
+                                                "currency": "BRL", "items": [{"item_id": compra.get("plano")}]}}])
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("conversoes compra: %s", e)
+    finally:   # avisando ou não, IP/navegador/códigos não ficam guardados depois da compra
+        _funil_limpa_navegador(conn, compra.get("uid"))
+
+
+def _funil_cancelou(conn, uid, pre_id, via) -> None:
+    """Cancelamento de quem JÁ PAGOU no cartão (assinatura que nunca cobrou — cartão recusado, checkout
+    abandonado — não é cancelamento de assinante). 1 linha por assinatura do MP."""
+    if not pre_id or _sqlite(conn) or not _RE_UUID.match(str(uid or "")):
+        return
+    try:
+        with _transacao(conn):
+            r = conn.execute(
+                "SELECT plano_alvo FROM mp_eventos WHERE uid = ?::uuid AND status = 'approved' "
+                "AND split_part(raw->>'external_reference', ':', 3) = 'cartao' "
+                "ORDER BY processado_em DESC LIMIT 1", (uid,)).fetchone()
+            if r:
+                _funil_registra(conn, "cancelou", uid, f"cancelou:{pre_id}", plano=r["plano_alvo"],
+                                forma="cartao", com_cartao=True, mp_assinatura_id=pre_id, via=via)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("api").warning("funil cancelou: %s", e)
+
+
 # ===== INDIQUE E GANHE (programa de indicação) =============================================
 # Regra (mão-dupla):
 #   - INDICADO: quem se cadastra por um link ganha um TRIAL DOBRADO (7 dias em vez de 3),
@@ -741,6 +1132,10 @@ try:
     database.garantir_equivalentes(_boot)   # de/para de EANs do mesmo produto + view unificada
     database.garantir_acessos(_boot)        # acessos por dia (painel /gestao)
     database.garantir_painel(_boot)         # buscas e histórico da saúde (painel /gestao)
+    try:   # origem do anúncio + funil (Fase A1/A3). Só muda o banco na publicação (ddl_liberado)
+        database.garantir_funil(_boot)
+    except Exception as _funil_err:  # noqa: BLE001
+        logging.getLogger("api").warning("boot: funil não preparado, seguindo mesmo assim: %s", _funil_err)
     _boot.close()
 except Exception as _boot_err:  # noqa: BLE001
     logging.getLogger("api").warning("boot: init do banco falhou, seguindo mesmo assim: %s", _boot_err)
@@ -1791,24 +2186,70 @@ _RE_VISITANTE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 _FUSO_BR = timezone(timedelta(hours=-3))   # dia de Brasília (sem horário de verão desde 2019)
 
 
+def _coluna_inexistente(e: Exception) -> bool:
+    """Erro de 'coluna não existe': psycopg UndefinedColumn (Postgres) ou o equivalente do SQLite (dev)."""
+    try:
+        from psycopg.errors import UndefinedColumn
+        if isinstance(e, UndefinedColumn):
+            return True
+    except ImportError:
+        pass
+    return isinstance(e, sqlite3.OperationalError) and "no column named" in str(e).lower()
+
+
 @app.post("/acesso", status_code=204)
-def registrar_acesso(body: dict = Body(...), authorization: str | None = Header(None)):
-    """O app chama ao abrir: 1 linha por aparelho por dia (n conta as aberturas). Com login,
-    grava também QUEM é. Sem dado pessoal além do uid: visitante é um id aleatório do aparelho."""
-    vis = str((body or {}).get("visitante") or "")
+def registrar_acesso(request: Request, body: dict = Body(...), authorization: str | None = Header(None),
+                     user_agent: str | None = Header(None)):
+    """O app chama ao abrir: 1 linha por aparelho por dia (n conta as aberturas). Com login, grava também
+    QUEM é. Vem junto de onde o aparelho veio: utm do 1º anúncio (a 1ª do dia fica) e o código do último
+    clique do Google/Meta (gclid/fbclid, que identificam o clique). clique=1: nesse dia o aparelho chegou
+    por link de anúncio (robô não conta). Conta criada há pouco vira 'conta criada' no funil."""
+    b = body if isinstance(body, dict) else {}
+    vis = str(b.get("visitante") or "")
     if not _RE_VISITANTE.match(vis):
         raise HTTPException(status_code=400, detail="visitante inválido")
+    o = _origem_do_corpo(b)
+    if user_agent and _RE_ROBO.search(user_agent):
+        o["clique"] = 0
     uid = _uid_do_header(authorization) if authorization else None
     agora = datetime.now(timezone.utc)
     dia = agora.astimezone(_FUSO_BR).date().isoformat()
     conn = _conn()
     try:
-        conn.execute(
-            "INSERT INTO acessos (dia, visitante, user_id, primeiro, ultimo, n) VALUES (?, ?, ?, ?, ?, 1) "
-            "ON CONFLICT (dia, visitante) DO UPDATE SET ultimo = excluded.ultimo, n = acessos.n + 1, "
-            "user_id = COALESCE(excluded.user_id, acessos.user_id)",
-            (dia, vis, uid, agora.isoformat(), agora.isoformat()))
+        try:
+            conn.execute(
+                "INSERT INTO acessos (dia, visitante, user_id, primeiro, ultimo, n, utm_source, utm_medium, "
+                "utm_campaign, utm_content, utm_term, utm_em, gclid, fbclid, clique) "
+                "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (dia, visitante) DO UPDATE SET ultimo = excluded.ultimo, n = acessos.n + 1, "
+                "user_id = COALESCE(excluded.user_id, acessos.user_id), "
+                "utm_source = COALESCE(acessos.utm_source, excluded.utm_source), "
+                "utm_medium = COALESCE(acessos.utm_medium, excluded.utm_medium), "
+                "utm_campaign = COALESCE(acessos.utm_campaign, excluded.utm_campaign), "
+                "utm_content = COALESCE(acessos.utm_content, excluded.utm_content), "
+                "utm_term = COALESCE(acessos.utm_term, excluded.utm_term), "
+                "utm_em = COALESCE(acessos.utm_em, excluded.utm_em), "
+                "gclid = COALESCE(excluded.gclid, acessos.gclid), "
+                "fbclid = COALESCE(excluded.fbclid, acessos.fbclid), "
+                "clique = CASE WHEN excluded.clique = 1 THEN 1 ELSE COALESCE(acessos.clique, excluded.clique) END",
+                (dia, vis, uid, agora.isoformat(), agora.isoformat(),
+                 *(o[k] for k in _UTM_CAMPOS), o["utm_em"], o["gclid"], o["fbclid"], o["clique"]))
+        except Exception as e:  # noqa: BLE001
+            # SÓ "coluna inexistente" (DDL da origem ainda não aplicada) cai no modo antigo; qualquer
+            # outro erro sobe. O rollback é seguro: este INSERT é o 1º comando da conexão (nada antes
+            # dele pra desfazer) e no Postgres a conexão é autocommit (o rollback não desfaz nada gravado).
+            if not _coluna_inexistente(e):
+                raise
+            logging.getLogger("api").warning("acesso: origem não gravada, colunas novas ainda não existem (%s)", e)
+            conn.rollback()
+            conn.execute(
+                "INSERT INTO acessos (dia, visitante, user_id, primeiro, ultimo, n) VALUES (?, ?, ?, ?, ?, 1) "
+                "ON CONFLICT (dia, visitante) DO UPDATE SET ultimo = excluded.ultimo, n = acessos.n + 1, "
+                "user_id = COALESCE(excluded.user_id, acessos.user_id)",
+                (dia, vis, uid, agora.isoformat(), agora.isoformat()))
         conn.commit()
+        if uid:   # nunca levanta erro; aviso ao Meta só com aceite (aparelho + conta); IP/navegador só se ESTE aparelho aceitou
+            _funil_conta(conn, uid, via="acesso", navegador=_navegador_do_pedido(request, b))
     finally:
         conn.close()
     return Response(status_code=204)
@@ -2017,7 +2458,7 @@ def admin_usuarios(authorization: str | None = Header(None)):
 
 
 @app.post("/assinatura/criar")
-def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(None)):
+def assinatura_criar(request: Request, body: dict = Body(...), authorization: str | None = Header(None)):
     """Cria o pagamento no Mercado Pago e devolve o init_point pra redirecionar o usuário.
       - metodo='pix'    -> Checkout Pro avulso (Pix ou cartão à vista); libera N dias no webhook.
       - metodo='cartao' -> assinatura recorrente (/preapproval); renova sozinho.
@@ -2036,7 +2477,12 @@ def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(
     if metodo == "cartao":
         # assinatura recorrente no cartão (renova sozinho) — fluxo redirect (/preapproval)
         _sem_cartao_ativo(uid)   # não abre uma 2ª assinatura (seria cobrança em dobro)
-        return _criar_preapproval(uid, plano_id, _email_do_header(authorization))
+        res = _criar_preapproval(uid, plano_id, _email_do_header(authorization))
+        # funil (A1/A3): pagamento aberto; nunca levanta erro. Dados do navegador só com aceite
+        _funil_novo("checkout_aberto", uid, res.get("ref_id"), navegador=_navegador_do_pedido(request, b),
+                    plano=plano_id, forma="cartao", com_cartao=True, valor=p["valor"],
+                    mp_assinatura_id=res.get("ref_id"))
+        return res
     # ---- Pix / avulso: Checkout Pro (uma cobrança; libera N dias) ----
     pref = {
         "items": [{"id": f"poupou-{plano_id}", "title": p["titulo"],
@@ -2059,6 +2505,9 @@ def assinatura_criar(body: dict = Body(...), authorization: str | None = Header(
     init = res.get("init_point") or res.get("sandbox_init_point")
     if not init:
         raise HTTPException(status_code=502, detail="Falha ao criar pagamento")
+    # funil (A1/A3): pagamento aberto (botão Pix); nunca levanta erro. Dados do navegador só com aceite
+    _funil_novo("checkout_aberto", uid, res.get("id"), navegador=_navegador_do_pedido(request, b),
+                plano=plano_id, forma="pix", com_cartao=False, valor=p["valor"], mp_preferencia_id=res.get("id"))
     return {"init_point": init, "ref_id": res.get("id")}
 
 
@@ -2189,8 +2638,14 @@ def _proc_payment(payment_id) -> None:
                                         preapproval_id=md.get("preapproval_id") or None)
                 elif novo:
                     _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+                # funil (A1): 1ª cobrança aprovada = "assinatura paga". SAVEPOINT próprio e sem levantar
+                # erro: se a anotação falhar, o evento e os dias do pagamento seguem gravados
+                compra = _funil_pagamento(conn, uid, plano_id, chave, valor=pay.get("transaction_amount"),
+                                          forma=_forma_pagamento(pay, assinatura), com_cartao=assinatura,
+                                          mp_assinatura_id=md.get("preapproval_id"))
             if novo:
                 _processar_indicacao(conn, uid)
+            _avisa_compra(conn, compra)   # A3: Meta/Google depois do commit, só com aceite; nunca levanta erro
         finally:
             conn.close()
 
@@ -2220,6 +2675,10 @@ def _proc_authorized_payment(ap_id) -> None:
                                         uid, plano_id, ap.get("transaction_amount"), ap)
                 if novo:
                     _estende_assinatura(conn, uid, plano_id, mp_status="authorized", preapproval_id=pre_id)
+                # funil (A1): 1ª cobrança aprovada = "assinatura paga" (SAVEPOINT próprio, nunca levanta erro)
+                compra = _funil_pagamento(conn, uid, plano_id, chave, valor=ap.get("transaction_amount"),
+                                          forma="cartao", com_cartao=True, mp_assinatura_id=pre_id)
+            _avisa_compra(conn, compra)   # A3: Meta/Google depois do commit, só com aceite; nunca levanta erro
             if novo:
                 _processar_indicacao(conn, uid)
             elif pre_id:
@@ -2251,11 +2710,13 @@ def _proc_preapproval(pre_id) -> None:
         try:
             # 'pending' (checkout do cartão aberto) não apaga o status de quem já paga; e aviso de
             # uma assinatura ANTIGA/abandonada não mexe na atual (só 'authorized' vira a atual)
-            conn.execute(
+            cur = conn.execute(
                 "UPDATE profiles SET mp_status=CASE WHEN ?='pending' AND mp_status IN ('approved','authorized') "
                 "THEN mp_status ELSE ? END, mp_preapproval_id=?, atualizado_em=? "
                 "WHERE id=? AND (?='authorized' OR mp_preapproval_id IS NULL OR mp_preapproval_id=?)",
                 (status, status, pre_id, datetime.now(timezone.utc).isoformat(), uid, status, pre_id))
+            if status == "cancelled" and getattr(cur, "rowcount", 0) == 1:
+                _funil_cancelou(conn, uid, pre_id, via="mp")   # cancelado no MP (pela pessoa ou falta de pagamento)
         finally:
             conn.close()
 
@@ -2346,6 +2807,7 @@ def assinatura_cancelar(authorization: str | None = Header(None)):
                 raise HTTPException(status_code=502, detail="Falha ao cancelar no Mercado Pago")
         conn.execute("UPDATE profiles SET mp_status='cancelled', atualizado_em=? WHERE id=?",
                      (datetime.now(timezone.utc).isoformat(), uid))
+        _funil_cancelou(conn, uid, pid, via="app")   # funil (A1): só conta quem já pagou no cartão
         return {"ok": True, "status": "cancelled",
                 "aviso": "As cobranças param. Seu acesso segue até o fim do período já pago."}
     finally:
@@ -2353,7 +2815,7 @@ def assinatura_cancelar(authorization: str | None = Header(None)):
 
 
 @app.post("/trial/iniciar")
-def trial_iniciar(authorization: str | None = Header(None)):
+def trial_iniciar(request: Request, authorization: str | None = Header(None), body: dict | None = Body(None)):
     """Começa o reverse trial no servidor (o cliente não escreve mais profiles). Só libera se
     ainda não usou o trial e está no grátis. Quem chegou por indicação (indicado_por setado)
     ganha o TRIAL DOBRADO (TRIAL_DIAS_INDICADO). Idempotente-ish: se já é assinante/trial,
@@ -2378,6 +2840,9 @@ def trial_iniciar(authorization: str | None = Header(None)):
         conn.execute(
             "UPDATE profiles SET plano = 'trial', trial_ini = ?, trial_usado = true, "
             "trial_dias = ?, atualizado_em = ? WHERE id = ?", (agora, dias, agora, uid))
+        # funil (A1/A3): conta + teste; nunca levanta erro. Corpo opcional {consent, fbp, fbc}: a escolha
+        # deste aparelho. Aviso ao Meta só com aceite (aparelho + conta); IP/navegador só se este aparelho aceitou
+        _funil_teste(conn, uid, navegador=_navegador_do_pedido(request, body))
         return {"ok": True, "plano": "trial", "trial_ini": agora, "trial_dias": dias}
     finally:
         conn.close()
@@ -2480,6 +2945,146 @@ def _dt_utc(v):
     if v is not None and v.tzinfo is None:
         v = v.replace(tzinfo=timezone.utc)
     return v
+
+
+# ===== ABA ANÚNCIOS do /gestao (Fase A1) =====
+_TIPOS_ANUNCIO = ("anuncio", "google_sem_utm", "meta_sem_utm")
+_ORDEM_TIPO = {"anuncio": 0, "google_sem_utm": 1, "meta_sem_utm": 2, "indicacao": 3, "sem_origem": 4, "teste": 5}
+_PASSOS = ("visitas", "contas", "testes", "checkouts", "pagas")
+_ETAPA_PASSO = {"conta_criada": "contas", "teste_iniciado": "testes", "checkout_aberto": "checkouts",
+                "assinatura_paga": "pagas"}
+
+
+def _segunda(d) -> str:
+    """Segunda-feira (começo da semana) de 'AAAA-MM-DD' (acessos.dia) ou de um date."""
+    if isinstance(d, str):
+        d = datetime.strptime(d[:10], "%Y-%m-%d").date()
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def _rotulo_origem(o) -> tuple:
+    """(chave do grupo, título, tipo) de uma linha de acessos ou funil_eventos."""
+    u = {k: str(o.get(k) or "").strip() for k in _UTM_CAMPOS}
+    if "teste" in (u["utm_source"].lower(), u["utm_campaign"].lower(), u["utm_content"].lower()):
+        return "teste", "Teste (fora dos totais)", "teste"
+    if any(u.values()):
+        f, c, a = u["utm_source"], u["utm_campaign"], u["utm_content"]
+        return f"a|{f.lower()}|{c.lower()}|{a.lower()}", (a or c or f or "Anúncio sem nome"), "anuncio"
+    if o.get("gclid"):
+        return "g", "Google Ads (link sem utm)", "google_sem_utm"
+    if o.get("fbclid"):
+        return "f", "Instagram/Facebook (link sem utm, pode ser orgânico)", "meta_sem_utm"
+    if o.get("indicado"):
+        return "i", "Indicação de amigo", "indicacao"
+    return "s", "Sem origem (direto, busca ou app instalado)", "sem_origem"
+
+
+@app.get("/admin/anuncios")
+def admin_anuncios(semanas: int = 8, authorization: str | None = Header(None)):
+    """Aba Anúncios: por semana (segunda a domingo, horário de Brasília) e por anúncio — visitas -> contas ->
+    testes -> pagamento aberto -> assinaturas pagas (cartão/Pix, mensal/anual) — e os cancelamentos do mês.
+    Conta aparelhos/pessoas distintos. Fora dos totais: admins e links com 'teste' na utm."""
+    semanas = max(1, min(int(semanas or 8), 26))
+    conn = _conn()
+    try:
+        if not _admin_uid(conn, authorization):
+            raise HTTPException(status_code=403, detail="Acesso restrito")
+        hoje = datetime.now(_FUSO_BR).date()
+        inicio = hoje - timedelta(days=hoje.weekday() + 7 * (semanas - 1))   # segunda da 1ª semana
+        lista = [(inicio + timedelta(weeks=i)).isoformat() for i in range(semanas)]
+        mes_ini = hoje.replace(day=1)
+        meia_noite = lambda d: datetime(d.year, d.month, d.day, tzinfo=_FUSO_BR)  # noqa: E731
+        admins = {str(r["id"]) for r in conn.execute("SELECT id FROM profiles WHERE is_admin").fetchall()}
+        grupos: dict = {}
+
+        def grupo(o):
+            ch, titulo, tipo = _rotulo_origem(o)
+            if ch not in grupos:
+                grupos[ch] = {"titulo": titulo, "tipo": tipo, "fonte": o.get("utm_source"),
+                              "campanha": o.get("utm_campaign"), "anuncio": o.get("utm_content"),
+                              **{p: set() for p in _PASSOS}, "receita": 0.0, "cancelou": 0,
+                              "formas": {"cartao": 0, "pix": 0, "outro": 0}, "planos": {"mensal": 0, "anual": 0},
+                              "sem": {s: {p: set() for p in _PASSOS} for s in lista}}
+            return grupos[ch]
+
+        # visitas: aparelhos que chegaram por link de anúncio (clique = 1; robô já sai no /acesso)
+        for r in conn.execute(
+                "SELECT dia, visitante, user_id, utm_source, utm_medium, utm_campaign, utm_content, utm_term, "
+                "gclid, fbclid FROM acessos WHERE dia >= ? AND clique = 1", (inicio.isoformat(),)).fetchall():
+            if r["user_id"] in admins:
+                continue
+            g, s = grupo(r), _segunda(r["dia"])
+            g["visitas"].add(r["visitante"])
+            if s in g["sem"]:
+                g["sem"][s]["visitas"].add(r["visitante"])
+
+        canc = {"mes": mes_ini.strftime("%Y-%m"), "n": 0, "pelo_app": 0, "no_mp": 0,
+                "planos": {"mensal": 0, "anual": 0}}
+        for r in conn.execute(
+                "SELECT f.etapa, (f.quando AT TIME ZONE 'America/Sao_Paulo')::date AS dia, f.user_id::text AS uid, "
+                "f.plano, f.forma, f.valor, f.via, f.utm_source, f.utm_medium, f.utm_campaign, f.utm_content, "
+                "f.utm_term, f.gclid, f.fbclid, (p.indicado_por IS NOT NULL) AS indicado "
+                "FROM funil_eventos f LEFT JOIN profiles p ON p.id = f.user_id WHERE f.quando >= ?",
+                (meia_noite(min(inicio, mes_ini)),)).fetchall():
+            if r["uid"] in admins:
+                continue
+            g = grupo(r)
+            if r["etapa"] == "cancelou":
+                if r["dia"] >= mes_ini and g["tipo"] != "teste":
+                    canc["n"] += 1
+                    canc["pelo_app" if r["via"] == "app" else "no_mp"] += 1
+                    if r["plano"] in canc["planos"]:
+                        canc["planos"][r["plano"]] += 1
+                    g["cancelou"] += 1
+                continue
+            if r["dia"] < inicio:
+                continue
+            p, s = _ETAPA_PASSO[r["etapa"]], _segunda(r["dia"])
+            g[p].add(r["uid"])
+            if s in g["sem"]:
+                g["sem"][s][p].add(r["uid"])
+            if r["etapa"] == "assinatura_paga":
+                g["receita"] += float(r["valor"] or 0)
+                g["formas"][r["forma"] if r["forma"] in g["formas"] else "outro"] += 1
+                if r["plano"] in g["planos"]:
+                    g["planos"][r["plano"]] += 1
+
+        def resumo(gs):
+            tot = {p: set() for p in _PASSOS}
+            sem = {s: {p: set() for p in _PASSOS} for s in lista}
+            out = {"receita": 0.0, "cancelou": 0, "formas": {"cartao": 0, "pix": 0, "outro": 0},
+                   "planos": {"mensal": 0, "anual": 0}}
+            for g in gs:
+                for p in _PASSOS:
+                    tot[p] |= g[p]
+                    for s in lista:
+                        sem[s][p] |= g["sem"][s][p]
+                out["receita"] += g["receita"]
+                out["cancelou"] += g["cancelou"]
+                for k in out["formas"]:
+                    out["formas"][k] += g["formas"][k]
+                for k in out["planos"]:
+                    out["planos"][k] += g["planos"][k]
+            out["receita"] = round(out["receita"], 2)
+            return {**{p: len(v) for p, v in tot.items()}, **out,
+                    "por_semana": [{"semana": s, **{p: len(sem[s][p]) for p in _PASSOS}} for s in reversed(lista)]}
+
+        gs = sorted(grupos.values(), key=lambda g: (_ORDEM_TIPO[g["tipo"]], -len(g["pagas"]),
+                                                     -len(g["contas"]), -len(g["visitas"])))
+        pix_venceram = conn.execute(
+            "SELECT COUNT(*) AS n FROM profiles WHERE plano = 'assinante' AND mp_status = 'approved' "
+            "AND NOT is_admin AND plano_expira_em >= ? AND plano_expira_em < now()",
+            (meia_noite(mes_ini),)).fetchone()["n"]
+        desde = conn.execute("SELECT MIN(dia) AS d FROM acessos WHERE clique IS NOT NULL").fetchone()["d"]
+        return {"semanas": lista, "desde": desde,
+                "anuncios": resumo([g for g in gs if g["tipo"] in _TIPOS_ANUNCIO]),
+                "fora": resumo([g for g in gs if g["tipo"] in ("indicacao", "sem_origem")]),
+                "tudo": resumo([g for g in gs if g["tipo"] != "teste"]),
+                "grupos": [{"titulo": g["titulo"], "tipo": g["tipo"], "fonte": g["fonte"], "campanha": g["campanha"],
+                            "anuncio": g["anuncio"], **resumo([g])} for g in gs],
+                "cancelamentos": {**canc, "pix_venceram": pix_venceram}}
+    finally:
+        conn.close()
 
 
 @app.get("/admin/dinheiro")
@@ -2934,6 +3539,33 @@ def ajuda():
     """Página pública "o app não abre?" — abre pelo link mesmo quando o ícone instalado falha
     (ex.: Android pedindo o Chrome). Estática e leve, não depende do app carregar."""
     return FileResponse(RAIZ / "front" / "ajuda.html", headers={"Cache-Control": "no-cache"})
+
+
+def _pagina_legal(nome: str):
+    """Página legal. Enquanto o texto ainda tem o quadro de RASCUNHO, vai sem cache e fora do Google
+    (noindex), pra a versão revisada aparecer na hora; sem o quadro, cache de 1 h."""
+    p = RAIZ / "front" / nome
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="página não encontrada")
+    try:
+        rascunho = "NÃO PUBLIQUE" in p.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        rascunho = True
+    h = ({"Cache-Control": "no-cache", "X-Robots-Tag": "noindex"} if rascunho
+         else {"Cache-Control": "public, max-age=3600"})
+    return FileResponse(p, media_type="text/html; charset=utf-8", headers=h)
+
+
+@app.get("/privacidade")
+def privacidade():
+    """Política de Privacidade (pública, estática). O aviso de cookies aponta pra /privacidade#cookies."""
+    return _pagina_legal("privacidade.html")
+
+
+@app.get("/termos")
+def termos():
+    """Termos de Uso (públicos, estáticos)."""
+    return _pagina_legal("termos.html")
 
 
 @app.get("/versao")

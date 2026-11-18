@@ -745,7 +745,9 @@ def principais(conn, eans: list[str]) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Acessos ao app (painel /gestao): 1 linha por aparelho por dia. 'visitante' é um id
 # aleatório que o próprio app gera e guarda no aparelho (sem nome, IP ou e-mail);
-# user_id só vem quando a pessoa está logada. Dá o fluxo diário sem rastrear além disso.
+# user_id só vem quando a pessoa está logada. Desde a Fase A1 a linha guarda também de onde
+# o aparelho veio (utm do 1º anúncio) e o código do último clique do Google/Meta (gclid/fbclid),
+# que identificam o clique no anúncio (colunas em garantir_funil).
 # ---------------------------------------------------------------------------
 def garantir_acessos(conn) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS acessos ("
@@ -756,6 +758,80 @@ def garantir_acessos(conn) -> None:
     if isinstance(conn, _PgConn):
         conn.execute("ALTER TABLE acessos ENABLE ROW LEVEL SECURITY")   # só o backend lê/grava
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Fase A1 (medição própria): de onde o aparelho veio (utm do 1º anúncio, código do último
+# clique gclid/fbclid, clique=1 no dia em que chegou por link de anúncio) e o funil conta -> teste ->
+# pagamento aberto -> assinatura paga -> cancelou, com a origem copiada em cada linha. gclid/fbclid
+# identificam o clique: só o backend lê.
+# Fase A3: a linha 'checkout_aberto' guarda também, SÓ de quem aceitou os cookies, os códigos do
+# navegador (fbp/fbc do Meta, client_id/session_id do Google), o IP e o navegador da pessoa, pra o
+# servidor avisar a compra ao Meta/Google depois (api/conversoes.py).
+# A DDL SÓ roda na publicação (Vercel produção) ou com PERMITIR_DDL=1: rodar a API no computador
+# (preview, iniciar.bat, testes) NÃO muda o banco de produção.
+# ---------------------------------------------------------------------------
+COLS_ORIGEM = {"utm_source": "TEXT", "utm_medium": "TEXT", "utm_campaign": "TEXT", "utm_content": "TEXT",
+               "utm_term": "TEXT", "utm_em": "TEXT", "gclid": "TEXT", "fbclid": "TEXT", "clique": "INTEGER"}
+ETAPAS_FUNIL = ("conta_criada", "teste_iniciado", "checkout_aberto", "assinatura_paga", "cancelou")
+COLS_FUNIL_A3 = {"consentiu": "boolean", "fbp": "text", "fbc": "text", "ga_client_id": "text",
+                 "ga_session_id": "text", "ip": "text", "ua": "text"}
+FUNIL_COLUNAS = (   # usada também pelos testes (tabela temporária idêntica)
+    "id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_id text NOT NULL UNIQUE, chave text NOT NULL UNIQUE, "
+    "etapa text NOT NULL CHECK (etapa IN (" + ", ".join(f"'{e}'" for e in ETAPAS_FUNIL) + ")), "
+    "quando timestamptz NOT NULL DEFAULT now(), registrado_em timestamptz NOT NULL DEFAULT now(), "
+    "user_id uuid, plano text, forma text, com_cartao boolean, valor numeric(10,2), "
+    "mp_pagamento_id text, mp_assinatura_id text, mp_preferencia_id text, via text, "
+    "utm_source text, utm_medium text, utm_campaign text, utm_content text, utm_term text, utm_em text, "
+    "gclid text, fbclid text, " + ", ".join(f"{c} {t}" for c, t in COLS_FUNIL_A3.items()))
+
+
+def ddl_liberado() -> bool:
+    """A DDL nova só roda na publicação: Vercel produção ou PERMITIR_DDL=1 (comando explícito)."""
+    return os.getenv("VERCEL_ENV") == "production" or os.getenv("PERMITIR_DDL") == "1"
+
+
+def garantir_funil(conn) -> None:
+    """Origem do anúncio em `acessos` + tabela `funil_eventos` (Fases A1 e A3). Idempotente. No
+    Postgres confere antes e só altera o que FALTA (sem travar `acessos` a cada partida a frio)."""
+    if not isinstance(conn, _PgConn):   # SQLite (dev): só as colunas de acessos; o funil é só Postgres
+        existentes = {r["name"] for r in conn.execute("PRAGMA table_info(acessos)")}
+        for col, tipo in COLS_ORIGEM.items():
+            if existentes and col not in existentes:
+                conn.execute(f"ALTER TABLE acessos ADD COLUMN {col} {tipo}")
+        conn.commit()
+        return
+    if not ddl_liberado():
+        return
+    tem = {r["column_name"] for r in conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'acessos'").fetchall()}
+    faltam = [c for c in COLS_ORIGEM if c not in tem]
+    if faltam:
+        # toda DDL numa transação com lock_timeout curto: se `acessos` estiver ocupada, desiste em 5s
+        # (erro na partida, tenta de novo na próxima) em vez de enfileirar e travar quem usa a tabela
+        with conn._c.transaction():
+            conn.execute("SET LOCAL lock_timeout = '5s'")
+            conn.execute("ALTER TABLE public.acessos " + ", ".join(
+                f"ADD COLUMN IF NOT EXISTS {c} {COLS_ORIGEM[c]}" for c in faltam))
+    if conn.execute("SELECT to_regclass('public.funil_eventos') AS t").fetchone()["t"] is None:
+        with conn._c.transaction():   # tabela + RLS + REVOKE juntos
+            conn.execute("SET LOCAL lock_timeout = '5s'")
+            conn.execute("CREATE TABLE IF NOT EXISTS public.funil_eventos (" + FUNIL_COLUNAS + ")")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_funil_etapa_quando ON public.funil_eventos (etapa, quando)")
+            conn.execute("ALTER TABLE public.funil_eventos ENABLE ROW LEVEL SECURITY")
+            conn.execute("REVOKE ALL ON public.funil_eventos FROM anon, authenticated")
+        return
+    # tabela já existe (criada antes da A3): só acrescenta as colunas da A3 que faltarem
+    tem = {r["column_name"] for r in conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'funil_eventos'").fetchall()}
+    faltam = [c for c in COLS_FUNIL_A3 if c not in tem]
+    if faltam:
+        with conn._c.transaction():
+            conn.execute("SET LOCAL lock_timeout = '5s'")
+            conn.execute("ALTER TABLE public.funil_eventos " + ", ".join(
+                f"ADD COLUMN IF NOT EXISTS {c} {COLS_FUNIL_A3[c]}" for c in faltam))
 
 
 # ---------------------------------------------------------------------------

@@ -262,6 +262,8 @@
   .mrank-val .t.muted{ color:var(--mut); font-weight:600; }
   .mrank-val .d{ font-size:12px; color:var(--red); margin-top:1px; }
   .mrank-val .d.ok{ color:var(--green-dark); font-weight:600; }
+  .mrank-val .t.ok{ color:var(--green-dark); }
+  .mrank-val .t.ok + .d{ color:var(--mut); }
   .mrank-val .d.muted{ color:var(--faint); }
   .mrank-cover{ font-size:11.5px; font-weight:600; color:var(--mut); background:var(--surface-2); border-radius:var(--r-pill); padding:1px 8px; }
   .mrank-cover.full{ color:var(--green-dark); background:var(--green-light); }
@@ -353,6 +355,14 @@
   .tema-btn{ width:38px; height:38px; border-radius:10px; border:1px solid var(--line); background:var(--surface);
     color:var(--mut); cursor:pointer; display:grid; place-items:center; font-size:19px; flex:0 0 auto; margin-left:12px; }
   .tema-btn:hover{ color:var(--ink); border-color:var(--line-2); }
+  /* "Baixar app" discreto no topo (some quando o app já está instalado) */
+  .app-btn{ height:38px; padding:0 11px; border-radius:10px; border:1px solid var(--line); background:var(--surface);
+    color:var(--mut); cursor:pointer; display:flex; align-items:center; gap:5px; font:600 13px/1 inherit;
+    flex:0 0 auto; margin-left:auto; white-space:nowrap; }
+  .app-btn svg{ width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .app-btn:hover{ color:var(--ink); border-color:var(--line-2); }
+  .app-btn[hidden]{ display:none; }
+  .app-btn + .tema-btn{ margin-left:8px; }
 
   /* ---------- drawer de produto ---------- */
   .drawer-ov{ position:fixed; inset:0; z-index:50; background:rgba(15,21,18,.5); display:flex; justify-content:flex-end;
@@ -407,6 +417,68 @@
   .chart-legenda{ display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; }
   .chart-legenda .leg{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500; color:var(--mut); }
   .chart-legenda .leg-dot{ width:10px; height:10px; border-radius:3px; flex:0 0 auto; }
+  /* gráfico do histórico: menor preço do dia + faixa; barras "preço hoje em cada mercado" */
+  .ch{ position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); padding:12px 12px 8px; }
+  .ch-leg{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; font-weight:500; color:var(--mut); margin-bottom:12px; }
+  .ch-leg span{ display:inline-flex; align-items:center; gap:6px; }
+  .ch-leg i{ display:inline-block; width:16px; height:3px; border-radius:2px; }
+  .ch-leg i.faixa{ height:10px; border-radius:3px; background:color-mix(in srgb,var(--green) 18%,transparent); }
+  .ch-leg i.tracej{ background:repeating-linear-gradient(90deg,var(--green) 0 5px,transparent 5px 8px); }
+  .ch-body{ display:flex; gap:8px; }
+  .ch-y{ position:relative; width:54px; flex:0 0 auto; font-size:10.5px; color:var(--faint); }
+  .ch-y span{ position:absolute; right:0; transform:translateY(-50%); white-space:nowrap; }
+  .ch-plot{ position:relative; flex:1; min-width:0; height:150px; touch-action:pan-y; cursor:crosshair; }
+  .ch-plot svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; display:block; }
+  .ch-dot{ position:absolute; width:12px; height:12px; border-radius:50%; transform:translate(-50%,-50%); background:currentColor; border:2.5px solid var(--surface); box-shadow:0 0 0 1px currentColor; pointer-events:none; }
+  .ch-hoje{ position:absolute; transform:translate(-100%,-170%); margin-left:4px; font-size:11.5px; font-weight:700; color:var(--on-green); padding:2px 8px; border-radius:var(--r-pill); white-space:nowrap; pointer-events:none; font-variant-numeric:tabular-nums; }
+  .ch-hoje.baixo{ transform:translate(-100%,70%); }
+  .ch-cur{ position:absolute; top:0; bottom:0; width:1px; background:var(--line-2); pointer-events:none; }
+  .ch-cur[hidden]{ display:none; }
+  .ch-tip{ transform:translate(-50%,-104%); z-index:2; }
+  .ch-x{ display:flex; justify-content:space-between; font-size:11px; color:var(--faint); margin:6px 0 0 62px; }
+  .hb-tit{ font-size:14px; font-weight:600; color:var(--ink); margin:16px 2px 8px; }
+  .hb-tit span{ display:block; font-size:12px; font-weight:400; color:var(--mut); }
+  .hb{ display:flex; flex-direction:column; gap:6px; }
+  .hb-row{ display:block; width:100%; text-align:left; font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:9px 12px 10px; cursor:pointer; }
+  .hb-row:hover{ border-color:var(--line-2); }
+  .hb-row.on{ border-color:var(--focus); box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 22%,transparent); }
+  .hb-top{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .hb-nm{ display:flex; align-items:center; gap:7px; min-width:0; font-size:13.5px; font-weight:600; }
+  .hb-nm > span:last-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hb-val{ flex:0 0 auto; font-size:13.5px; font-weight:700; }
+  .hb-val em{ font-style:normal; font-size:11.5px; font-weight:700; color:var(--red); background:var(--red-soft); border-radius:var(--r-pill); padding:1px 7px; margin-left:4px; }
+  .hb-val em.ok{ color:var(--green-dark); background:var(--green-light); }
+  .hb-track{ display:block; height:8px; margin-top:7px; background:var(--surface-2); border-radius:var(--r-pill); overflow:hidden; }
+  .hb-fill{ display:block; height:100%; background:color-mix(in srgb,var(--red) 70%,transparent); border-radius:var(--r-pill); overflow:hidden; }
+  .hb-base{ display:block; height:100%; background:var(--line-2); }
+  .hb-row.best .hb-base, .hb-row.best .hb-fill{ background:var(--green); }
+  /* lista: cartão "você economiza até R$ X" + barras da feira inteira em cada mercado */
+  .ecv{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--sh); padding:18px 16px 16px; margin-bottom:14px; }
+  .ecv-lbl{ font-size:13px; font-weight:600; color:var(--mut); }
+  .ecv-num{ font-family:var(--disp); font-size:40px; font-weight:800; line-height:1.05; letter-spacing:-.02em; color:var(--green-dark); margin:4px 0 2px; }
+  .ecv-num small{ font-family:var(--body); font-size:13px; font-weight:700; color:var(--green-dark); background:var(--green-light); border-radius:var(--r-pill); padding:3px 9px; margin-left:8px; vertical-align:middle; letter-spacing:0; }
+  .ecv-sub{ font-size:14px; color:var(--mut); line-height:1.45; }
+  .ecv-sub b{ color:var(--ink); }
+  .ecv-bars{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+  .ecv-row .t{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13.5px; }
+  .ecv-row .n{ display:flex; align-items:center; gap:7px; min-width:0; font-weight:600; color:var(--ink); }
+  .ecv-row .n > span:last-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ecv-row .v{ flex:0 0 auto; font-weight:700; color:var(--ink); }
+  .ecv-row .v em{ font-style:normal; font-size:12px; font-weight:700; color:var(--red); margin-left:6px; }
+  .ecv-row .bar{ display:flex; height:14px; margin-top:5px; background:var(--surface-2); border-radius:6px; overflow:hidden; }
+  .ecv-row .bar .b{ height:100%; background:color-mix(in srgb,var(--green) 35%,transparent); }
+  .ch-hoje.verde{ background:var(--green-dark)!important; }   /* contraste da letra (claro: branco; escuro: quase preto) */
+  .ecv-row .bar .x{ height:100%; background:color-mix(in srgb,var(--red) 75%,transparent); }
+  .ecv-row.pp .n{ color:var(--green-dark); }
+  .ecv-row.pp .v{ color:var(--green-dark); }
+  .ecv-row.pp .bar .b{ background:var(--green); }
+  .ecv-row .mkt-oculto{ font-size:13px; }
+  .ecv-leg{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:var(--mut); margin-top:12px; }
+  .ecv-leg span{ display:inline-flex; align-items:center; gap:6px; }
+  .ecv-leg i{ width:12px; height:10px; border-radius:3px; display:inline-block; }
+  .ecv-extra{ font-size:13px; color:var(--mut); margin-top:10px; }
+  .ecv .pw-inline{ margin-top:14px; }
+  .ecv .eco-det{ margin-top:14px; }
   /* comparação de mercados no drawer */
   .cmp{ list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:var(--r-card); overflow:hidden; }
   .cmp li{ display:flex; align-items:center; gap:11px; padding:12px 14px; border-bottom:1px solid var(--line); }
@@ -447,6 +519,11 @@
     .brand .loc{ font-size:13px; }
     .brand .loc .full{ display:none; }             /* mostra só "Campinas" */
     .tema-btn{ width:36px; height:36px; margin-left:8px; }
+    .app-btn{ height:36px; padding:0 9px; font-size:12px; }
+    .app-btn + .tema-btn{ margin-left:6px; }
+  }
+  @media(max-width:460px){   /* celular: o "Campinas" do topo cede lugar ao "App" (o texto do hero já diz Campinas) */
+    .brand:has(.app-btn:not([hidden])) .loc{ display:none; }
     .tagline{ margin:8px 0 12px; font-size:13.5px; }
     .searchrow{ flex-direction:column; gap:10px; }  /* busca e "Minha lista" empilhados */
     .search input{ height:50px; }
@@ -701,6 +778,27 @@
   .pf2-plus .btn-ghost{ width:100%; height:46px; margin-top:8px; border:1.5px solid var(--green); background:transparent; color:var(--green-dark); border-radius:var(--r-btn); font-weight:700; font-size:14.5px; cursor:pointer; }
   .pf2-plus .btn-ghost:hover{ background:var(--green-light); }
   .pf2-plus .fine{ font-size:11.5px; color:var(--mut); text-align:center; margin:10px 0 0; }
+  .pf2-plus .ps span{ flex-wrap:wrap; }
+  .pf2-plus .btn-pay.btn-ghost{ height:auto; min-height:46px; padding:8px 12px; line-height:1.3; }
+  .pay-aviso{ margin:10px 0 0; padding:9px 12px; border-radius:var(--r-btn); font-size:12px; line-height:1.45; text-align:left;
+    color:#7a4b00; background:rgba(244,185,66,.18); }
+  /* anual: Pix em destaque (bônus) + cartão à vista/parcelado como segunda opção */
+  .pix-dest{ position:relative; margin:4px 0 0; padding:18px 14px 14px; border-radius:16px; text-align:center;
+    border:2px solid #f4b942; background:linear-gradient(160deg,rgba(244,185,66,.16),rgba(57,199,139,.10)); }
+  .pix-tag{ position:absolute; top:-11px; left:50%; transform:translateX(-50%); display:inline-flex; align-items:center; gap:4px;
+    white-space:nowrap; padding:3px 10px; border-radius:var(--r-pill); background:#f4b942; color:#3a2600; font-size:11.5px; font-weight:800; }
+  .pix-tag .ico svg{ width:12px; height:12px; }
+  .pix-h{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .pix-h b{ font-size:16px; font-weight:800; color:var(--ink); } .pix-h span{ font-size:20px; font-weight:800; color:var(--ink); }
+  .pix-bonus{ margin:6px 0 2px; font-size:13.5px; line-height:1.4; color:var(--green-dark); text-align:left; }
+  .pix-bonus b{ font-weight:800; }
+  .pf2-plus .pix-btn{ height:52px; font-size:16px; font-weight:800; }
+  .pix-fine{ margin:8px 0 0; font-size:11.5px; color:var(--mut); }
+  .ou-pay{ text-align:center; font-size:12px; color:var(--mut); margin:10px 0 0; }
+  .pay-regra{ display:flex; gap:7px; align-items:flex-start; margin:12px 0 0; padding:10px 12px; border-radius:var(--r-btn);
+    font-size:12px; line-height:1.45; color:var(--mut); background:color-mix(in srgb,var(--green) 8%,transparent); text-align:left; }
+  .pay-regra .ico{ color:var(--green); flex:0 0 auto; margin-top:1px; } .pay-regra .ico svg{ width:14px; height:14px; }
+  .pay-regra a{ color:inherit; font-weight:700; }
 
   /* banner PWA "instalar na tela inicial" */
   .pwa-bar{ position:fixed; left:12px; right:12px; bottom:12px; z-index:40; margin:0 auto; max-width:520px;
@@ -1209,6 +1307,12 @@
   .pf2-plus.pr .btn-ghost{ border-color:rgba(255,255,255,.35); color:#fff; background:rgba(255,255,255,.04); }
   .pf2-plus.pr .btn-ghost:hover{ background:rgba(255,255,255,.1); }
   .pf2-plus.pr .fine{ color:rgba(238,245,240,.6); }
+  .pf2-plus.pr .pix-h b, .pf2-plus.pr .pix-h span{ color:#fff; }
+  .pf2-plus.pr .pix-bonus{ color:#bff3da; } .pf2-plus.pr .pix-bonus b{ color:#fff; }
+  .pf2-plus.pr .pix-fine, .pf2-plus.pr .ou-pay{ color:rgba(238,245,240,.6); }
+  .pf2-plus.pr .pay-regra{ color:rgba(238,245,240,.72); background:rgba(255,255,255,.05); }
+  .pf2-plus.pr .pay-regra .ico{ color:#5fe0a8; }
+  .pf2-plus.pr .pay-aviso{ color:#ffe3a6; background:rgba(244,185,66,.12); }
 
   /* ===== indique e ganhe: cupons de recompensa + WhatsApp ===== */
   .ref-cupons{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:2px 0 14px; }
@@ -1319,6 +1423,7 @@
       </svg></span>
       <h1>Pou<span class="p2">Pou</span></h1>
       <span class="loc"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span> Campinas<span class="full"> e região</span></span>
+      <button id="btnApp" class="app-btn" type="button" hidden onclick="baixarApp()" aria-label="Baixar o app do PouPou" title="Instalar o PouPou no celular ou computador"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>App</button>
       <button id="btnTema" class="tema-btn" type="button" aria-label="Alternar modo claro e escuro" title="Modo claro/escuro" onclick="toggleTema()"></button>
       <button id="btnConta" class="acct-btn" type="button" aria-label="Minha conta e assinatura" title="Minha conta" onclick="loadPerfil()">
         <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>
@@ -1572,9 +1677,18 @@ async function abrirFresco(chave, nome){
     const histMkts=(hist.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
     const cheapMkt=(g.precos&&g.precos[0])?g.precos[0].mercado:null;   // mercado mais barato hoje
     const primary=(cheapMkt&&histMkts.includes(cheapMkt))?cheapMkt:(histMkts[0]||cheapMkt);
-    DRAWER={ean:null, hist, periodo:30, mercado:primary, cheap:primary, prod:null, fresco:{chave,nome,g,modo:g.modo||"kg"}};
+    const bandeja=g.modo==="bandeja", suf=bandeja?"":uniRot(g.rotulo,g.unidade);
+    DRAWER={ean:null, hist, periodo:30, mercado:histMkts.length>1?"__todos__":primary, cheap:primary, prod:null, fresco:{chave,nome,g,modo:g.modo||"kg"},
+      hoje:(g.precos||[]).map(l=>({mercado:l.mercado, preco:bandeja?l.preco:((l.comp!=null)?l.comp:l.preco), cor:l.cor_badge, suf}))};
     renderDrawerFresco();
   }catch(e){ /* ignora */ }
+}
+// filtro do gráfico. Quando as barras "Preço hoje em cada mercado" aparecem (elas já trocam de
+// mercado no toque), fica só o "Visão geral" pra voltar — sem repetir os mercados em chips.
+function _chipsMercado(mkts){
+  const comBarras=(DRAWER.hoje||[]).filter(h=>h&&h.mercado&&h.preco!=null).length>=2;
+  const lista=comBarras?[]:mkts;
+  return `<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Visão geral</button>${lista.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado(this.dataset.m)">${esc(m)}</button>`).join("")}</div>`;
 }
 function renderDrawerFresco(){
   const f=DRAWER.fresco||{}, g=f.g||{precos:[]}, nome=f.nome||"", bandeja=f.modo==="bandeja";
@@ -1587,7 +1701,7 @@ function renderDrawerFresco(){
   const ver=_veredito(cheapPts);
   const verHTML=ver?`<div class="verdict ${ver.c}"><span class="vdot"></span><div><div class="vt">${ver.t}</div><div class="vs">${ver.s}</div></div></div>`:"";
   const mkts=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length).map(s=>s.mercado);
-  const mktTabs=mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${jsesc(m)}')">${esc(m)}</button>`).join("")}</div>`:"";
+  const mktTabs=mkts.length>1?_chipsMercado(mkts):"";
   const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
   const cmp=rk.map((l,i)=>{
     const val=(l.comp!=null)?l.comp:l.preco;
@@ -1647,7 +1761,9 @@ async function abrirProduto(ean){
     // sem PouPou+ a resposta vem sem a loja: o histórico é UMA linha ("menor preço do dia",
     // mercado null) e nada vem pré-selecionado — antes o filtro abria no mercado mais barato
     const cheap=rk[0]?.mercado||null;
-    DRAWER={ean,hist,periodo:30,mercado:cheap,cheap,prod};
+    // abre na "Visão geral" (menor preço do dia + faixa entre os mercados), não numa loja só
+    DRAWER={ean,hist,periodo:30,mercado:cheap?"__todos__":null,cheap,prod,
+      hoje:cheap?rk.map(l=>({mercado:l.mercado,preco:l.preco,cor:l.cor_badge})):null};
     renderDrawer(prod);
   }catch(e){ /* ignora */ }
 }
@@ -1681,7 +1797,7 @@ function renderDrawer(prod){
   // sem PouPou+: nenhum nome de mercado no filtro — 1 linha (menor preço do dia) + cadeado
   const mktTabs=!prem
     ? `<div class="tabs mkts" id="drMkts" role="group" aria-label="Filtro do gráfico"><span class="tab on tab-fixa">Menor preço do dia</span><button class="tab tab-trava" type="button" onclick="abrirCadeado(event,this)">${ic("lock")} Ver por mercado</button></div>`
-    : (mkts.length>1?`<div class="tabs mkts" id="drMkts"><button class="tab ${DRAWER.mercado==="__todos__"?"on":""}" data-m="__todos__" onclick="drSetMercado('__todos__')">Todos</button>${mkts.map(m=>`<button class="tab ${m===DRAWER.mercado?"on":""}" data-m="${esc(m)}" onclick="drSetMercado('${esc(m)}')">${esc(m)}</button>`).join("")}</div>`:"");
+    : (mkts.length>1?_chipsMercado(mkts):"");
   const perTabs=`<div class="tabs" id="drPer">${PERIODOS.map(p=>`<button class="tab ${p.d===DRAWER.periodo?"on":""}" onclick="drSetPeriodo(${p.d})">${p.l}</button>`).join("")}</div>`;
   const cmp=prem
     ? rk.map((l,i)=>`<li class="${i===0?"best":""}">${badgeMini({nome:l.mercado,cor_badge:l.cor_badge})}<span class="nm">${esc(l.mercado)}</span>${i===0?'<span class="best-lbl">menor preço</span>':""}<span class="pr num">${brl(l.preco)}</span>${verLinkTxt(l.url,l.mercado)}</li>`).join("")
@@ -1737,82 +1853,185 @@ function drFoot(onAdd, naLista, travado){
 }
 function drSetPeriodo(d){ DRAWER.periodo=d; document.querySelectorAll("#drPer .tab").forEach((b,i)=>b.classList.toggle("on",PERIODOS[i].d===d)); drRenderChart(); }
 function drSetMercado(m){ DRAWER.mercado=m; document.querySelectorAll("#drMkts .tab").forEach(b=>b.classList.toggle("on",b.dataset.m===m)); drRenderChart(); }
+// Gráfico do histórico, feito pra ser lido de relance:
+//  - "Visão geral" (padrão): UMA linha verde = menor preço do dia + faixa clara do mais barato
+//    ao mais caro entre os mercados, com o preço de hoje em destaque. Embaixo, pra PouPou+,
+//    barras "Preço hoje em cada mercado" (do mais barato ao mais caro).
+//  - Tocou num mercado (chip ou barra): a linha DELE contra a linha do menor preço (2 linhas no máximo).
+// Sem PouPou+ o servidor já manda só a linha agregada (menor e maior do dia, sem loja): dá a
+// faixa e o menor preço, nunca QUAL mercado.
 function drRenderChart(){
   const host=$("#drChart"); if(!host) return;
-  if(DRAWER.mercado==="__todos__"){ drRenderTodos(host); return; }   // comparar todos os mercados de uma vez
-  const pts=_janela(_serie(DRAWER.mercado),DRAWER.periodo);
-  if(pts.length<2){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há preços suficientes${DRAWER.mercado?` de <b>${esc(DRAWER.mercado)}</b>`:""} nesse período.<br>O histórico cresce conforme o app coleta a cada dia.</div></div>`; return; }
-  const precos=pts.map(p=>p.preco), mn=Math.min(...precos), mx=Math.max(...precos), rg=(mx-mn)||1;
-  const W=1000,H=130,pad=10,st=(W-2*pad)/(pts.length-1);
-  const xy=pts.map((p,i)=>[pad+i*st, H-pad-((p.preco-mn)/rg)*(H-2*pad)]);
-  const line=xy.map(c=>`${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(" ");
-  const area=`${pad},${H-pad} ${line} ${(W-pad).toFixed(1)},${H-pad}`;
-  const dots=xy.map((c,i)=>`<circle class="chart-dot" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="9" fill="transparent" data-i="${i}"/><circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.5" fill="var(--green)" pointer-events="none"/>`).join("");
-  const v=_variacao(pts,DRAWER.periodo);
-  const vtxt=v?`<span class="v ${v.dir}">${v.dir==="down"?"↓":v.dir==="up"?"↑":"→"} ${v.dir==="flat"?"estável":brl(Math.abs(v.abs))+" ("+(v.pct<0?"":"+")+v.pct.toFixed(1).replace(".",",")+"%)"}</span>`:"—";
-  host.innerHTML=`<div class="chart-wrap">
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Gráfico de preço">
-      <polygon fill="var(--green-light)" points="${area}"/>
-      <polyline fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${line}" vector-effect="non-scaling-stroke"/>
-      ${dots}
-    </svg>
-    <div class="chart-tip" id="drTip" hidden></div>
-  </div>
-  ${_pontosChave()}
-  <div class="resumo">
-    <div class="r"><div class="l">variação no período</div><div class="v ${v?v.dir:""}">${vtxt}</div></div>
-    <div class="r"><div class="l">menor no período</div><div class="v num">${brl(mn)}</div></div>
-    <div class="r"><div class="l">maior no período</div><div class="v num">${brl(mx)}</div></div>
-  </div>`;
-  const svg=host.querySelector("svg"), tip=$("#drTip"), wrap=host.querySelector(".chart-wrap");
-  svg.querySelectorAll(".chart-dot").forEach(dot=>{
-    const show=()=>{ const i=+dot.dataset.i, p=pts[i], rect=wrap.getBoundingClientRect();
-      const cx=dot.getBoundingClientRect().left-rect.left+ (dot.getBoundingClientRect().width/2);
-      const cy=dot.getBoundingClientRect().top-rect.top;
-      tip.innerHTML=`<div class="d">${dataCurta(p.coletado_em)}</div><div>${DRAWER.mercado?esc(DRAWER.mercado):"menor preço do dia"}</div><div class="p num">${brl(p.preco)}</div>`;
-      tip.style.left=cx+"px"; tip.style.top=cy+"px"; tip.hidden=false; };
-    dot.addEventListener("mouseenter",show); dot.addEventListener("click",show);
-    dot.addEventListener("mouseleave",()=>{ tip.hidden=true; });
-  });
+  const m=DRAWER.mercado;
+  if(!m || m==="__todos__"){ drRenderFaixa(host); return; }
+  drRenderMercado(host,m);
 }
-// modo "Todos": sobrepõe a linha de cada mercado (cor da marca), eixo X por tempo pra alinhar as datas.
-function drRenderTodos(host){
-  const series=(DRAWER.hist?.series||[]).map(s=>({mercado:s.mercado, cor:s.cor_badge||"#8a8a8a",
-      pts:_janela(s.pontos||[],DRAWER.periodo).slice().sort((a,b)=>new Date(a.coletado_em)-new Date(b.coletado_em))}))
-    .filter(s=>s.pts.length>=2);
-  if(!series.length){ host.innerHTML=`<div class="chart-wrap"><div class="chart-vazio">Ainda não há histórico suficiente pra comparar os mercados nesse período.<br>O histórico cresce conforme a coleta.</div></div>`; return; }
-  const allp=[], allt=[];
-  series.forEach(s=>s.pts.forEach(p=>{ allp.push(p.preco); allt.push(new Date(p.coletado_em).getTime()); }));
-  const mn=Math.min(...allp), mx=Math.max(...allp), rg=(mx-mn)||1;
-  const t0=Math.min(...allt), t1=Math.max(...allt), tr=(t1-t0)||1;
-  const W=1000,H=150,pad=12;
-  const X=t=>pad+((t-t0)/tr)*(W-2*pad), Y=p=>H-pad-((p-mn)/rg)*(H-2*pad);
-  let polys="", dots="";
-  series.forEach(s=>{
-    const d=s.pts.map(p=>`${X(new Date(p.coletado_em).getTime()).toFixed(1)},${Y(p.preco).toFixed(1)}`).join(" ");
-    polys+=`<polyline fill="none" stroke="${s.cor}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" points="${d}" vector-effect="non-scaling-stroke"/>`;
-    s.pts.forEach(p=>{ const x=X(new Date(p.coletado_em).getTime()), y=Y(p.preco);
-      dots+=`<circle class="chart-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="transparent" data-m="${esc(s.mercado)}" data-p="${p.preco}" data-d="${esc(p.coletado_em)}" data-c="${s.cor}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${s.cor}" pointer-events="none"/>`; });
-  });
-  const legenda=series.map(s=>`<span class="leg"><span class="leg-dot" style="background:${s.cor}"></span>${esc(s.mercado)}</span>`).join("");
-  host.innerHTML=`<div class="chart-wrap">
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Comparação de preços entre mercados">${polys}${dots}</svg>
-    <div class="chart-tip" id="drTip" hidden></div>
-  </div>
-  <div class="chart-legenda">${legenda}</div>
-  <div class="resumo">
-    <div class="r"><div class="l">mercados</div><div class="v num">${series.length}</div></div>
-    <div class="r"><div class="l">menor no período</div><div class="v num">${brl(mn)}</div></div>
-    <div class="r"><div class="l">maior no período</div><div class="v num">${brl(mx)}</div></div>
+// dia "AAAA-MM-DD" de um coletado_em ISO
+function _dk(iso){ return String(iso||"").slice(0,10); }
+function _dkAdd(k,n){ const d=new Date(k+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function _dkHoje(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function _dkTxt(k){ return k>=_dkHoje()?"hoje":dataCurta(k+"T12:00:00"); }
+// dias (um por dia) da janela escolhida, até o último dia com dado
+function _diasJanela(listas,periodo){
+  let pri="", ult="";
+  listas.forEach(ps=>ps.forEach(p=>{ const k=_dk(p.coletado_em); if(!k) return; if(!pri||k<pri) pri=k; if(k>ult) ult=k; }));
+  if(!ult) return [];
+  const ini=_dkAdd(ult,-(periodo-1)); let k=pri>ini?pri:ini; const out=[];
+  while(k<=ult && out.length<400){ out.push(k); k=_dkAdd(k,1); }
+  return out;
+}
+// valor de cada dia = último preço conhecido até aquele dia (o histórico só guarda mudanças);
+// depois do último registro da série (a loja parou de vender) fica vazio
+function _valoresDia(pontos,keys,campo){
+  const ps=(pontos||[]).slice().sort((a,b)=>String(a.coletado_em)<String(b.coletado_em)?-1:1);
+  if(!ps.length) return keys.map(()=>null);
+  const fim=_dk(ps[ps.length-1].coletado_em); let i=0, cur=null;
+  return keys.map(k=>{
+    while(i<ps.length && _dk(ps[i].coletado_em)<=k){ const v=campo?ps[i][campo]:null; cur=+(v!=null?v:ps[i].preco); i++; }
+    return k>fim?null:cur; });
+}
+// menor e maior preço de cada dia entre os mercados
+function _dadosFaixa(){
+  let ss=(DRAWER.hist?.series||[]).filter(s=>s.pontos&&s.pontos.length);
+  // só os mercados que estão no ranking de hoje (o /historico pode trazer loja desativada)
+  const ativos=new Set((DRAWER.hoje||[]).map(h=>h&&h.mercado).filter(Boolean));
+  if(ativos.size){ const f=ss.filter(s=>ativos.has(s.mercado)); if(f.length) ss=f; }
+  const keys=_diasJanela(ss.map(s=>s.pontos),DRAWER.periodo);
+  if(!keys.length) return null;
+  if(ss.length===1 && !ss[0].mercado){   // visitante: o servidor já manda o menor (preco) e o maior do dia
+    return {keys, mins:_valoresDia(ss[0].pontos,keys,"preco"), maxs:_valoresDia(ss[0].pontos,keys,"maior"), n:null};
+  }
+  const vs=ss.map(s=>_valoresDia(s.pontos,keys));
+  const col=i=>vs.map(v=>v[i]).filter(x=>x!=null);
+  return {keys,
+    mins:keys.map((_,i)=>{ const a=col(i); return a.length?Math.min(...a):null; }),
+    maxs:keys.map((_,i)=>{ const a=col(i); return a.length?Math.max(...a):null; }),
+    n:ss.length};
+}
+const _ultimo=a=>{ for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return i; return -1; };
+// desenha o gráfico: faixa (opcional) + até 2 linhas + ponto de hoje em destaque. Texto em HTML
+// (o SVG estica na largura; letra e bolinha dentro dele ficariam tortas).
+function _grafHTML(o){
+  const W=1000,H=150, all=[];
+  if(o.faixa){ o.faixa.lo.forEach(v=>v!=null&&all.push(v)); o.faixa.hi.forEach(v=>v!=null&&all.push(v)); }
+  o.linhas.forEach(l=>l.vals.forEach(v=>v!=null&&all.push(v)));
+  let dmn=Math.min(...all), dmx=Math.max(...all);
+  let mn=dmn, mx=dmx; if(mx-mn<0.02){ mn-=Math.max(0.5,mn*0.05); mx+=Math.max(0.5,mx*0.05); }
+  const pd=(mx-mn)*0.12; mn=Math.max(0,mn-pd); mx+=pd;
+  const n=o.keys.length, X=i=>n>1?i/(n-1)*W:W/2, Y=v=>H-((v-mn)/(mx-mn))*H;
+  const runs=vals=>{ const out=[]; let cur=[]; vals.forEach((v,i)=>{ if(v==null){ if(cur.length) out.push(cur); cur=[]; } else cur.push([X(i),Y(v)]); }); if(cur.length) out.push(cur); return out; };
+  const ptsTxt=r=>r.map(c=>`${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(" ");
+  let svg="";
+  // grade leve: menor e maior do período + meio
+  const ticks=dmx-dmn<0.02?[dmn]:[dmx,(dmn+dmx)/2,dmn];
+  ticks.forEach(t=>{ svg+=`<line x1="0" x2="${W}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`; });
+  if(o.faixa){
+    const both=o.keys.map((_,i)=>(o.faixa.lo[i]!=null&&o.faixa.hi[i]!=null)?i:null);
+    let run=[]; const flush=()=>{ if(run.length){
+        const top=run.map(i=>[X(i),Y(o.faixa.hi[i])]), bot=run.slice().reverse().map(i=>[X(i),Y(o.faixa.lo[i])]);
+        if(run.length===1){ top.push([top[0][0]+2,top[0][1]]); bot.unshift([bot[0][0]+2,bot[0][1]]); }
+        svg+=`<polygon points="${ptsTxt(top.concat(bot))}" fill="var(--green)" fill-opacity=".16" stroke="none"/>`; } run=[]; };
+    both.forEach(i=>{ if(i==null) flush(); else run.push(i); }); flush();
+  }
+  o.linhas.forEach(l=>runs(l.vals).forEach(r=>{
+    if(r.length===1) r=[r[0],[r[0][0]+2,r[0][1]]];
+    svg+=`<polyline fill="none" stroke="${l.cor}" stroke-width="${l.w||2.5}" ${l.dash?`stroke-dasharray="${l.dash}"`:""} stroke-linejoin="round" stroke-linecap="round" points="${ptsTxt(r)}" vector-effect="non-scaling-stroke"/>`; }));
+  const ylab=ticks.map(t=>`<span class="num" style="top:${(Y(t)/H*100).toFixed(1)}%">${brl(t)}</span>`).join("");
+  // ponto de hoje (último dia com valor da linha principal)
+  let hoje="";
+  const d=o.destaque;
+  if(d){ const i=_ultimo(d.vals); if(i>=0){ const x=X(i)/W*100, y=Y(d.vals[i])/H*100;
+    hoje=`<span class="ch-dot" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;color:${d.cor}"></span>
+      <span class="ch-hoje ${y<28?"baixo":""} ${d.cor==="var(--green)"?"verde":""}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;background:${d.cor}">${d.rot?(d.rot==="hoje"?_dkTxt(o.keys[i]):d.rot)+" ":""}${brl(d.vals[i])}</span>`; } }
+  const mid=n>2?`<span>${_dkTxt(o.keys[Math.floor((n-1)/2)])}</span>`:"";
+  const leg=o.legenda?`<div class="ch-leg">${o.legenda}</div>`:"";
+  return `<div class="ch">${leg}
+    <div class="ch-body"><div class="ch-y" aria-hidden="true">${ylab}</div>
+      <div class="ch-plot" role="img" aria-label="${esc(o.aria||"Gráfico de preço")}">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>
+        ${hoje}<span class="ch-cur" hidden></span><div class="chart-tip ch-tip" hidden></div>
+      </div></div>
+    <div class="ch-x num" aria-hidden="true"><span>${_dkTxt(o.keys[0])}</span>${mid}<span>${_dkTxt(o.keys[n-1])}</span></div>
   </div>`;
-  const svg=host.querySelector("svg"), tip=$("#drTip"), wrap=host.querySelector(".chart-wrap");
-  svg.querySelectorAll(".chart-dot").forEach(dot=>{
-    const show=()=>{ const rect=wrap.getBoundingClientRect(), r=dot.getBoundingClientRect();
-      tip.innerHTML=`<div class="d">${dataCurta(dot.dataset.d)}</div><div style="color:${dot.dataset.c};font-weight:600">${esc(dot.dataset.m)}</div><div class="p num">${brl(+dot.dataset.p)}</div>`;
-      tip.style.left=(r.left-rect.left+r.width/2)+"px"; tip.style.top=(r.top-rect.top)+"px"; tip.hidden=false; };
-    dot.addEventListener("mouseenter",show); dot.addEventListener("click",show);
-    dot.addEventListener("mouseleave",()=>{ tip.hidden=true; });
-  });
+}
+// toque/mouse no gráfico: mostra o dia mais perto e os valores dele
+function _ligaTip(host,keys,linhaTip){
+  const plot=host.querySelector(".ch-plot"); if(!plot) return;
+  const tip=plot.querySelector(".ch-tip"), cur=plot.querySelector(".ch-cur"), n=keys.length;
+  const show=ev=>{ const r=plot.getBoundingClientRect(); if(!r.width) return;
+    const f=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width)), i=n>1?Math.round(f*(n-1)):0;
+    const html=linhaTip(i); if(!html){ tip.hidden=true; cur.hidden=true; return; }
+    const xp=n>1?i/(n-1)*100:50;
+    cur.style.left=xp+"%"; cur.hidden=false;
+    tip.innerHTML=`<div class="d">${_dkTxt(keys[i])}</div>${html}`;
+    tip.style.left=Math.min(82,Math.max(18,xp))+"%"; tip.style.top="0px"; tip.hidden=false; };
+  const hide=()=>{ tip.hidden=true; cur.hidden=true; };
+  plot.addEventListener("pointermove",show); plot.addEventListener("pointerdown",show);
+  plot.addEventListener("pointerleave",hide);
+}
+function _vazioChart(txt){ return `<div class="chart-wrap"><div class="chart-vazio">${txt}<br>O histórico cresce conforme o app coleta a cada dia.</div></div>`; }
+// barras "Preço hoje em cada mercado". Produto: só PouPou+ (DRAWER.hoje só é montado quando o
+// servidor mandou o nome do mercado). Fresco: livre pra todos, decisão de produto (o servidor
+// não tranca frescos em /buscar nem em /historico-fresco).
+function _barrasHoje(sel){
+  const hj=(DRAWER.hoje||[]).filter(h=>h&&h.mercado&&h.preco!=null).slice().sort((a,b)=>a.preco-b.preco);
+  if(hj.length<2) return "";
+  const min=hj[0].preco, max=hj[hj.length-1].preco||1;
+  const empate=hj[1].preco-min<=0.004;
+  const linhas=hj.map((h,i)=>{
+    const dif=h.preco-min, w=Math.max(6,h.preco/max*100);
+    // parte vermelha sempre visível quando custa mais (preços muito próximos sumiriam)
+    const base=dif>0.004?Math.min(min/h.preco*w,w*0.97):w;
+    const tag=dif>0.004?`<em>+${brl(dif)}</em>`:`<em class="ok">${empate?"mais barato (empate)":"mais barato"}</em>`;
+    return `<button type="button" class="hb-row ${i===0?"best":""} ${h.mercado===sel?"on":""}" data-m="${esc(h.mercado)}" onclick="drSetMercado(this.dataset.m)" aria-pressed="${h.mercado===sel}">
+      <span class="hb-top"><span class="hb-nm">${badgeMini({nome:h.mercado,cor_badge:h.cor})}<span>${esc(h.mercado)}</span></span><span class="hb-val num">${brl(h.preco)}${h.suf||""} ${tag}</span></span>
+      <span class="hb-track"><span class="hb-fill" style="width:${w.toFixed(1)}%"><span class="hb-base" style="width:${(base/w*100).toFixed(1)}%"></span></span></span>
+    </button>`; }).join("");
+  return `<div class="hb-tit">Preço hoje em cada mercado <span>toque num mercado pra ver o histórico dele</span></div><div class="hb">${linhas}</div>`;
+}
+function drRenderFaixa(host){
+  const fx=_dadosFaixa();
+  const ok=fx && fx.mins.filter(v=>v!=null).length>=2;
+  if(!ok){ host.innerHTML=_vazioChart("Ainda não há preços suficientes nesse período.")+_barrasHoje(null); return; }
+  const temFaixa=fx.maxs.some((v,i)=>v!=null&&fx.mins[i]!=null&&v-fx.mins[i]>0.004);
+  const leg=`<span><i style="background:var(--green)"></i>menor preço do dia</span>${temFaixa?`<span><i class="faixa"></i>do mais barato ao mais caro</span>`:""}`;
+  host.innerHTML=_grafHTML({keys:fx.keys, faixa:temFaixa?{lo:fx.mins,hi:fx.maxs}:null,
+      linhas:[{vals:fx.mins,cor:"var(--green)",w:2.8}], destaque:{vals:fx.mins,cor:"var(--green)",rot:"hoje"},
+      legenda:leg, aria:"Menor preço de cada dia e a faixa de preço entre os mercados"});
+  const iu=_ultimo(fx.mins), hojeMin=fx.mins[iu], hojeMax=fx.maxs[iu];
+  const lo=Math.min(...fx.mins.filter(v=>v!=null));
+  const ini=fx.mins.find(v=>v!=null), dif=hojeMin-ini;
+  const varTxt=Math.abs(dif)<0.005?`<span class="v flat">→ estável</span>`:`<span class="v ${dif<0?"down":"up"}">${dif<0?"↓":"↑"} ${brl(Math.abs(dif))}</span>`;
+  host.insertAdjacentHTML("beforeend",`<div class="resumo">
+      <div class="r"><div class="l">menor preço ${_dkTxt(fx.keys[iu])}</div><div class="v num">${brl(hojeMin)}</div></div>
+      ${(hojeMax!=null&&hojeMax-hojeMin>0.004)?`<div class="r"><div class="l">mais caro ${_dkTxt(fx.keys[iu])}</div><div class="v num up">${brl(hojeMax)}</div></div>`:""}
+      <div class="r"><div class="l">menor preço no período</div><div class="v num">${brl(lo)}</div></div>
+      <div class="r"><div class="l">variação do menor preço</div>${varTxt}</div>
+    </div>${_barrasHoje(null)}`);
+  _ligaTip(host,fx.keys,i=>{ const a=fx.mins[i], b=fx.maxs[i]; if(a==null) return "";
+    return `<div>menor <span class="p num">${brl(a)}</span></div>${(b!=null&&b-a>0.004)?`<div>mais caro <span class="num">${brl(b)}</span></div>`:""}`; });
+}
+function drRenderMercado(host,m){
+  const s=(DRAWER.hist?.series||[]).find(x=>x.mercado===m);
+  const fx=_dadosFaixa();
+  if(!s||!s.pontos||!fx){ host.innerHTML=_vazioChart(`Ainda não há preços de <b>${esc(m)}</b> nesse período.`)+_barrasHoje(m); return; }
+  const vals=_valoresDia(s.pontos,fx.keys);
+  if(vals.filter(v=>v!=null).length<2){ host.innerHTML=_vazioChart(`Ainda não há preços suficientes de <b>${esc(m)}</b> nesse período.`)+_barrasHoje(m); return; }
+  const AZ="var(--focus)";
+  const leg=`<span><i style="background:${AZ}"></i>${esc(m)}</span><span><i class="tracej"></i>menor preço do dia</span>`;
+  host.innerHTML=_grafHTML({keys:fx.keys, faixa:null,
+      linhas:[{vals,cor:AZ,w:2.8},{vals:fx.mins,cor:"var(--green)",w:2,dash:"6 5"}],
+      destaque:{vals,cor:AZ,rot:""}, legenda:leg, aria:`Preço no ${m} comparado ao menor preço do dia`});
+  const iu=_ultimo(vals), hoje=vals[iu], im=_ultimo(fx.mins), menor=fx.mins[im];
+  const dif=(hoje!=null&&menor!=null)?hoje-menor:null;
+  const ini=vals.find(v=>v!=null), dv=hoje-ini;
+  const varTxt=Math.abs(dv)<0.005?`<span class="v flat">→ estável</span>`:`<span class="v ${dv<0?"down":"up"}">${dv<0?"↓":"↑"} ${brl(Math.abs(dv))}</span>`;
+  host.insertAdjacentHTML("beforeend",`<div class="resumo">
+      <div class="r"><div class="l">diferença pro menor preço</div>${dif==null?"—":dif>0.004?`<div class="v num up">+${brl(dif)}</div>`:`<div class="v down">é o mais barato</div>`}</div>
+      <div class="r"><div class="l">variação no período</div>${varTxt}</div>
+    </div>${_pontosChave()}${_barrasHoje(m)}`);
+  _ligaTip(host,fx.keys,i=>{ const a=vals[i], b=fx.mins[i]; if(a==null&&b==null) return "";
+    return `${a!=null?`<div style="font-weight:600"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${AZ};margin-right:5px"></i>${esc(m)} <span class="num">${brl(a)}</span></div>`:""}${b!=null?`<div>menor <span class="num">${brl(b)}</span></div>`:""}`; });
 }
 
 /* ---------- card de produto (e-commerce) + ranking de preços ---------- */
@@ -1872,7 +2091,7 @@ function cardProduto(p){
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')">Comparar<span class="cmp-mais">&nbsp;preços</span> ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(p.nome)}" onclick="abrirProduto('${p.ean}')"><span class="cmp-tx">Comparar<span class="cmp-mais"> preços</span></span>${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
   return `<article class="prod${rk.length?" clicavel":""}"${rk.length?` onclick="cardAbre(event,this)"`:""}>
     <div class="prod-top">${thumb(p.imagem_url,p.nome,p.ean)}
@@ -1954,7 +2173,7 @@ function cardPerecivel(g,ord,modo){
       <div class="prod-n">${rk.length} mercado${rk.length!==1?"s":""} comparado${rk.length!==1?"s":""}${bandeja?` · ${brl(g.menor_preco)}${uG}`:""}</div>
     </div>`;
   const compare=rk.length
-    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(g.nome)}" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')">Comparar<span class="cmp-mais">&nbsp;preços</span> ${ic("chevron")}</button>`
+    ? `<button class="btn-compare" type="button" aria-label="Comparar preços e histórico de ${esc(g.nome)}" onclick="abrirFresco('${jsesc(g.chave)}','${jsesc(g.nome)}')"><span class="cmp-tx">Comparar<span class="cmp-mais"> preços</span></span>${ic("chevron")}</button>`
     : `<span class="prod-n" style="align-self:center">sem preço recente</span>`;
   return `<article class="prod${rk.length?" clicavel":""}"${rk.length?` onclick="cardAbre(event,this)"`:""}>
     <div class="prod-top">${thumb(g.imagem_url,g.nome)}
@@ -2180,19 +2399,84 @@ function ecoDetalhe(d){
     <p class="eco-fonte">Usamos os preços online que o app coleta em cada mercado todo dia. O cálculo é feito item por item — a diferença entre a loja mais barata e a mais cara, mais quedas de preço recentes:</p>
     <ul class="eco-lista">${linhas.join("")}</ul></details>`;
 }
+/* cartão do topo da lista: "você economiza até R$ X nessa feira" = feira inteira no mercado
+   (viável) mais caro − total pelo PouPou (cada item no mais barato). Barras: "Pelo PouPou" x a
+   feira inteira em cada mercado, com o "+R$" que sairia a mais. Sem PouPou+ não aparece NENHUM
+   nome: só a loja única mais barata (com cadeado) e a mais cara, com números que o servidor já
+   manda livres (melhor_mercado.completo_total e economia_vs_pior). */
+function cartaoEconomia(d,prem,eDias){
+  const pp=d.mix&&d.mix.total; if(!(pp>0)) return "";
+  let lojas=[];
+  if(prem){
+    lojas=(d.mercados||[]).filter(m=>m.viavel&&m.completo_total!=null).map(m=>({m,total:m.completo_total,completo:m.completo}));
+  }else{
+    const mm=d.melhor_mercado;
+    if(mm&&mm.viavel!==false&&mm.completo_total!=null){
+      lojas.push({anon:"menor",total:mm.completo_total,completo:mm.completo});
+      if((d.economia_vs_pior||0)>0.004) lojas.push({anon:"maior",total:mm.completo_total+d.economia_vs_pior});
+    }
+  }
+  lojas.sort((a,b)=>a.total-b.total);
+  if(!lojas.length) return "";
+  const pior=lojas[lojas.length-1], eco=pior.total-pp;
+  if(eco<0.01) return "";
+  const pct=Math.round(eco/pior.total*100);
+  const ref=prem
+    ? `em vez de comprar tudo no <b>${esc(pior.m.nome)}</b>`
+    : (lojas.length>1?"em vez de comprar tudo no <b>mercado mais caro</b>":"em vez de comprar tudo numa loja só");
+  const mostra=lojas.length>6?lojas.slice(0,5).concat([pior]):lojas;
+  const W=v=>(v/pior.total*100).toFixed(1);
+  const nome=l=>l.m?`${badgeMini(l.m)}<span>${esc(l.m.nome)}</span>`
+    : l.anon==="menor"?`<button type="button" class="mkt-oculto" onclick="abrirCadeado(event,this)">${ic("lock")} loja única mais barata</button>`
+    : `<span>Loja mais cara</span>`;
+  const linhas=mostra.map(l=>{ const dif=l.total-pp;
+    return `<div class="ecv-row"><div class="t"><span class="n">${nome(l)}</span><span class="v num">${brl(l.total)}${dif>0.004?`<em>+${brl(dif)}</em>`:""}</span></div>
+      <div class="bar" role="img" aria-label="${esc(l.m?l.m.nome:"loja")}: ${brl(l.total)}, ${brl(Math.max(0,dif))} a mais"><span class="b" style="width:${W(Math.min(pp,l.total))}%"></span><span class="x" style="width:${W(Math.max(0,dif))}%"></span></div></div>`; }).join("");
+  const nM=d.mix.n_mercados||0;
+  const pelo=`<div class="ecv-row pp"><div class="t"><span class="n">${ic("check")}<span>Pelo PouPou${nM>1?` · ${nM} mercados`:""}</span></span><span class="v num">${brl(pp)}</span></div>
+      <div class="bar" role="img" aria-label="Pelo PouPou: ${brl(pp)}"><span class="b" style="width:${W(pp)}%"></span></div></div>`;
+  const estim=mostra.some(l=>l.completo===false)?`<div class="ecv-extra">Itens que uma loja não vende entram pelo preço médio, pra comparar a feira inteira de forma justa.</div>`:"";
+  return `<div class="ecv">
+    <div class="ecv-lbl">Você economiza até</div>
+    <div class="ecv-num num">${brl(eco)}${pct>0?`<small>${pct}% a menos</small>`:""}</div>
+    <div class="ecv-sub">nessa feira, ${ref}.</div>
+    <div class="ecv-bars">${pelo}${linhas}</div>
+    <div class="ecv-leg"><span><i style="background:var(--green)"></i>o que você paga pelo PouPou</span><span><i style="background:color-mix(in srgb,var(--red) 75%,transparent)"></i>o que pagaria a mais</span></div>
+    ${estim}${eDias>0?`<div class="ecv-extra">E mais <b>${brl(eDias)}</b> em quedas de preço recentes nos seus itens.</div>`:""}
+    ${prem?ecoCartaoDetalhe(d,pior,pp,eco):""}
+  </div>`;
+}
+/* "Como calculamos" do cartão: a MESMA conta do número grande (feira inteira no mercado mais
+   caro − pelo PouPou) e, item a item, onde esse mercado cobra mais. Só PouPou+ (tem nomes). */
+function ecoCartaoDetalhe(d,pior,pp,eco){
+  const slug=pior.m.slug, nmP=esc(pior.m.nome);
+  const linhas=[];
+  (d.itens||[]).forEach(it=>{
+    if(!it.melhor) return;
+    const p=(it.precos||[]).find(x=>x.slug===slug); if(!p) return;
+    const q=it.quantidade||1, dif=(p.preco-it.melhor.preco)*q;
+    if(dif<0.005) return;
+    const nome=esc((it.nome||"").split(" ").slice(0,5).join(" "));
+    linhas.push({dif,html:`<li><div class="ed-nome">${nome}${q>1?` <span class="ed-q">×${q}</span>`:""}</div><div class="ed-txt">${brl(it.melhor.preco)} no ${esc(it.melhor.mercado)}, ${brl(p.preco)} no ${nmP}</div><b class="num">${brl(dif)}</b></li>`});
+  });
+  linhas.sort((a,b)=>b.dif-a.dif);
+  const est=pior.completo===false?` Os itens que o ${nmP} não vende entram pelo preço médio.`:"";
+  return `<details class="eco-det"><summary>Como calculamos</summary>
+    <p class="eco-fonte">Feira inteira no ${nmP}: <b class="num">${brl(pior.total)}</b> − pelo PouPou: <b class="num">${brl(pp)}</b> = <b class="num">${brl(eco)}</b>.${est} Usamos os preços online que o app coleta todo dia.</p>
+    ${linhas.length?`<p class="eco-fonte">Onde o ${nmP} cobra mais que o menor preço:</p><ul class="eco-lista">${linhas.map(l=>l.html).join("")}</ul>`:""}</details>`;
+}
 /* ranking de mercados (comprando tudo numa loja só) */
 function rankingMercados(d){
   // COMPARAÇÃO JUSTA: só lojas onde dá pra fazer a feira (falta pouco), pelo total da FEIRA
   // INTEIRA (o que a loja tem + o que falta pelo menor preço fora). Já vem ordenado do servidor.
   const mkts=(d.mercados||[]).filter(m=>m.viavel);
   if(!mkts.length) return "";
-  const min=mkts[0].completo_total;
   const medal=["🥇","🥈","🥉"];
   const linhas=mkts.slice(0,6).map((m,i)=>{
-    const diff=m.completo_total-min;
+    // o "+R$" por mercado já está nas barras do cartão do topo: aqui só a posição
     const extra=i===0
       ? `<div class="d ok">mais barata pra sua feira</div>`
-      : `<div class="d num">R$ ${diff.toFixed(2).replace(".",",")} a mais</div>`;
+      : `<div class="d">${i+1}º lugar</div>`;
     const sub=m.completo
       ? `tem todos os ${d.n_itens} itens`
       : `tem ${m.cobertura}, + ${m.faltam} ${m.faltam===1?"item estimado":"itens estimados"} pela média`;
@@ -2203,8 +2487,27 @@ function rankingMercados(d){
       <div class="mrank-val"><div class="t num">${brl(m.completo_total)}</div>${extra}</div>
     </div>`;
   }).join("");
-  const nota=`<p class="mrank-nota">Quanto sua <b>feira inteira</b> (${d.n_itens} itens) sai em cada loja: o que ela tem + os que faltam <b>estimados pelo preço médio</b> (a loja não vende o item). Assim a comparação é justa. O valor em <b class="tred">vermelho</b> é quanto sai <b>mais caro</b> que a mais barata.</p>`;
-  return `<div class="sec-title">Sua feira inteira, comparada de forma justa</div>${nota}<div class="mrank">${linhas}</div>`;
+  const nota=`<p class="mrank-nota">A <b>feira inteira</b> (${d.n_itens} itens) comprada numa loja só. O que ela não vende entra pelo preço médio.</p>`;
+  return `<div class="sec-title">Sua feira inteira, comparada de forma justa</div>${nota}<div class="mrank">${linhas}</div>${economiaPorMercado(d)}`;
+}
+/* "quanto eu economizo vs. cada mercado": compara só os itens que CADA loja tem (sem estimativa),
+   o preço dela vs. o menor preço do PouPou pros mesmos itens. Funciona mesmo com lista grande,
+   em que nenhuma loja tem tudo. */
+function economiaPorMercado(d){
+  const minCob=Math.max(1,Math.ceil((d.n_itens||0)*0.25));
+  const ms=(d.mercados||[]).filter(m=>m.cobertura>=minCob && m.mais_caro_mesmos>0.009)
+    .sort((a,b)=>b.mais_caro_mesmos-a.mais_caro_mesmos).slice(0,8);
+  if(!ms.length) return "";
+  const linhas=ms.map(m=>`<div class="mrank-row">
+      <span class="mrank-medal">${badgeMini(m)}</span>
+      <div class="mrank-info"><div class="mrank-nm">${esc(m.nome)}${seloFav(m)}</div>
+        <div class="mrank-sub">nos ${m.cobertura} ${m.cobertura===1?"item que ele tem":"itens que ele tem"}: ${brl(m.total)} lá</div></div>
+      <div class="mrank-val"><div class="t num ok">−${brl(m.mais_caro_mesmos)}</div><div class="d">você economiza</div></div>
+    </div>`).join("");
+  // outra conta (só os itens que cada loja tem): fica recolhida pra não competir com o cartão do topo
+  return `<details class="eco-det"><summary>Ver só os itens que cada mercado tem</summary>
+    <p class="mrank-nota">Sem estimativa: nos itens que cada mercado vende, quanto você pagaria a mais lá do que pelo <b>menor preço</b> do PouPou.</p>
+    <div class="mrank">${linhas}</div></details>`;
 }
 function cardItemCesta(it){
   const uni=it.rotulo?" "+it.rotulo.replace(/R\$/,"").trim():"";
@@ -2267,7 +2570,8 @@ async function loadCesta(){
     const pctEco=(eMerc>0&&naiveTot>0)?Math.round(100*eMerc/naiveTot):0;
     const prem=(d.premium!==undefined)?d.premium:acessoPremium();  // verdade do servidor
     const trialBanner=trialAtivo()?`<div class="trial-banner">${ic("crown")} Acesso completo liberado — faltam <b>${diasRestantesTrial()} dia(s)</b> do seu período grátis</div>`:"";
-    const ecoBox=(eMerc>0||eDias>0)?`<div class="eco">
+    const cartao=cartaoEconomia(d,prem,eDias);   // topo: "você economiza até R$ X" + barras por mercado
+    const ecoBox=cartao?cartao:(eMerc>0||eDias>0)?`<div class="eco">
         <div class="eco-lbl">Você pode economizar</div>
         <div class="eco-num num">${brl(heroVal)}${pctEco>0?`<span class="eco-pct">até ${pctEco}%</span>`:""}</div>
         <div class="eco-sub">Comprando cada produto pelo menor preço em vez do mais caro${(eMerc>0&&eDias>0)?`, e aproveitando ${brl(eDias)} em quedas recentes`:""}.</div>
@@ -2276,7 +2580,7 @@ async function loadCesta(){
     // 1 loja vs otimizada — os TOTAIS agregados ficam LIVRES (grátis entende o valor)
     const mm=d.melhor_mercado, poupa=d.economia_dividido_vs_loja;
     let vs="";
-    if(mm){
+    if(mm&&!cartao){   // com o cartão do topo, as barras já mostram "1 loja x Pelo PouPou"
       const mmNome=prem?`${badgeMini(mm)} ${esc(mm.nome)}`:`<button type="button" class="mkt-oculto" onclick="abrirCadeado(event,this)">${ic("lock")} a loja mais barata</button>`;
       const umaLoja=`<div class="vs-card"><div class="vs-tag">${mm.completo?"Compra em 1 mercado":"Feira quase toda numa loja"}</div><div class="vs-mkt">${mmNome}</div><div class="vs-val num">${brl(mm.completo_total!=null?mm.completo_total:mm.total)}</div><div class="vs-sub">${mm.completo?`os ${d.n_itens} itens numa loja só`:`tem ${mm.cobertura}/${d.n_itens} · +${mm.faltam} estimado pela média`}</div></div>`;
       const otim=`<div class="vs-card best"><div class="vs-tag">Compra otimizada</div><div class="vs-mkt">${d.mix.n_mercados} mercados</div><div class="vs-val num">${brl(d.mix.total)}</div><div class="vs-sub">${(poupa!=null&&poupa>0)?`economia de <b style="color:var(--green-dark)">${brl(poupa)}</b>`:"pegando cada item no menor preço"}</div></div>`;
@@ -2295,9 +2599,9 @@ async function loadCesta(){
     if(prem){
       miolo=vs+otimBloco+rankingMercados(d);
     }else{
-      const teaser=(poupa!=null&&poupa>0)?`economizar até ${brl(poupa)} nesta feira`:`ver onde comprar cada item mais barato`;
-      miolo=vs+bloqueado(otimBloco+rankingMercados(d), `Desbloqueie pra ${teaser}`,
-        `Você já vê <b>quanto</b> dá pra economizar e a loja única mais barata. O PouPou+ mostra <b>em qual mercado</b> pegar cada item e <b>qual</b> sai mais barato no total.`);
+      // sem número aqui: o cartão do topo já mostra a economia (evita dois "até R$" diferentes)
+      miolo=vs+bloqueado(otimBloco+rankingMercados(d), `Desbloqueie pra ver em qual mercado pegar cada item`,
+        `Você já vê <b>quanto</b> economiza. O PouPou+ mostra <b>em qual mercado</b> pegar cada item e <b>qual</b> sai mais barato no total.`);
     }
     // toggle "Meus mercados / Todos" (só aparece se a pessoa tem favoritos)
     const semMeus=prem&&(modo==="meus"&&favs.length&&!(d.mercados||[]).some(m=>m.viavel));
@@ -2334,6 +2638,19 @@ const PRECO_MENSAL="R$ 9,90", PRECO_ANUAL="R$ 99,90";
 // comparações VERDADEIRAS (sem "preço de" que nunca foi cobrado: risco no Procon com anúncio)
 const PRECO_ANUAL_MES="R$ 8,33", PRECO_DIA="R$ 0,33";   // 99,90 ÷ 12 e 9,90 ÷ 30
 const FOLGA_CARTAO_MS=3*864e5;   // igual ao FOLGA_CARTAO do servidor (ver assinanteAtivo)
+// oferta do anual (bônus do Pix, parcelas, "sem juros"): quem manda é o servidor (/assinatura/oferta).
+// Valores de partida enquanto a resposta não chega: SEM bônus (a tela só promete o bônus quando o
+// servidor confirma — se a busca falhar, nunca mostra um bônus que pode estar desligado).
+let OFERTA={bonusPix:0, parcelas:12, semJuros:true, parcela:8.33};
+// "+1 mês grátis" (30 dias), "+2 meses grátis" (60), "+15 dias grátis"…
+function textoBonus(d){ d=+d||0; if(d<=0) return ""; if(d%30===0){ const m=d/30; return `+${m} ${m>1?"meses":"mês"} grátis`; } return `+${d} dias grátis`; }
+async function carregarOferta(){
+  try{ const o=await fetch(`${API}/assinatura/oferta`).then(r=>r.ok?r.json():null); const a=o&&o.anual; if(!a) return;
+    const novo={bonusPix:Math.max(0,+a.bonus_pix_dias||0), parcelas:Math.max(1,+a.parcelas_max||1), semJuros:!!a.parcelas_sem_juros, parcela:+a.valor_parcela||OFERTA.parcela};
+    const mudou=JSON.stringify(novo)!==JSON.stringify(OFERTA); OFERTA=novo;
+    if(mudou && document.querySelector(".pf2")) loadPerfil(undefined,true);   // tela de conta aberta: redesenha com a oferta certa
+  }catch(e){}
+}
 // data de validade: com o ano quando não é este ano (no plano anual, "16/11" parecia hoje)
 const dataAte=iso=>{ const d=new Date(iso); return d.getFullYear()===new Date().getFullYear()?dataCurta(d):d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}); };
 
@@ -2346,9 +2663,12 @@ const sb=(window.supabase&&SUPABASE_URL)?window.supabase.createClient(SUPABASE_U
 // Sessão + perfil ficam em cache na memória (os renders são síncronos); hidratados no login/init.
 let SESSAO=null;
 let PERFIL={plano:"gratis", trial_ini:null, trial_usado:false, nome:null, plano_expira_em:null, mp_preapproval_id:null, mp_status:null};
-let PLANO_SEL="mensal";   // plano escolhido no card de assinatura (mensal|anual)
+let PLANO_SEL="anual";    // plano escolhido no card de assinatura (mensal|anual). Abre no anual: é onde está o Pix com bônus
 let PF_PLANOS_ABERTO=false;   // revelação progressiva: preços/pagamento só aparecem ao "Gerenciar"
 function setPlanoSel(p){ PLANO_SEL=(p==="anual")?"anual":"mensal"; loadPerfil(undefined,true); }
+// botão "Assinar por R$ 9,90/mês": abre os planos já no MENSAL (o preço do botão bate com o que aparece)
+function abrirPlanosMensal(){ PLANO_SEL="mensal"; PF_PLANOS_ABERTO=true; loadPerfil(undefined,true);
+  const box=document.getElementById("pf2Planos"); if(box) box.scrollIntoView({behavior:"smooth",block:"nearest"}); }
 
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
@@ -2505,10 +2825,14 @@ function reabrir(){
   if(catAtiva && catAtiva.indexOf("fresco")!==0){ const c=categorias.find(x=>x.slug===catAtiva); if(c) loadCategoria(c.slug,c.nome); }
 }
 // Cobrança REAL: cria o pagamento no Mercado Pago e redireciona pro checkout (init_point).
-//   metodo='cartao' -> assinatura recorrente (renova sozinho); 'pix' -> avulso (libera N dias).
+//   mensal + 'cartao' -> assinatura que renova sozinha; anual + 'pix' -> pagamento único com bônus;
+//   anual + 'parcelado' -> pagamento único no cartão, à vista ou parcelado (não renova).
 async function assinarAgora(plano, metodo){
   if(!estaLogado()){ abrirLogin(()=>assinarAgora(plano,metodo),"entrar"); return; }
-  plano=(plano==="anual")?"anual":"mensal"; metodo=(metodo==="cartao")?"cartao":"pix";
+  plano=(plano==="anual")?"anual":"mensal";
+  metodo=(metodo==="cartao"||metodo==="parcelado")?metodo:"pix";
+  if(plano==="mensal") metodo="cartao";   // mensal é só no cartão (renova sozinho)
+  else if(metodo==="cartao") metodo="parcelado";
   const btns=[...document.querySelectorAll(".btn-pay")]; btns.forEach(b=>b.disabled=true);
   const solta=()=>btns.forEach(b=>b.disabled=false);
   try{
@@ -2800,15 +3124,34 @@ function loadPerfil(secao, manterPlanos){
   }
 
   // seletor de plano (mensal/anual) + botões de pagamento — revelados só ao "Gerenciar"
-  const selMensal = PLANO_SEL!=="anual", diasSel = selMensal ? "30 dias" : "365 dias";
+  const selMensal = PLANO_SEL!=="anual";
+  const bonusTxt = textoBonus(OFERTA.bonusPix), mesesPix = 12+Math.floor(OFERTA.bonusPix/30);
   const seletor = `<div class="plano-sel">
-      <button type="button" class="ps ${selMensal?'on':''}" onclick="setPlanoSel('mensal')"><span>Mensal</span><b>${PRECO_MENSAL}<i>/mês</i></b></button>
-      <button type="button" class="ps ${selMensal?'':'on'}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">${PRECO_ANUAL_MES}/mês</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
+      <button type="button" class="ps ${selMensal?'on':''}" aria-pressed="${selMensal}" onclick="setPlanoSel('mensal')"><span>Mensal</span><b>${PRECO_MENSAL}<i>/mês</i></b></button>
+      <button type="button" class="ps ${selMensal?'':'on'}" aria-pressed="${!selMensal}" onclick="setPlanoSel('anual')"><span>Anual <em class="badge-off">${bonusTxt?`Pix: ${bonusTxt}`:`${PRECO_ANUAL_MES}/mês`}</em></span><b>${PRECO_ANUAL}<i>/ano</i></b></button>
     </div>`;
-  const payBtns = `
-      <button class="btn-primary btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','cartao')">${ic("crown")} Assinar no cartão — renova sozinho</button>
-      <button class="btn-ghost btn-pay" type="button" onclick="assinarAgora('${PLANO_SEL}','pix')">Pagar no Pix — libera ${diasSel}</button>
-      <p class="fine">Cartão: renova automático, cancele quando quiser. Pix: cada pagamento libera ${diasSel} (avulso). Via Mercado Pago.</p>`;
+  // regra de devolução escrita perto do botão de pagar (a mesma do item 8 dos Termos)
+  const regra = (txt,quando)=>`<p class="pay-regra">${ic("check")}<span>${txt} Desistiu em até 7 dias${quando||""}? Devolvemos tudo. Depois disso não há devolução proporcional: você usa até o fim do período pago. <a href="/termos" target="_blank" rel="noopener">Ver regras (item 8 dos Termos)</a></span></p>`;
+  const parcTxt = OFERTA.parcelas>1
+    ? `à vista ou em até ${OFERTA.parcelas}x${OFERTA.semJuros?` de ${brl(OFERTA.parcela)} sem juros`:""}` : "à vista";
+  const payBtns = selMensal ? `
+      <button class="btn-primary btn-pay" type="button" onclick="assinarAgora('mensal','cartao')">${ic("crown")} Assinar por ${PRECO_MENSAL}/mês no cartão</button>
+      ${regra("Renova sozinho todo mês. Cancele quando quiser, no app, e o acesso segue até o fim do mês pago."," da primeira cobrança")}
+      <p class="fine">Quer pagar no Pix? Escolha o plano Anual${bonusTxt?` e ganhe ${bonusTxt.slice(1)}`:""}. Via Mercado Pago.</p>` : `
+      <div class="pix-dest">
+        <span class="pix-tag">${ic("star")} Melhor para você</span>
+        <div class="pix-h"><b>Pix à vista</b><span>${PRECO_ANUAL}</span></div>
+        ${!bonusTxt?`<div class="pix-bonus">12 meses de PouPou+ · sai ${PRECO_ANUAL_MES}/mês</div>`
+          : OFERTA.bonusPix%30===0?`<div class="pix-bonus">${bonusTxt} no Pix: <b>${mesesPix} meses</b> de PouPou+ pelo preço de 12</div>`
+          : `<div class="pix-bonus">${bonusTxt} no Pix: <b>${365+OFERTA.bonusPix} dias</b> de PouPou+ pelo preço de 1 ano</div>`}
+        <button class="btn-primary btn-pay pix-btn" type="button" onclick="assinarAgora('anual','pix')">Pagar ${PRECO_ANUAL} no Pix</button>
+        <p class="pix-fine">Libera assim que o Pix cai. Pagamento único: não renova sozinho.${bonusTxt?" O bônus vale só pagando com Pix (não com saldo do Mercado Pago).":""}</p>
+      </div>
+      ${PERFIL.mp_status==="authorized"?`<p class="pay-aviso">Você tem a assinatura mensal no cartão: ela continua cobrando todo mês. Se quiser ficar só com o anual, cancele a mensal depois de pagar.</p>`:""}
+      <div class="ou-pay">ou</div>
+      <button class="btn-ghost btn-pay" type="button" onclick="assinarAgora('anual','parcelado')">${PRECO_ANUAL} no cartão, ${parcTxt}</button>
+      <p class="fine">Cartão: pagamento único de 12 meses, total de ${PRECO_ANUAL}${bonusTxt?" (o bônus é só no Pix)":""}. Não renova sozinho. Via Mercado Pago.</p>
+      ${regra("Pagamento único de um ano: nada é cobrado de novo.")}`;
 
   // ---------- cabeçalho compacto ----------
   const inicial=((u.nome||u.email||"?").trim().charAt(0)||"?").toUpperCase();
@@ -2853,8 +3196,8 @@ function loadPerfil(secao, manterPlanos){
       : `Veja em qual dos ${nMk} mercados cada item sai mais barato e monte a rota que faz sua feira render.`;
     const cta = trialAvail
       ? `<button class="pr-btn" type="button" onclick="desbloquear(this)">Começar ${trialDiasOferta()} dias grátis</button>`
-      : `<button class="pr-btn" type="button" onclick="pfPlanos(this,true)">Assinar por ${PRECO_MENSAL}/mês</button>`;
-    const micro = trialAvail ? "Sem cartão de crédito · sem compromisso" : "Pix ou cartão · cancele a renovação quando quiser";
+      : `<button class="pr-btn" type="button" onclick="abrirPlanosMensal()">Assinar por ${PRECO_MENSAL}/mês</button>`;
+    const micro = trialAvail ? "Sem cartão de crédito · sem compromisso" : `Mensal no cartão, cancele quando quiser · anual no Pix ou ${OFERTA.parcelas>1?`em até ${OFERTA.parcelas}x`:"à vista"} no cartão`;
     // cartão autorizado no MP mas sem período pago (1ª cobrança em processamento OU renovação
     // recusada — daqui não dá pra saber qual): texto neutro e o "cancelar" desta assinatura, senão
     // a pessoa ficava presa (o servidor não abre uma 2ª). Vale também no teste grátis.
@@ -2868,7 +3211,7 @@ function loadPerfil(secao, manterPlanos){
         <div class="pr-oferta">
           <div class="pr-de">Sai a ${PRECO_DIA} por dia</div>
           <div class="pr-preco"><b class="now">${PRECO_MENSAL}</b><span class="per">/mês</span></div>
-          <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · sai ${PRECO_ANUAL_MES}/mês</div>
+          <div class="pr-anual">ou <b>${PRECO_ANUAL}/ano</b> · sai ${PRECO_ANUAL_MES}/mês${OFERTA.bonusPix>0?` · <b>${textoBonus(OFERTA.bonusPix)} no Pix</b>`:""}</div>
           ${avisoCartao}${cta}
           <p class="pr-micro">${micro}</p>
         </div>
@@ -3400,6 +3743,7 @@ $("#btnCesta").addEventListener("click",loadCesta);
     if(SESSAO){ talvezVincularIndicacao(); copiarConsentConta(); }   // sessão já ativa (ou volta do Google) com código pendente
   }
   registrarAcesso();   // 1 registro por aparelho por dia (painel /gestao)
+  carregarOferta();    // bônus do Pix / parcelas do anual (sem esperar: a tela usa os valores de partida)
   await tratarRetornoPagamento();   // se voltou do checkout do Mercado Pago
   atualizarContaUI();
   // tocou no "Testar grátis" antes do app carregar: abre agora (sem esperar as listas), e só
@@ -3494,7 +3838,20 @@ function mostrarInstalarPWA(){
   };
   bar.querySelector(".pwa-x").onclick=()=>{ lsSet("mb_pwa_dismiss","1"); bar.remove(); };
 }
-addEventListener("appinstalled",()=>{ const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉 Se um dia não abrir: seu-link/ajuda".replace("seu-link",location.host),6000); }catch(e){} });
+// botão "App" do topo: aparece pra quem ainda não instalou (no app instalado some). Instala na hora
+// quando o navegador deixa (Chrome/Edge/Android); no iPhone/Safari explica o "Adicionar à Tela de Início".
+function appInstalado(){ return matchMedia("(display-mode: standalone)").matches || navigator.standalone===true; }
+function atualizarBtnApp(){ const b=document.getElementById("btnApp"); if(b) b.hidden=appInstalado(); }
+async function baixarApp(){
+  if(_pwaPrompt){ const p=_pwaPrompt; p.prompt(); try{ await p.userChoice; }catch(e){} _pwaPrompt=null;
+    const bar=document.getElementById("pwaBar"); if(bar) bar.remove(); return; }
+  const ua=navigator.userAgent||"";
+  if(navegadorInterno()) toast("Abra o PouPou no navegador (menu ⋮ → Abrir no navegador) pra instalar o app.",7000);
+  else if(/iPhone|iPad|iPod/i.test(ua)) toast("No iPhone: toque em Compartilhar (□↑) e depois em “Adicionar à Tela de Início”.",8000);
+  else toast("No menu do navegador (⋮), toque em “Instalar app” ou “Adicionar à tela inicial”.",7000);
+}
+atualizarBtnApp();
+addEventListener("appinstalled",()=>{ atualizarBtnApp(); const b=document.getElementById("pwaBar"); if(b) b.remove(); try{ toast("PouPou instalado ✓ 🎉 Se um dia não abrir: seu-link/ajuda".replace("seu-link",location.host),6000); }catch(e){} });
 
 /* ===== Notificações push (avisa no celular, mesmo com o app fechado) ===== */
 function pushSuportado(){ return ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window); }

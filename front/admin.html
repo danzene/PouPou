@@ -619,10 +619,10 @@ function telaAnuncios(){
   const semanas=(sel.por_semana||[]).map((s,i)=>`<tr><td>${diaCurto(s.semana)}${i===0?" <small>(esta)</small>":""}</td><td>${num(s.visitas)}</td><td>${num(s.contas)}</td><td>${num(s.testes)}</td><td>${num(s.checkouts)}</td><td><b>${num(s.pagas)}</b></td></tr>`).join("");
   const item=(n,v,tot)=>`<div class="it"><div class="tx"><b>${n}</b><div class="barra"><i style="width:${tot?Math.round(100*v/tot):0}%"></i></div></div><div class="dir"><b class="num">${num(v)}</b></div></div>`;
   const f=sel.formas||{}, pl=sel.planos||{}, c=a.cancelamentos||{};
-  const formas=[["cartao","Cartão (renova sozinho)"],["pix","Pix"],["outro","Outro meio (cartão à vista, saldo)"]].map(([k,n])=>item(n,f[k]||0,nPag)).join("");
+  const formas=[["cartao","Cartão (mensal que renova ou anual parcelado)"],["pix","Pix"],["outro","Outro meio (cartão à vista, saldo)"]].map(([k,n])=>item(n,f[k]||0,nPag)).join("");
   const planos=[["mensal","Mensal"],["anual","Anual"]].map(([k,n])=>item(n,pl[k]||0,nPag)).join("");
   const semPag=`<div class="vazio">Nenhuma assinatura paga nesse período.</div>`;
-  const cancel=`<div class="pad"><div class="kpi" style="padding:0"><div class="v num">${num(c.n)}</div><div class="s">${num(c.pelo_app)} pelo app · ${num(c.no_mp)} no Mercado Pago (pela pessoa ou cobrança recusada)</div>${c.pix_venceram?`<div class="s">+ ${num(c.pix_venceram)} no Pix que venceram sem renovar</div>`:""}</div></div>`;
+  const cancel=`<div class="pad"><div class="kpi" style="padding:0"><div class="v num">${num(c.n)}</div><div class="s">${num(c.pelo_app)} pelo app · ${num(c.no_mp)} no Mercado Pago (pela pessoa ou cobrança recusada)</div>${c.pix_venceram?`<div class="s">+ ${num(c.pix_venceram)} pagos de uma vez (Pix ou anual no cartão) que venceram</div>`:""}</div></div>`;
   const desde=a.desde?`anotando a origem desde ${diaCurto(a.desde)}`:"a origem começa a ser anotada na publicação";
   return `
     <h2 class="h2">Anúncios <span class="m">${desde}</span><span class="periodo">${per}</span></h2>

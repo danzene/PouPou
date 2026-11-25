@@ -353,6 +353,25 @@ PLANOS = {
 # vale até a validade + esta folga. A folga só entra na CONFERÊNCIA (nunca é gravada), então
 # não se acumula mês a mês. O front (assinanteAtivo) usa a mesma folga.
 FOLGA_CARTAO = timedelta(days=3)
+# ---- Formas de pagar (nov/2026) ----
+#   mensal: só cartão, assinatura que renova sozinha (preapproval) — ref "uid:mensal:cartao"
+#   anual no Pix: pagamento único em DESTAQUE, com bônus — ref "uid:anual:pix:<dias de bônus>"
+#   anual no cartão: pagamento ÚNICO (Checkout Pro), à vista ou em até N parcelas, NÃO renova —
+#     ref "uid:anual:parcelado"
+# Refs antigas continuam valendo no aviso do MP: ":avulso" (Pix/à vista de antes, sem bônus) e
+# ":cartao" (assinaturas recorrentes, inclusive as anuais recorrentes de antes).
+# Bônus do Pix anual, em dias (30 = "+1 mês grátis no Pix"). 0 = sem bônus: some da tela (o app lê
+# /assinatura/oferta) e os pedidos NOVOS saem sem bônus. Só entra quando o MP confirma um pagamento
+# Pix do anual; vale o bônus gravado no pedido (nunca o que o app manda), limitado a BONUS_PIX_MAX_DIAS.
+BONUS_PIX_ANUAL_DIAS = 30
+# Teto de segurança do bônus que o aviso do MP honra. O bônus de cada pedido vai na ref (escrita aqui
+# no servidor, quem paga não muda) e é honrado mesmo que BONUS_PIX_ANUAL_DIAS baixe depois que a pessoa
+# abriu o Pix (a oferta mostrada vale — CDC art. 30 e Termos 7.1/7.5). Nunca abaixo do maior bônus já usado.
+BONUS_PIX_MAX_DIAS = 60
+PARCELAS_MAX_ANUAL = 12          # anual no cartão: à vista ou em até 12x
+# "sem juros" na tela: só é verdade se o parcelamento SEM ACRÉSCIMO estiver ligado na conta do
+# Mercado Pago (quem paga os juros é o vendedor). Desligado lá -> pôr False aqui.
+PARCELAS_SEM_JUROS = True
 
 
 def _mp():
@@ -494,7 +513,9 @@ def _historico_agregado(series: dict[str, dict], atuais: set[str]) -> list[dict]
     """Histórico de quem não tem PouPou+: UMA linha com o menor preço de cada dia entre os
     mercados, sem dizer de qual loja. Cada mercado vale pelo último preço conhecido (o
     histórico só guarda mudanças); quem não vende mais o produto (sem preço atual) só conta
-    até o seu último registro. Data sem horário: o horário da coleta entrega o mercado."""
+    até o seu último registro. Data sem horário: o horário da coleta entrega o mercado.
+    "maior" = o preço mais alto do dia entre os mesmos mercados (a faixa do gráfico), também
+    sem loja: só o valor, que o visitante já vê (sem nome) na lista "Comparar mercados"."""
     # ordem pela data-HORA completa (ISO em UTC ordena como o tempo): no mesmo dia, o último
     # preço do mercado é o que vale — ordenar só pelo dia punha os pontos em ordem de PREÇO
     ev = sorted((str(p["coletado_em"]), m, p["preco"])
@@ -502,7 +523,7 @@ def _historico_agregado(series: dict[str, dict], atuais: set[str]) -> list[dict]
     ultimo_dia = {m: max(str(p["coletado_em"])[:10] for p in s["pontos"])
                   for m, s in series.items() if s["pontos"]}
     ult: dict[str, float] = {}
-    out: dict[str, float] = {}
+    out: dict[str, tuple[float, float]] = {}
     i = 0
     for d in sorted({e[0][:10] for e in ev}):
         while i < len(ev) and ev[i][0][:10] == d:
@@ -510,8 +531,9 @@ def _historico_agregado(series: dict[str, dict], atuais: set[str]) -> list[dict]
             i += 1
         vivos = [v for m, v in ult.items() if m in atuais or ultimo_dia.get(m, "") >= d]
         if vivos:
-            out[d] = min(vivos)
-    return [{"preco": round(v, 2), "coletado_em": f"{d}T12:00:00"} for d, v in sorted(out.items())]
+            out[d] = (min(vivos), max(vivos))
+    return [{"preco": round(lo, 2), "maior": round(hi, 2), "coletado_em": f"{d}T12:00:00"}
+            for d, (lo, hi) in sorted(out.items())]
 
 
 def _gate_cesta(resp: dict, premium: bool) -> dict:
@@ -576,10 +598,12 @@ def _registra_evento(conn, payment_id, topico, status, uid, plano_id, valor, raw
     return getattr(cur, "rowcount", 0) != 0
 
 
-def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapproval_id=None) -> str:
+def _estende_assinatura(conn, uid, plano_id, *, mp_status="approved", preapproval_id=None,
+                        dias_extra=0) -> str:
     """Marca plano='assinante' e estende plano_expira_em a partir do MAIOR entre agora e a
-    validade atual (não perde dias já pagos). Escreve via _conn() (owner, ignora RLS)."""
-    dias = PLANOS[plano_id]["dias"]
+    validade atual (não perde dias já pagos). Escreve via _conn() (owner, ignora RLS).
+    dias_extra: bônus calculado NO SERVIDOR (Pix anual), somado aos dias do plano."""
+    dias = PLANOS[plano_id]["dias"] + max(0, int(dias_extra or 0))
     agora = datetime.now(timezone.utc)
     base = agora
     r = conn.execute("SELECT plano_expira_em FROM profiles WHERE id = ?", (uid,)).fetchone()
@@ -1973,7 +1997,8 @@ def cesta(authorization: str | None = Header(None), mercados: str | None = None)
 
         # acumuladores por mercado
         acc = {m["id"]: {"slug": m["slug"], "nome": m["nome"], "cor_badge": m["cor_badge"],
-                         "total": 0.0, "cobertura": 0, "faltantes": [], "completar_custo": 0.0}
+                         "total": 0.0, "cobertura": 0, "faltantes": [], "completar_custo": 0.0,
+                         "melhor_mesmos": 0.0}   # os MESMOS itens que a loja tem, pelo menor preço do PouPou
                for m in mercados}
         itens_out = []
         mix_total = 0.0
@@ -2001,12 +2026,14 @@ def cesta(authorization: str | None = Header(None), mercados: str | None = None)
             por_mercado = {r["mercado_slug"]: r for r in ranking}
             # total por mercado
             slugs_com = set()
+            menor_i = min((r["preco"] for r in ranking), default=0.0)
             for r in ranking:
                 # mapeia slug -> id
                 mid = next((m["id"] for m in mercados if m["slug"] == r["mercado_slug"]), None)
                 if mid is None:
                     continue
                 acc[mid]["total"] += r["preco"] * qtd
+                acc[mid]["melhor_mesmos"] += menor_i * qtd
                 acc[mid]["cobertura"] += 1
                 slugs_com.add(r["mercado_slug"])
             for m in mercados:
@@ -2068,10 +2095,14 @@ def cesta(authorization: str | None = Header(None), mercados: str | None = None)
                             "rotulo": r.get("rotulo")} for r in ranking],
             })
 
-        LIMITE_FALTA = 4  # loja "pra fazer a feira" = falta no MÁXIMO isso; o resto some do ranking
+        # loja "pra fazer a feira" = falta no máximo 4 itens OU 30% da lista (lista grande: nenhuma loja
+        # tem tudo, e o limite fixo deixava só 1 loja no ranking, sem com quem comparar)
+        LIMITE_FALTA = max(4, round(n_itens * 0.3))
         mercados_out = list(acc.values())
         for m in mercados_out:
             m["total"] = round(m["total"], 2)
+            # quanto a loja cobra A MAIS pelos itens que ela tem vs. os mesmos itens pelo menor preço
+            m["mais_caro_mesmos"] = round(max(0.0, m["total"] - m.pop("melhor_mesmos", 0.0)), 2)
             m["completo"] = (m["cobertura"] == n_itens and n_itens > 0)
             m["faltam"] = n_itens - m["cobertura"]
             # total da FEIRA INTEIRA nessa loja: o que ela tem + o que falta pelo menor preço fora
@@ -2460,9 +2491,12 @@ def admin_usuarios(authorization: str | None = Header(None)):
 @app.post("/assinatura/criar")
 def assinatura_criar(request: Request, body: dict = Body(...), authorization: str | None = Header(None)):
     """Cria o pagamento no Mercado Pago e devolve o init_point pra redirecionar o usuário.
-      - metodo='pix'    -> Checkout Pro avulso (Pix ou cartão à vista); libera N dias no webhook.
-      - metodo='cartao' -> assinatura recorrente (/preapproval); renova sozinho.
-    O SERVIDOR escolhe o valor pelo id do plano — o cliente NUNCA manda preço."""
+      - mensal + 'cartao'          -> assinatura recorrente (/preapproval); renova sozinho.
+      - anual  + 'pix'             -> Checkout Pro só Pix, pagamento único; 365 dias + bônus do Pix.
+      - anual  + 'cartao'/'parcelado' -> Checkout Pro só cartão, à vista ou em até 12x; pagamento
+                                       ÚNICO de 365 dias, não renova.
+      - mensal + 'pix'             -> (compatibilidade com app antigo aberto) avulso de 30 dias.
+    O SERVIDOR escolhe o valor e o bônus pelo id do plano — o cliente NUNCA manda preço."""
     uid = _uid_do_header(authorization)
     if not uid:
         raise HTTPException(status_code=401, detail="Não autenticado")
@@ -2473,30 +2507,80 @@ def assinatura_criar(request: Request, body: dict = Body(...), authorization: st
     metodo = (b.get("metodo") or "pix").lower()
     if plano_id not in PLANOS:
         raise HTTPException(status_code=400, detail="plano inválido")
+    if metodo not in ("pix", "cartao", "parcelado"):
+        raise HTTPException(status_code=400, detail="forma de pagamento inválida")
     p = PLANOS[plano_id]
-    if metodo == "cartao":
-        # assinatura recorrente no cartão (renova sozinho) — fluxo redirect (/preapproval)
+    nav = _navegador_do_pedido(request, b)
+    if plano_id == "anual" and metodo in ("cartao", "parcelado"):
+        # anual no cartão = pagamento ÚNICO parcelável (não é mais assinatura que renova)
+        _sem_cartao_ativo(uid)   # quem tem assinatura no cartão ativa cancela antes (senão paga em dobro)
+        res = _criar_preferencia(uid, plano_id, "parcelado")
+        _funil_novo("checkout_aberto", uid, res.get("ref_id"), navegador=nav, plano=plano_id, forma="cartao",
+                    com_cartao=True, valor=p["valor"], mp_preferencia_id=res.get("ref_id"))
+        return res
+    if metodo in ("cartao", "parcelado"):
+        # mensal: assinatura recorrente no cartão (renova sozinho) — fluxo redirect (/preapproval)
         _sem_cartao_ativo(uid)   # não abre uma 2ª assinatura (seria cobrança em dobro)
         res = _criar_preapproval(uid, plano_id, _email_do_header(authorization))
         # funil (A1/A3): pagamento aberto; nunca levanta erro. Dados do navegador só com aceite
-        _funil_novo("checkout_aberto", uid, res.get("ref_id"), navegador=_navegador_do_pedido(request, b),
+        _funil_novo("checkout_aberto", uid, res.get("ref_id"), navegador=nav,
                     plano=plano_id, forma="cartao", com_cartao=True, valor=p["valor"],
                     mp_assinatura_id=res.get("ref_id"))
         return res
-    # ---- Pix / avulso: Checkout Pro (uma cobrança; libera N dias) ----
+    # ---- Pix: Checkout Pro (uma cobrança; libera N dias). Anual: só Pix, com bônus ----
+    res = _criar_preferencia(uid, plano_id, "pix" if plano_id == "anual" else "avulso")
+    # funil (A1/A3): pagamento aberto (botão Pix); nunca levanta erro. Dados do navegador só com aceite
+    _funil_novo("checkout_aberto", uid, res.get("ref_id"), navegador=nav,
+                plano=plano_id, forma="pix", com_cartao=False, valor=p["valor"], mp_preferencia_id=res.get("ref_id"))
+    return res
+
+
+def _bonus_pix(plano_id) -> int:
+    """Dias de bônus do Pix (só no anual). 0 = sem bônus."""
+    return max(0, int(BONUS_PIX_ANUAL_DIAS or 0)) if plano_id == "anual" else 0
+
+
+def _criar_preferencia(uid, plano_id, tipo) -> dict:
+    """Pagamento ÚNICO no Checkout Pro. tipo:
+      'pix'       -> anual só no Pix; o bônus prometido vai no 4º campo da ref (escrito AQUI, no
+                     servidor; o aviso do MP honra esse valor, com teto BONUS_PIX_MAX_DIAS);
+      'parcelado' -> anual só no cartão, à vista ou em até PARCELAS_MAX_ANUAL vezes; não renova;
+      'avulso'    -> como era antes (Pix ou à vista), mantido pro mensal no Pix de app antigo."""
+    p = PLANOS[plano_id]
+    dias = p["dias"]
+    ref = f"{uid}:{plano_id}:{tipo}"
+    pagamento = None
+    if tipo == "pix":
+        bonus = _bonus_pix(plano_id)
+        dias += bonus
+        ref = f"{ref}:{bonus}"
+        # só Pix: tira cartão, boleto, lotérica e Mercado Crédito (parcelado do MP) desta página
+        # (Pix = bank_transfer no MP). Saldo do MP (account_money) o MP não deixa excluir: sem bônus.
+        pagamento = {"excluded_payment_types": [{"id": "credit_card"}, {"id": "debit_card"},
+                                                {"id": "prepaid_card"}, {"id": "ticket"}, {"id": "atm"},
+                                                {"id": "digital_currency"}],
+                     "installments": 1}
+    elif tipo == "parcelado":
+        # só cartão: tira Pix, boleto e lotérica; até N parcelas (o "sem juros" é ligado na conta do MP)
+        pagamento = {"excluded_payment_types": [{"id": "bank_transfer"}, {"id": "ticket"}, {"id": "atm"},
+                                                {"id": "digital_currency"}],
+                     "installments": PARCELAS_MAX_ANUAL}
     pref = {
         "items": [{"id": f"poupou-{plano_id}", "title": p["titulo"],
-                   "description": f"PouPou+ — acesso por {p['dias']} dias",
+                   "description": f"PouPou+ — acesso por {dias} dias" + (
+                       " (pagamento único, não renova)" if tipo == "parcelado" else ""),
                    "quantity": 1, "currency_id": "BRL", "unit_price": p["valor"]}],
-        "external_reference": f"{uid}:{plano_id}:avulso",
+        "external_reference": ref,
         "back_urls": {"success": f"{PUBLIC_BASE_URL}/?pagamento=sucesso",
                       "failure": f"{PUBLIC_BASE_URL}/?pagamento=falha",
                       "pending": f"{PUBLIC_BASE_URL}/?pagamento=pendente"},
         "auto_return": "approved",
         "notification_url": f"{PUBLIC_BASE_URL}/webhooks/mercadopago",
         "statement_descriptor": "POUPOU",
-        "metadata": {"uid": uid, "plano": plano_id},
+        "metadata": {"uid": uid, "plano": plano_id, "forma": tipo},
     }
+    if pagamento:
+        pref["payment_methods"] = pagamento
     try:
         res = _mp().preference().create(pref).get("response", {})
     except Exception as e:  # noqa: BLE001
@@ -2505,10 +2589,18 @@ def assinatura_criar(request: Request, body: dict = Body(...), authorization: st
     init = res.get("init_point") or res.get("sandbox_init_point")
     if not init:
         raise HTTPException(status_code=502, detail="Falha ao criar pagamento")
-    # funil (A1/A3): pagamento aberto (botão Pix); nunca levanta erro. Dados do navegador só com aceite
-    _funil_novo("checkout_aberto", uid, res.get("id"), navegador=_navegador_do_pedido(request, b),
-                plano=plano_id, forma="pix", com_cartao=False, valor=p["valor"], mp_preferencia_id=res.get("id"))
     return {"init_point": init, "ref_id": res.get("id")}
+
+
+@app.get("/assinatura/oferta")
+def assinatura_oferta():
+    """O que a tela de planos mostra (bônus do Pix, parcelas, "sem juros"). Público e sem dados de
+    ninguém: assim, mudar uma constante aqui muda a tela e o servidor juntos."""
+    a = PLANOS["anual"]
+    return {"mensal": {"valor": PLANOS["mensal"]["valor"], "dias": PLANOS["mensal"]["dias"]},
+            "anual": {"valor": a["valor"], "dias": a["dias"], "bonus_pix_dias": _bonus_pix("anual"),
+                      "parcelas_max": PARCELAS_MAX_ANUAL, "parcelas_sem_juros": bool(PARCELAS_SEM_JUROS),
+                      "valor_parcela": round(a["valor"] / PARCELAS_MAX_ANUAL + 0.004999, 2)}}
 
 
 def _sem_cartao_ativo(uid) -> None:
@@ -2619,14 +2711,29 @@ def _proc_payment(payment_id) -> None:
     ext = (pay.get("external_reference") or "").split(":")
     uid = ext[0] if ext else ""
     plano_id = ext[1] if len(ext) > 1 else ""
+    tipo = ext[2] if len(ext) > 2 else ""   # cartao | avulso (antigos) | pix | parcelado (nov/2026)
     if status == "approved" and uid and plano_id in PLANOS:
         # cobrança da ASSINATURA no cartão: o MP avisa a MESMA cobrança 2x — aqui (aviso
         # "payment") e em _proc_authorized_payment (aviso da fatura). Os dois gravam com a
         # chave = id do PAGAMENTO, então cada cobrança libera 30 dias uma vez só (antes, 60).
         md = pay.get("metadata") or {}
-        assinatura = ((pay.get("point_of_interaction") or {}).get("type") == "SUBSCRIPTIONS"
-                      or pay.get("operation_type") == "recurring_payment"
-                      or bool(md.get("preapproval_id")))
+        assinatura = tipo != "parcelado" and (
+            (pay.get("point_of_interaction") or {}).get("type") == "SUBSCRIPTIONS"
+            or pay.get("operation_type") == "recurring_payment"
+            or bool(md.get("preapproval_id")))
+        forma = _forma_pagamento(pay, assinatura)
+        parcelado = tipo == "parcelado"   # anual no cartão: pagamento único (à vista ou parcelado), não renova
+        if parcelado:
+            forma = "cartao"
+        # bônus do Pix anual: só com ref nova ":pix" e pago de fato no Pix. Vale o bônus gravado no
+        # pedido (o que a pessoa viu), com teto fixo; mudar BONUS_PIX_ANUAL_DIAS só afeta pedidos novos
+        bonus = 0
+        if tipo == "pix" and forma == "pix":
+            try:
+                prometido = int(ext[3]) if len(ext) > 3 else 0
+            except ValueError:
+                prometido = 0
+            bonus = max(0, min(prometido, BONUS_PIX_MAX_DIAS)) if plano_id == "anual" else 0
         chave = str(pay.get("id") or payment_id)
         conn = _conn()
         try:
@@ -2636,13 +2743,13 @@ def _proc_payment(payment_id) -> None:
                 if novo and assinatura:   # recorrente: o painel mostra "renova sozinho"
                     _estende_assinatura(conn, uid, plano_id, mp_status="authorized",
                                         preapproval_id=md.get("preapproval_id") or None)
-                elif novo:
-                    _estende_assinatura(conn, uid, plano_id, mp_status="approved")
+                elif novo:   # Pix, à vista ou anual parcelado: 'approved' = não renova sozinho
+                    _estende_assinatura(conn, uid, plano_id, mp_status="approved", dias_extra=bonus)
                 # funil (A1): 1ª cobrança aprovada = "assinatura paga". SAVEPOINT próprio e sem levantar
                 # erro: se a anotação falhar, o evento e os dias do pagamento seguem gravados
                 compra = _funil_pagamento(conn, uid, plano_id, chave, valor=pay.get("transaction_amount"),
-                                          forma=_forma_pagamento(pay, assinatura), com_cartao=assinatura,
-                                          mp_assinatura_id=md.get("preapproval_id"))
+                                          forma=forma, com_cartao=assinatura or parcelado,
+                                          mp_assinatura_id=md.get("preapproval_id") if assinatura else None)
             if novo:
                 _processar_indicacao(conn, uid)
             _avisa_compra(conn, compra)   # A3: Meta/Google depois do commit, só com aceite; nunca levanta erro
